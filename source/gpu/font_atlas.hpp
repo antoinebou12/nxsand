@@ -1,0 +1,57 @@
+#pragma once
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include "gl_loader.hpp"
+
+namespace nx {
+
+class RenderPipeline;
+
+class FontAtlas {
+public:
+    struct GlyphInfo {
+        float u0 = 0.f;
+        float v0 = 0.f;
+        float u1 = 0.f;
+        float v1 = 0.f;
+        int width = 0;
+        int height = 0;
+        int bearingX = 0;
+        int bearingY = 0;
+        int advance = 8;
+    };
+
+    GLuint tex = 0;
+    mutable int atlasW = 512;
+    mutable int atlasH = 512;
+    int lineH = 20;
+    int baseline = 16;
+    int pixelSize = 20;
+
+    bool init();
+    void shutdown();
+
+    float textWidth(const std::string& text, float scale) const;
+
+    void drawText(RenderPipeline& rp, float x, float y, float scale, const std::string& text,
+                  float cr, float cg, float cb, float ca, int screenW, int screenH) const;
+
+    void drawTextCentered(RenderPipeline& rp, float cx, float y, float scale, const std::string& text,
+                          float cr, float cg, float cb, float ca, int screenW, int screenH) const;
+
+private:
+    void prewarmCommonGlyphs();
+
+    mutable std::unordered_map<uint32_t, GlyphInfo> glyphs_;
+    mutable std::vector<uint8_t> atlasPixels_;
+    mutable int penX_ = 2;
+    mutable int penY_ = 2;
+    mutable int rowH_ = 0;
+
+    const GlyphInfo& ensureGlyph(uint32_t codepoint) const;
+    bool growAtlas() const;
+    bool uploadAtlas() const;
+};
+
+} // namespace nx

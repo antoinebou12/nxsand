@@ -1,0 +1,62 @@
+name: Build NXSand.nro
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  switch:
+    name: Switch NRO
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkita64:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install required portlibs
+        run: |
+          dkp-pacman -Sy --noconfirm switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz
+
+      - name: Build NRO
+        run: make
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NXSand-nro
+          path: build/NXSand.nro
+          if-no-files-found: error
+
+      - name: Install hint
+        if: success()
+        run: |
+          echo "Artifact: NXSand-nro (build/NXSand.nro)"
+          echo "Install: copy to sdmc:/switch/ on the SD card, or see docs/INSTALL.md"
+
+  unit-tests:
+    name: CPU unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run unit tests
+        run: make test
+
+  desktop:
+    name: Desktop sanity build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDL2 + GLESv2 + FreeType (Mesa)
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgles2-mesa-dev libfreetype6-dev curl
+
+      - name: Fetch UI font
+        run: |
+          mkdir -p romfs/fonts
+          curl -fsSL -o romfs/fonts/NotoSans-Regular.ttf \
+            https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf
+          test -s romfs/fonts/NotoSans-Regular.ttf
+      - name: Build desktop
+        run: make desktop
+      - name: Verify binary
+        run: test -f build/NXSand

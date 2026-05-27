@@ -1,0 +1,179 @@
+#include "settings_io.hpp"
+#include "save_paths.hpp"
+#include <fstream>
+
+#include <nlohmann/json.hpp>
+
+namespace nx {
+
+static bool g_dirty = false;
+
+static std::string settingsPath() {
+    return saveDirectory() + "settings.json";
+}
+
+static int readEnumInt(const nlohmann::json& j, const char* k, int def) {
+    auto it = j.find(k);
+    if (it == j.end() || !it->is_number_integer()) return def;
+    return it->get<int>();
+}
+
+static bool readBool(const nlohmann::json& j, const char* k, bool def) {
+    auto it = j.find(k);
+    if (it == j.end() || !it->is_boolean()) return def;
+    return it->get<bool>();
+}
+
+static float readFloat(const nlohmann::json& j, const char* k, float def) {
+    auto it = j.find(k);
+    if (it == j.end() || !it->is_number()) return def;
+    return static_cast<float>(it->get<double>());
+}
+
+static int readInt(const nlohmann::json& j, const char* k, int def) {
+    auto it = j.find(k);
+    if (it == j.end() || !it->is_number_integer()) return def;
+    return it->get<int>();
+}
+
+static void migrateSettings(GameSettings& s) {
+#if defined(__SWITCH__)
+    s.display.orientation = ScreenOrientation::Landscape;
+#endif
+    if (s.version < CURRENT_SETTINGS_VERSION) {
+        s.version = CURRENT_SETTINGS_VERSION;
+    }
+}
+
+bool loadGameSettings(GameSettings& out) {
+    migrateLegacySaveData();
+    out = defaultGameSettings();
+    std::ifstream f(settingsPath());
+    if (!f) return false;
+    try {
+        nlohmann::json j = nlohmann::json::parse(f, nullptr, false);
+        if (j.is_discarded()) return false;
+
+        out.version = readInt(j, "version", CURRENT_SETTINGS_VERSION);
+
+        if (j.contains("performance") && j["performance"].is_object()) {
+            const auto& p = j["performance"];
+            out.performance.mode = static_cast<PerfPreset>(
+                readEnumInt(p, "mode", static_cast<int>(PerfPreset::Balanced)));
+            out.performance.targetFps = readInt(p, "targetFps", 60);
+            out.performance.simWidth = readInt(p, "simWidth", 0);
+            out.performance.simHeight = readInt(p, "simHeight", 0);
+            out.performance.substeps = readInt(p, "substeps", 2);
+            out.performance.dynamicResolution = readBool(p, "dynamicResolution", false);
+            out.performance.activeTiles = static_cast<ActiveTileMode>(
+                readEnumInt(p, "activeTiles", static_cast<int>(out.performance.activeTiles)));
+        }
+
+        if (j.contains("visuals") && j["visuals"].is_object()) {
+            const auto& v = j["visuals"];
+            out.visuals.paletteMode = readInt(v, "paletteMode", 0);
+            out.visuals.ao = static_cast<VisualAo>(readEnumInt(v, "ao", static_cast<int>(VisualAo::Low)));
+            out.visuals.bloom = static_cast<VisualBloom>(
+                readEnumInt(v, "bloom", static_cast<int>(VisualBloom::Off)));
+            out.visuals.flicker = readBool(v, "flicker", true);
+            out.visuals.grain = readBool(v, "grain", false);
+            out.visuals.glowEnabled = readBool(v, "glowEnabled", false);
+        }
+
+        if (j.contains("controls") && j["controls"].is_object()) {
+            const auto& c = j["controls"];
+            out.controls.cursorSpeed = readFloat(c, "cursorSpeed", 1.f);
+            out.controls.brushRadius = readInt(c, "brushRadius", 3);
+            out.controls.deadzone = readFloat(c, "deadzone", 0.18f);
+            out.controls.invertY = readBool(c, "invertY", false);
+            out.controls.rumble = static_cast<RumbleLevel>(
+                readEnumInt(c, "rumble", static_cast<int>(RumbleLevel::Medium)));
+        }
+
+        if (j.contains("accessibility") && j["accessibility"].is_object()) {
+            const auto& a = j["accessibility"];
+            out.accessibility.uiScale = readFloat(a, "uiScale", 1.f);
+            out.accessibility.reduceFlashing = readBool(a, "reduceFlashing", false);
+            out.accessibility.togglePaint = readBool(a, "togglePaint", false);
+        }
+
+        if (j.contains("display") && j["display"].is_object()) {
+            const auto& di = j["display"];
+            out.display.menuChrome = static_cast<MenuChrome>(
+                readEnumInt(di, "menuChrome", static_cast<int>(MenuChrome::Full)));
+            out.display.orientation = static_cast<ScreenOrientation>(
+                readEnumInt(di, "orientation", static_cast<int>(ScreenOrientation::Auto)));
+            out.display.fullscreenSim = readBool(di, "fullscreenSim", true);
+        }
+
+        if (j.contains("debug") && j["debug"].is_object()) {
+            const auto& d = j["debug"];
+            out.debug.profilerHud = static_cast<ProfilerHud>(
+                readEnumInt(d, "profilerHud", static_cast<int>(ProfilerHud::Compact)));
+            out.debug.showActiveTiles = readBool(d, "showActiveTiles", false);
+            out.debug.showMaterialIds = readBool(d, "showMaterialIds", false);
+            out.debug.benchmarkScene = readInt(d, "benchmarkScene", 0);
+        }
+
+        migrateSettings(out);
+        g_dirty = false;
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+bool saveGameSettings(const GameSettings& s) {
+    migrateLegacySaveData();
+    ensureDirectoryExists(saveDirectory());
+
+    nlohmann::json j;
+    j["version"] = CURRENT_SETTINGS_VERSION;
+
+    j["performance"]["mode"] = static_cast<int>(s.performance.mode);
+    j["performance"]["targetFps"] = s.performance.targetFps;
+    j["performance"]["simWidth"] = s.performance.simWidth;
+    j["performance"]["simHeight"] = s.performance.simHeight;
+    j["performance"]["substeps"] = s.performance.substeps;
+    j["performance"]["dynamicResolution"] = s.performance.dynamicResolution;
+    j["performance"]["activeTiles"] = static_cast<int>(s.performance.activeTiles);
+
+    j["visuals"]["paletteMode"] = s.visuals.paletteMode;
+    j["visuals"]["ao"] = static_cast<int>(s.visuals.ao);
+    j["visuals"]["bloom"] = static_cast<int>(s.visuals.bloom);
+    j["visuals"]["flicker"] = s.visuals.flicker;
+    j["visuals"]["grain"] = s.visuals.grain;
+    j["visuals"]["glowEnabled"] = s.visuals.glowEnabled;
+
+    j["controls"]["cursorSpeed"] = s.controls.cursorSpeed;
+    j["controls"]["brushRadius"] = s.controls.brushRadius;
+    j["controls"]["deadzone"] = s.controls.deadzone;
+    j["controls"]["invertY"] = s.controls.invertY;
+    j["controls"]["rumble"] = static_cast<int>(s.controls.rumble);
+
+    j["accessibility"]["uiScale"] = s.accessibility.uiScale;
+    j["accessibility"]["reduceFlashing"] = s.accessibility.reduceFlashing;
+    j["accessibility"]["togglePaint"] = s.accessibility.togglePaint;
+
+    j["display"]["menuChrome"] = static_cast<int>(s.display.menuChrome);
+    j["display"]["orientation"] = static_cast<int>(s.display.orientation);
+    j["display"]["fullscreenSim"] = s.display.fullscreenSim;
+
+    j["debug"]["profilerHud"] = static_cast<int>(s.debug.profilerHud);
+    j["debug"]["showActiveTiles"] = s.debug.showActiveTiles;
+    j["debug"]["showMaterialIds"] = s.debug.showMaterialIds;
+    j["debug"]["benchmarkScene"] = s.debug.benchmarkScene;
+
+    if (!atomicWriteFile(settingsPath(), j.dump(2))) return false;
+    g_dirty = false;
+    return true;
+}
+
+void markGameSettingsDirty() { g_dirty = true; }
+
+void flushGameSettingsIfDirty(const GameSettings& settings) {
+    if (!g_dirty) return;
+    saveGameSettings(settings);
+}
+
+} // namespace nx
