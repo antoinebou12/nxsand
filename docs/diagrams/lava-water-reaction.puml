@@ -1,0 +1,12 @@
+@startuml
+title Lava + water quench (NXSand sim.frag)
+start
+:Active lava cell L;
+if (Cell below L is water W?) then (yes)
+  :L becomes smoke\n(active branch);
+  :W becomes stone\n(passive acceptance);
+else (no)
+  :Normal lava flow / spread;
+endif
+stop
+@enduml

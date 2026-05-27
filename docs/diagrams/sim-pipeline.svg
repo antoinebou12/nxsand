@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="300" viewBox="0 0 760 300" role="img" aria-labelledby="title desc">
+  <title id="title">NXSand GLES fragment simulation pipeline</title>
+  <desc id="desc">Input and saves feed fragment paint and four simulation passes, then palette, glow, UI, and presentation.</desc>
+  <style>
+    text{font-family:Arial,sans-serif;font-size:13px;fill:#17202a}
+    .title{font-size:18px;font-weight:700}
+    .lane{fill:#f8fbff;stroke:#b0bec5;stroke-width:1.2}
+    .box{fill:#ffffff;stroke:#607d8b;stroke-width:1.5;rx:8}
+    .gpu{fill:#f1f8e9;stroke:#689f38}
+    .arrow{stroke:#37474f;stroke-width:2;fill:none;marker-end:url(#arrow)}
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#37474f"/>
+    </marker>
+  </defs>
+  <text class="title" x="24" y="34">NXSand play frame</text>
+  <rect class="lane" x="24" y="54" width="240" height="210"/>
+  <text x="42" y="78">CPU</text>
+  <rect class="lane" x="300" y="54" width="420" height="210"/>
+  <text x="318" y="78">GPU</text>
+  <rect class="box" x="52" y="104" width="150" height="40"/>
+  <text x="78" y="129">Input / brush</text>
+  <rect class="box" x="52" y="174" width="150" height="40"/>
+  <text x="82" y="199">App tick</text>
+  <rect class="box gpu" x="326" y="92" width="140" height="42"/>
+  <text x="352" y="117">paint.frag</text>
+  <rect class="box gpu" x="326" y="166" width="140" height="42"/>
+  <text x="344" y="191">sim.frag x4</text>
+  <rect class="box gpu" x="518" y="92" width="150" height="42"/>
+  <text x="536" y="117">palette/glow</text>
+  <rect class="box gpu" x="518" y="166" width="150" height="42"/>
+  <text x="556" y="191">UI quads</text>
+  <rect class="box" x="518" y="226" width="150" height="32"/>
+  <text x="552" y="247">Drawable</text>
+  <path class="arrow" d="M127 144 V174"/>
+  <path class="arrow" d="M202 194 C250 194 274 113 326 113"/>
+  <path class="arrow" d="M202 194 H326"/>
+  <path class="arrow" d="M466 187 H518"/>
+  <path class="arrow" d="M466 113 H518"/>
+  <path class="arrow" d="M593 134 V166"/>
+  <path class="arrow" d="M593 208 V226"/>
+</svg>

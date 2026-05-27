@@ -1,0 +1,31 @@
+%% NXSand play frame - GLES fragment CA (regenerate: docs/DIAGRAMS.md)
+flowchart LR
+  subgraph CPU["CPU"]
+    Input["platform/input\npoll / brush"]
+    App["game/app.cpp\ntickPlay fixed dt"]
+    Save["save.cpp\nslots"]
+    Phys["PhysicsBlock UBO\nphysics_gpu.hpp"]
+  end
+
+  subgraph GPU["GPU"]
+    Paint["paint.frag\ndirty-rect brush"]
+    Sim["sim.frag x4 phases\nfragment Margolus passes"]
+    Pal["palette_lookup.frag"]
+    Glow["glow_extract / glow_blur"]
+    UI["ui_quad batched + FontAtlas"]
+  end
+
+  Present["Drawable framebuffer\nsim upscaled in play region"]
+
+  Input --> App
+  App -->|paintDisk| Paint
+  Paint --> Sim
+  App -->|step| Sim
+  Phys --> Sim
+  Save <-->|readGrid / upload| Sim
+  Sim --> Pal
+  Sim --> Glow
+  Pal --> Present
+  Glow --> Present
+  App --> UI
+  UI --> Present
