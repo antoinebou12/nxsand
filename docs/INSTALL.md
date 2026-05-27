@@ -4,7 +4,7 @@ NXSand ships as a homebrew `.nro`. You need a Switch setup that can run homebrew
 
 ## Build Output
 
-After `make` in a devkitPro shell, or `scripts\build-native.ps1` on Windows:
+After `make` in a devkitPro shell:
 
 | Artifact | Path |
 |----------|------|
@@ -54,6 +54,6 @@ Runtime shaders live in `shaders/`. The Switch build copies fragment/vertex shad
 ## Troubleshooting
 
 - The app file must be `sdmc:/switch/NXSand.nro`, not inside the save folder.
-- Rebuild with `make` or `scripts\build-native.ps1` after code or shader changes.
+- Rebuild with `make` after code or shader changes.
 - If the app opens then exits, NXSand shows a fatal text screen and writes `sdmc:/switch/nxsand/launch.log` when possible.
 - Saves belong in `sdmc:/switch/nxsand/`; the `.nro` belongs in `sdmc:/switch/`.

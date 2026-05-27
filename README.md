@@ -1,72 +1,110 @@
 # NXSand
 
-Native Nintendo Switch homebrew falling-sand simulator. NXSand uses SDL2 + OpenGL ES 3.0 with a GPU Margolus cellular automaton: ping-pong `GL_R8UI` textures, four fragment passes, dirty-rect fragment painting, and custom OpenGL UI.
+[![Build](https://github.com/antoinebou12/nxsand/actions/workflows/native-nro.yml/badge.svg)](https://github.com/antoinebou12/nxsand/actions/workflows/native-nro.yml)
+[![Platform](https://img.shields.io/badge/platform-Nintendo%20Switch-E60012)](docs/INSTALL.md)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/antoinebou12/nxsand/blob/main/LICENSE)
 
-## Quick Start
+**NXSand** is a falling-sand sandbox for Nintendo Switch homebrew. Pour sand, spill water, light fires, grow plants, melt ice, and watch materials react on a live pixel grid. Paint with the touchscreen or Joy-Con, pick materials from a ring, save up to three worlds, and tune performance when you want smoother play on handheld.
 
-### Desktop
+The simulation runs on the GPU (OpenGL ES 3.0): a Margolus cellular automaton on ping-pong `GL_R8UI` textures, four fragment passes per step, dirty-rect painting, and a custom OpenGL UI (no ImGui). Desktop builds exist for faster iteration; the Switch `.nro` is the primary target.
 
-Desktop is for iteration; Switch NRO is the primary target.
+## Materials & play
+
+| Material | Behavior (short) |
+|----------|------------------|
+| Sand | Falls and piles |
+| Water | Flows, fills gaps |
+| Fire / smoke | Burns and spreads smoke |
+| Lava / acid | Hot or corrosive fluids |
+| Plant | Grows near water |
+| Ice / oil | Cold solid and slick liquid |
+| Wall / stone | Static or structural solids |
+
+Reactions follow the rules in `shaders/sim.frag` (for example, lava meeting water can form stone and smoke). Saves use the same JSON + base64 slot layout as the original nxsand web project so worlds stay portable.
+
+## Controls
+
+| Input | Action |
+|-------|--------|
+| **A** or **ZR** | Paint |
+| **B** or **ZL** | Erase |
+| **L** / **R** | Brush size |
+| **X** | Material ring |
+| **+** | Menu (slots, settings) |
+| Mouse (desktop) | Left paint · right or Shift+left erase |
+
+## Install on Switch (players)
+
+You need a homebrew-ready Switch ([setup guide](https://switch.hacks.guide/)).
+
+1. Get **`NXSand.nro`** — build it yourself (below) or download the latest **NXSand-nro** artifact from [GitHub Actions](https://github.com/antoinebou12/nxsand/actions/workflows/native-nro.yml) on the `main` branch.
+2. Copy the file to the SD card: `sdmc:/switch/NXSand.nro` (folder `switch/` at the card root).
+3. Launch from the Homebrew Menu.
+
+Saves live in `sdmc:/switch/nxsand/`. Legacy `sdmc:/switch/nxengine/` data is migrated on first launch when possible. Full install notes: [docs/INSTALL.md](docs/INSTALL.md).
+
+## Build from source
+
+### 1. Install devkitPro
+
+| OS | Install |
+|----|---------|
+| **Windows** | Download and run the installer from **[devkitPro installer releases](https://github.com/devkitPro/installer/releases)**. Use the **MSYS2** shortcut it adds (e.g. “devkitPro MSYS2”) so `make` and `dkp-pacman` are on your PATH. |
+| **Linux / macOS** | Follow **[Getting Started](https://devkitpro.org/wiki/Getting_Started)** on devkitpro.org. |
+
+Set `DEVKITPRO` if your environment does not (the installer usually does).
+
+### 2. Install Switch libraries
+
+In the devkitPro shell:
 
 ```bash
-make desktop
-./build/NXSand
-make test
+dkp-pacman -S switch-dev switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz
 ```
 
-Windows helper: `powershell -File scripts/build-desktop.ps1`.
-WSL helper: `bash scripts/build-desktop-wsl.sh`.
+### 3. Build the NRO
 
-Saves go to `./nxsand_save/`. Legacy `./nxengine_save/` is migrated when possible.
-
-### Switch NRO
-
-1. Install devkitPro.
-2. Install portlibs:
-
-```bash
-(dkp-)pacman -S switch-dev switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz
-```
-
-3. Build:
+From the repository root:
 
 ```bash
 make
 ```
 
-Output: `build/NXSand.nro`. Copy it to `sdmc:/switch/NXSand.nro`.
+Output: **`build/NXSand.nro`**. Copy to `sdmc:/switch/NXSand.nro`.
 
-Windows build helper: `scripts\build-native.ps1`.
-LAN FTP deploy helper: `scripts\serve-nro-ftp.ps1`, staging `dist/switch/NXSand.nro`.
+CI runs the same `make` on every push to `main`; see the workflow badge above for status.
 
-Switch saves go to `sdmc:/switch/nxsand/`. Legacy `sdmc:/switch/nxengine/` is migrated on first launch when possible.
+### Desktop (optional)
 
-## Controls
+For UI and logic work without a Switch:
 
-- `A` or `ZR`: paint
-- `B` or `ZL`: erase
-- `L` / `R`: brush radius
-- `X`: material ring
-- `+`: menu
-- Desktop mouse/touchpad: left paints, right or Shift+left erases
+```bash
+make desktop
+./build/NXSand    # or build\NXSand.exe on Windows
+make test         # CPU reference tests, no GPU
+```
 
-## Architecture
+Requires a C++20 toolchain plus SDL2, GLESv2, and FreeType (e.g. MSYS2 MinGW on Windows). Saves go to `./nxsand_save/`; legacy `./nxengine_save/` is migrated when possible.
+
+## Project layout
 
 | Path | Role |
 |------|------|
 | `source/platform/main.cpp` | Entry, romfs, fatal screen |
-| `source/game/app.*` | Scene loop, sim tick, render orchestration |
-| `source/gpu/sim_pipeline.*` | Ping-pong `GL_R8UI`, Margolus fragment passes, fragment brush |
-| `source/gpu/render_pipeline.*` | Palette LUT, glow, UI passes |
-| `source/gpu/font_atlas.*` | Switch shared font / FreeType R8 glyph atlas |
-| `source/sim/materials.hpp` | Material IDs and palette |
-| `shaders/sim.frag` | Margolus CA rules |
-| `shaders/paint.frag` | Dirty-rect GPU brush stamp |
-| `shaders/palette_lookup.frag` | Material ID to visible pixel |
-| `source/save/save.cpp` | JSON save slots compatible with nxsand layout |
+| `source/game/app.*` | Frame loop, sim tick, render |
+| `source/gpu/sim_pipeline.*` | Ping-pong grid, Margolus passes, GPU brush |
+| `source/gpu/render_pipeline.*` | Palette, glow, world draw |
+| `shaders/sim.frag` | Cellular automaton rules |
+| `shaders/paint.frag` | Dirty-rect brush stamp |
+| `shaders/palette_lookup.frag` | Material ID → color |
+| `source/save/save.cpp` | JSON save slots |
 
-More detail: [docs/NATIVE.md](docs/NATIVE.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/INSTALL.md](docs/INSTALL.md).
+Deeper write-ups: [docs/NATIVE.md](docs/NATIVE.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/PHYSICS.md](docs/PHYSICS.md) · [docs/INSTALL.md](docs/INSTALL.md)
 
 ## Reference
 
-This project is a native rewrite inspired by the read-only TypeScript / nx.js nxsand project at `E:\nxapplication`. The native port aims for play-feel parity, not bit-identical CPU frame order.
+Native C++ / SDL2 port aimed at the same play feel as the nx.js **nxsand** falling-sand prototype (material IDs, menus, Joy-Con-first UX, save format). Behavior is tuned for GPU Margolus steps, not bit-identical CPU frame order.
+
+## License
+
+MIT — see [LICENSE](https://github.com/antoinebou12/nxsand/blob/main/LICENSE).

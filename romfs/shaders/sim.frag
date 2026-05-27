@@ -101,6 +101,15 @@ float flowChance(uint m) {
     return 0.0;
 }
 
+float fallChance(uint m) {
+    if (m == M_WATER) return 0.96;
+    if (m == M_ACID) return 0.88;
+    if (m == M_LAVA) return clamp(lava_flowRate + 0.45, 0.25, 0.95);
+    if (m == M_OIL) return 0.72;
+    if (m == M_FIRE || m == M_SMOKE) return fire_speed;
+    return 1.0;
+}
+
 int density(uint m) {
     if (m == M_FIRE || m == M_SMOKE) return 0;
     if (m == M_EMPTY) return 1;
@@ -109,6 +118,12 @@ int density(uint m) {
     if (m == M_SAND) return 4;
     if (m == M_STONE) return 5;
     return 9;
+}
+
+bool canDisplace(uint moving, uint target) {
+    if (!isMovable(moving)) return false;
+    if (target == M_WALL || target == M_PLANT || target == M_ICE) return false;
+    return density(moving) > density(target);
 }
 
 bool anyNeighbor(ivec2 c, uint m) {
@@ -129,19 +144,25 @@ bool hasSupport(ivec2 c) {
 
 uint react(uint self, ivec2 c) {
     if (self >= 12u) return M_EMPTY;
-    if (self == M_WALL) return M_WALL;
 
     bool nearFire = anyNeighbor(c, M_FIRE);
     bool nearLava = anyNeighbor(c, M_LAVA);
     bool nearWater = anyNeighbor(c, M_WATER);
     bool nearAcid = anyNeighbor(c, M_ACID);
     bool nearIce = anyNeighbor(c, M_ICE);
+    bool nearOil = anyNeighbor(c, M_OIL);
 
     if (self == M_EMPTY) {
         if (hasPlantNeighbor(c) && hasSupport(c) && rand01(c, 10u) < plant_growthRate) return M_PLANT;
         return M_EMPTY;
     }
+    if (self == M_WALL) {
+        if (nearAcid && rand01(c, 25u) < acid_wallCorrode) return M_EMPTY;
+        if (nearLava && rand01(c, 26u) < 0.015) return M_STONE;
+        return M_WALL;
+    }
     if (self == M_PLANT) {
+        if (nearAcid && rand01(c, 27u) < 0.35) return M_EMPTY;
         if ((nearFire && rand01(c, 11u) < fire_ignitePlant) || nearLava) return M_FIRE;
         return M_PLANT;
     }
@@ -157,8 +178,9 @@ uint react(uint self, ivec2 c) {
         return M_WATER;
     }
     if (self == M_LAVA) {
-        if (nearWater) return M_SMOKE;
+        if (nearWater || nearIce) return M_SMOKE;
         if (anyNeighbor(c, M_SAND)) return M_STONE;
+        if (nearOil && rand01(c, 28u) < lava_igniteGas) return M_FIRE;
         return M_LAVA;
     }
     if (self == M_SAND) {
@@ -168,6 +190,7 @@ uint react(uint self, ivec2 c) {
     }
     if (self == M_STONE) {
         if (nearAcid && rand01(c, 18u) < acid_stoneCorrode) return M_EMPTY;
+        if (nearLava && nearWater && rand01(c, 29u) < 0.04) return M_SMOKE;
         return M_STONE;
     }
     if (self == M_ICE) {
@@ -176,7 +199,8 @@ uint react(uint self, ivec2 c) {
         return M_ICE;
     }
     if (self == M_ACID) {
-        if (nearWater && rand01(c, 20u) < 0.35) return M_SMOKE;
+        if (nearWater && rand01(c, 20u) < 0.25) return M_SMOKE;
+        if ((nearFire || nearLava) && rand01(c, 30u) < 0.18) return M_SMOKE;
         return M_ACID;
     }
     if (self == M_FIRE) {
@@ -194,14 +218,41 @@ uint react(uint self, ivec2 c) {
     return self;
 }
 
-void verticalSwap(inout uint bottom, inout uint top) {
-    if (isMovable(top) && density(top) > density(bottom)) {
+void diagonalSwap(inout uint bottomA, inout uint topA, inout uint bottomB, inout uint topB,
+                  ivec2 c, uint salt) {
+    bool flip = (rng(c, salt) & 1u) != 0u;
+    if (flip) {
+        if (canDisplace(topA, bottomB) && rand01(c, salt + 50u) < max(0.30, flowChance(topA))) {
+            uint t = bottomB;
+            bottomB = topA;
+            topA = t;
+        } else if (canDisplace(topB, bottomA) && rand01(c, salt + 51u) < max(0.30, flowChance(topB))) {
+            uint t = bottomA;
+            bottomA = topB;
+            topB = t;
+        }
+    } else {
+        if (canDisplace(topB, bottomA) && rand01(c, salt + 52u) < max(0.30, flowChance(topB))) {
+            uint t = bottomA;
+            bottomA = topB;
+            topB = t;
+        } else if (canDisplace(topA, bottomB) && rand01(c, salt + 53u) < max(0.30, flowChance(topA))) {
+            uint t = bottomB;
+            bottomB = topA;
+            topA = t;
+        }
+    }
+}
+
+void verticalSwap(inout uint bottom, inout uint top, ivec2 c, uint salt) {
+    if (isMovable(top) && density(top) > density(bottom) && rand01(c, salt) < fallChance(top)) {
         uint t = bottom;
         bottom = top;
         top = t;
         return;
     }
-    if (isMovable(bottom) && (bottom == M_FIRE || bottom == M_SMOKE) && density(bottom) < density(top)) {
+    if (isMovable(bottom) && (bottom == M_FIRE || bottom == M_SMOKE) && density(bottom) < density(top) &&
+        rand01(c, salt + 1u) < fallChance(bottom)) {
         uint t = bottom;
         bottom = top;
         top = t;
@@ -247,12 +298,13 @@ uint simulateBlockCell(ivec2 c) {
     uint v01 = react(cell(origin + ivec2(0, 1)), origin + ivec2(0, 1));
     uint v11 = react(cell(origin + ivec2(1, 1)), origin + ivec2(1, 1));
 
-    verticalSwap(v00, v01);
-    verticalSwap(v10, v11);
+    verticalSwap(v00, v01, origin, 60u);
+    verticalSwap(v10, v11, origin + ivec2(1, 0), 62u);
+    diagonalSwap(v00, v01, v10, v11, origin, 32u);
     horizontalSwap(v00, v10, origin, 30u);
     horizontalSwap(v01, v11, origin + ivec2(0, 1), 31u);
-    verticalSwap(v00, v01);
-    verticalSwap(v10, v11);
+    verticalSwap(v00, v01, origin + ivec2(0, 1), 64u);
+    verticalSwap(v10, v11, origin + ivec2(1, 1), 66u);
 
     if (local.x == 0 && local.y == 0) return v00;
     if (local.x == 1 && local.y == 0) return v10;

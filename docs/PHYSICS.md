@@ -26,10 +26,24 @@ Each `simulateCell` fragment loads the neighboring cells it needs from `uSim` wi
 | 11 | Ice | Solid; melts/freezes |
 | 12-13 | Legacy | Reserved reference IDs; treated as empty |
 
-## Lava And Water
+## Material Rule List
 
-When active lava sits on water, lava becomes smoke and the water cell becomes stone. This keeps the intended quench gameplay while using Stone instead of the reference browser build's Wall result.
+Rules are intentionally local and stable: each fragment pass reads a 2x2 Margolus block plus direct cardinal neighbors for reactions.
+
+| Material | Movement | Interactions |
+|----------|----------|--------------|
+| Sand | Falls through empty/gas/liquids and slides diagonally at edges. | Lava fuses it into Stone; Acid can dissolve it. |
+| Water | Fast downward liquid, slower sideways spread. | Strongly quenches Fire; Lava + Water creates Stone/Smoke; Ice can freeze it. |
+| Fire | Rises as a hot gas, drifts lightly, then becomes Smoke/Empty. | Ignites Plant and Oil; Water/Ice/Acid extinguish it. |
+| Smoke | Rises/drifts and fades out. | Ice can condense some smoke back into Water. |
+| Wall | Static support. | Acid burns/corrodes it into Empty; Lava can slowly scorch it into Stone. |
+| Acid | Corrosive liquid with restrained sideways spread. | Burns Sand, Plant, Ice, Stone, and Wall; Water dilutes some Acid into Smoke. |
+| Plant | Static growth material near Water or supported Wall. | Burns near Fire/Lava and is eaten by Acid. |
+| Lava | Heavy hot liquid, slower than Water. | Water/Ice quench it to Smoke/Stone; Sand becomes Stone; Oil can ignite nearby. |
+| Stone | Heavy granular solid; falls and slides at edges. | Acid burns it away; Lava/Water can crack it into Smoke in small amounts. |
+| Oil | Light liquid that floats on Water. | Fire/Lava ignite it; it spreads slower than Water. |
+| Ice | Static cold solid. | Fire/Lava melt it to Water; Acid weakens it; freezes nearby Water. |
 
 ## Tests
 
-Run `make test` for CPU unit tests covering materials, saves, settings, layout, grid policy, physics parameter serialization, and brush-stroke command emission. Runtime GPU behavior is validated through shader validation and Switch play testing.
+Run `make test` for CPU unit tests covering materials, saves, settings, layout, grid policy, physics parameter serialization, brush-stroke command emission, menu scroll windows, and active-tile bounds. Runtime GPU behavior is validated through shader validation and Switch play testing.

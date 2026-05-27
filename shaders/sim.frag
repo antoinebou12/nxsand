@@ -101,6 +101,15 @@ float flowChance(uint m) {
     return 0.0;
 }
 
+float fallChance(uint m) {
+    if (m == M_WATER) return 0.96;
+    if (m == M_ACID) return 0.88;
+    if (m == M_LAVA) return clamp(lava_flowRate + 0.45, 0.25, 0.95);
+    if (m == M_OIL) return 0.72;
+    if (m == M_FIRE || m == M_SMOKE) return fire_speed;
+    return 1.0;
+}
+
 int density(uint m) {
     if (m == M_FIRE || m == M_SMOKE) return 0;
     if (m == M_EMPTY) return 1;
@@ -235,14 +244,15 @@ void diagonalSwap(inout uint bottomA, inout uint topA, inout uint bottomB, inout
     }
 }
 
-void verticalSwap(inout uint bottom, inout uint top) {
-    if (isMovable(top) && density(top) > density(bottom)) {
+void verticalSwap(inout uint bottom, inout uint top, ivec2 c, uint salt) {
+    if (isMovable(top) && density(top) > density(bottom) && rand01(c, salt) < fallChance(top)) {
         uint t = bottom;
         bottom = top;
         top = t;
         return;
     }
-    if (isMovable(bottom) && (bottom == M_FIRE || bottom == M_SMOKE) && density(bottom) < density(top)) {
+    if (isMovable(bottom) && (bottom == M_FIRE || bottom == M_SMOKE) && density(bottom) < density(top) &&
+        rand01(c, salt + 1u) < fallChance(bottom)) {
         uint t = bottom;
         bottom = top;
         top = t;
@@ -288,13 +298,13 @@ uint simulateBlockCell(ivec2 c) {
     uint v01 = react(cell(origin + ivec2(0, 1)), origin + ivec2(0, 1));
     uint v11 = react(cell(origin + ivec2(1, 1)), origin + ivec2(1, 1));
 
-    verticalSwap(v00, v01);
-    verticalSwap(v10, v11);
+    verticalSwap(v00, v01, origin, 60u);
+    verticalSwap(v10, v11, origin + ivec2(1, 0), 62u);
     diagonalSwap(v00, v01, v10, v11, origin, 32u);
     horizontalSwap(v00, v10, origin, 30u);
     horizontalSwap(v01, v11, origin + ivec2(0, 1), 31u);
-    verticalSwap(v00, v01);
-    verticalSwap(v10, v11);
+    verticalSwap(v00, v01, origin + ivec2(0, 1), 64u);
+    verticalSwap(v10, v11, origin + ivec2(1, 1), 66u);
 
     if (local.x == 0 && local.y == 0) return v00;
     if (local.x == 1 && local.y == 0) return v10;
