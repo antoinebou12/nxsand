@@ -17,7 +17,7 @@ struct alignas(16) PhysicsParamsGPU {
     float smoke_fadeRate;
     float smoke_driftRate;
     float water_flowRate;
-    float _pad1;
+    float acid_flowRate;
 
     float acid_wallCorrode;
     float acid_stoneCorrode;
@@ -50,6 +50,7 @@ inline PhysicsParamsGPU to_gpu(const PhysicsParams& p, int /*simW*/ = SIM_W) {
     g.smoke_fadeRate = p.smoke_fadeRate;
     g.smoke_driftRate = p.smoke_driftRate;
     g.water_flowRate = p.water_flowRate;
+    g.acid_flowRate = p.acid_flowRate;
     g.acid_wallCorrode = p.acid_wallCorrode;
     g.acid_stoneCorrode = p.acid_stoneCorrode;
     g.plant_growthRate = p.plant_growthRate;

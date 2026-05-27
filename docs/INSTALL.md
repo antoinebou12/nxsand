@@ -34,9 +34,11 @@ Install Switch portlibs once:
 
 Override the FTP port with `$env:NXSAND_FTP_PORT = 2121`. The legacy `$env:NXENGINE_FTP_PORT` is still accepted.
 
-### CI Artifact
+### CI artifact
 
-GitHub Actions uploads **NXSand-nro** containing `build/NXSand.nro`.
+GitHub Actions uploads **NXSand-switch** (`NXSand-switch.zip`) with `switch/NXSand.nro` inside. Unzip at the SD card root so the file lands at `switch/NXSand.nro`, or copy that path manually to `sdmc:/switch/NXSand.nro`.
+
+Tagged releases use **Actions → Release NXSand** (`workflow_dispatch`) and attach the same zip layout.
 
 ## Saves
 

@@ -31,6 +31,7 @@ bool loadPhysicsParams(PhysicsParams& out) {
         g("smoke_fadeRate", out.smoke_fadeRate);
         g("smoke_driftRate", out.smoke_driftRate);
         g("water_flowRate", out.water_flowRate);
+        g("acid_flowRate", out.acid_flowRate);
         g("acid_wallCorrode", out.acid_wallCorrode);
         g("acid_stoneCorrode", out.acid_stoneCorrode);
         g("plant_growthRate", out.plant_growthRate);
@@ -61,6 +62,7 @@ bool savePhysicsParams(const PhysicsParams& p) {
     j["smoke_fadeRate"] = p.smoke_fadeRate;
     j["smoke_driftRate"] = p.smoke_driftRate;
     j["water_flowRate"] = p.water_flowRate;
+    j["acid_flowRate"] = p.acid_flowRate;
     j["acid_wallCorrode"] = p.acid_wallCorrode;
     j["acid_stoneCorrode"] = p.acid_stoneCorrode;
     j["plant_growthRate"] = p.plant_growthRate;

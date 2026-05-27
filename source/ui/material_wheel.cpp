@@ -44,7 +44,7 @@ void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app) {
 
     const int W = app.screenW;
     const int H = app.screenH;
-    const float s = theme::uiScale(W, H);
+    const float s = theme::uiScale(W, H, app.settings.accessibility.uiScale);
     const float cx = float(W) * 0.5f;
     const float cy = float(H) * 0.42f;
     const float rad = 132.f * s;

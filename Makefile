@@ -45,7 +45,18 @@ UNIT_SRCS     := tests/unit_main.cpp \
                  source/save/save_paths.cpp \
                  source/save/base64.cpp
 
-.PHONY: desktop test golden clean help
+GPU_UNIT_CXXFLAGS := -std=c++17 -O2 -Wall -Wno-missing-field-initializers \
+                     -DNX_DESKTOP=1 -Isource -Ithird_party -Itests \
+                     $(shell pkg-config --cflags sdl2 glesv2 2>/dev/null)
+GPU_UNIT_LIBS     := $(shell pkg-config --libs sdl2 glesv2 2>/dev/null || echo "-lSDL2 -lGLESv2")
+GPU_UNIT_SRCS     := tests/gpu_unit_main.cpp \
+                     tests/unit_gpu_sim.cpp \
+                     tests/gpu_test_gl.cpp \
+                     source/gpu/sim_pipeline.cpp \
+                     source/gpu/shader_program.cpp \
+                     source/gpu/gl_loader.cpp
+
+.PHONY: desktop test test-gpu golden clean help dist
 desktop:
 	@mkdir -p build
 	$(DESKTOP_CXX) $(DESKTOP_CXXFLAGS) $(DESKTOP_SRCS) -o build/NXSand $(DESKTOP_LDFLAGS) $(DESKTOP_LIBS)
@@ -57,6 +68,11 @@ test:
 
 golden: test
 
+test-gpu:
+	@mkdir -p build
+	$(DESKTOP_CXX) $(GPU_UNIT_CXXFLAGS) $(GPU_UNIT_SRCS) -o build/gpu_unit_tests $(GPU_UNIT_LIBS)
+	./build/gpu_unit_tests
+
 #---------------------------------------------------------------------------------
 # Switch target. Requires devkitPro env: $DEVKITPRO must be set.
 #---------------------------------------------------------------------------------
@@ -66,10 +82,12 @@ help:
 	@echo "NXSand build help"
 	@echo "  make desktop   -> build/NXSand (SDL2 + GLESv2)"
 	@echo "  make test      -> CPU unit tests (no GPU/SDL)"
+	@echo "  make test-gpu  -> GLES sim pipeline tests (SDL offscreen + Mesa)"
 	@echo "  make golden    -> alias for make test"
 	@echo "  make           -> build/NXSand.nro for Nintendo Switch"
 	@echo "                    Requires devkitPro shell: (dkp-)pacman -S switch-dev switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz"
 	@echo "                    On Windows: scripts/build-native.ps1; FTP deploy: scripts/serve-nro-ftp.ps1"
+	@echo "  make dist      -> copy build/NXSand.nro to dist/switch/ (after Switch make)"
 	@echo "  make clean     -> remove build/, dist/, and legacy root artifacts"
 else
 
@@ -178,6 +196,13 @@ $(OUTPUT).elf: $(OFILES)
 endif
 
 endif
+
+# Stage Switch NRO for deploy/FTP (run after `make` in devkitPro shell).
+dist:
+	@mkdir -p dist/switch
+	@test -f build/NXSand.nro || (echo "dist: missing build/NXSand.nro (run make first)" >&2; exit 1)
+	@cp -f build/NXSand.nro dist/switch/NXSand.nro
+	@echo "Staged: dist/switch/NXSand.nro"
 
 clean:
 	@rm -rf build dist

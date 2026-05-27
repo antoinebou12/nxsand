@@ -106,7 +106,7 @@ static void drawPaletteRow(RenderPipeline& r, FontAtlas& font, float rowY, float
 
 void drawHudSolid(RenderPipeline& r, App& app, const PlayRegion& pr) {
     const int W = app.screenW, H = app.screenH;
-    float s = theme::uiScale(W, H);
+    float s = theme::uiScale(W, H, app.settings.accessibility.uiScale);
 
     char title[96];
     std::snprintf(title, sizeof(title), "%s  R%d  %s", theme::APP_TITLE,

@@ -76,6 +76,9 @@ void MenuState::goBack(App& app) {
         index = static_cast<int>(engineTab);
         return;
     }
+    if (screen == MenuScreen::EngineSettings) {
+        flushGameSettingsIfDirty(app.settings);
+    }
     if (screen != MenuScreen::Main) {
         screen = MenuScreen::Main;
         index = 0;
@@ -239,9 +242,9 @@ struct MenuLayout {
 };
 
 static MenuLayout computeLayout(int W, int H, int itemCount, int selectedIndex,
-                                bool hasBreadcrumb) {
+                                bool hasBreadcrumb, float accessibilityScale) {
     MenuLayout L{};
-    L.s = theme::uiScale(W, H);
+    L.s = theme::uiScale(W, H, accessibilityScale);
     const bool portrait = W < H;
 #if defined(__SWITCH__)
     const float sideMargin = portrait ? 92.f * L.s : 156.f * L.s;
@@ -255,7 +258,7 @@ static MenuLayout computeLayout(int W, int H, int itemCount, int selectedIndex,
     L.panelW = std::min(590.f * L.s, std::max(220.f * L.s, float(W) - sideMargin * 2.f));
     L.titleY = safeTop + 18.f * L.s;
     L.logoY = std::max(10.f * L.s, L.titleY - 54.f * L.s);
-    const float titleBlock = hasBreadcrumb ? 112.f * L.s : 92.f * L.s;
+    const float titleBlock = hasBreadcrumb ? 128.f * L.s : 108.f * L.s;
     L.panelY = L.titleY + titleBlock;
     L.footerY = float(H) - safeBottom * 0.74f;
     const float panelChrome = 72.f * L.s;
@@ -447,7 +450,8 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
     const int W = app.screenW, H = app.screenH;
     const int items = menuItemCount(app.menu);
     const bool hasBreadcrumb = app.menu.screen != MenuScreen::Main;
-    const MenuLayout L = computeLayout(W, H, items, app.menu.index, hasBreadcrumb);
+    const MenuLayout L =
+        computeLayout(W, H, items, app.menu.index, hasBreadcrumb, app.settings.accessibility.uiScale);
     const int tick = app.menu.tick;
     const bool mainMenuFlow = app.menu.screen == MenuScreen::Main || app.menu.screen == MenuScreen::Load ||
                               app.menu.screen == MenuScreen::Save;
@@ -486,11 +490,20 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
     font.drawTextCentered(r, cx, L.titleY, titleScale, theme::APP_TITLE, 0.30f, 0.86f, 0.82f, 1.f,
                           W, H);
     {
+#if defined(__SWITCH__)
+        const float subY = L.titleY + 30.f * L.s;
+        const float crumbY = L.titleY + 52.f * L.s;
+#else
+        const float subY = L.titleY + 24.f * L.s;
+        const float crumbY = L.titleY + 46.f * L.s;
+#endif
         char sub[80];
+#if defined(__SWITCH__)
+        std::snprintf(sub, sizeof(sub), "v%s", theme::APP_VERSION);
+#else
         std::snprintf(sub, sizeof(sub), "Sand Simulation  |  v%s", theme::APP_VERSION);
-        font.drawTextCentered(r, cx, L.titleY + 20.f * L.s, subScale, sub, 0.58f, 0.63f, 0.69f,
-                              1.f, W, H);
-    }
+#endif
+        font.drawTextCentered(r, cx, subY, subScale, sub, 0.58f, 0.63f, 0.69f, 1.f, W, H);
 
     if (app.menu.screen != MenuScreen::Main) {
         char crumb[96];
@@ -505,8 +518,9 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
         }
         char crumbFit[96];
         fitLabel(crumbFit, sizeof(crumbFit), crumb, L.panelW, crumbScale);
-        font.drawTextCentered(r, cx, L.titleY + 36.f * L.s, crumbScale, crumbFit, 0.50f, 0.55f,
-                              0.65f, 1.f, W, H);
+        font.drawTextCentered(r, cx, crumbY, crumbScale, crumbFit, 0.50f, 0.55f, 0.65f, 1.f, W,
+                              H);
+    }
     }
 
     char buf[96];

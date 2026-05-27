@@ -1,12 +1,8 @@
 # Physics And Material Reactions
 
-NXSand runs a 4-phase Margolus cellular automaton in `shaders/sim.frag` using GLES 3.0 fragment passes over a ping-pong `GL_R8UI` material grid. The CPU reference in `E:\nxapplication\src\physics.ts` remains the feel target, not a bit-identical frame-order target.
+NXSand runs a 4-phase Margolus cellular automaton in `shaders/sim.frag` using GLES 3.0 fragment passes over a ping-pong `GL_R8UI` material grid. Tunables are uploaded through the `PhysicsBlock` UBO (`source/sim/physics_gpu.hpp`) and edited in **Element Settings** (`physics.json`). **Engine Settings** (`settings.json`) control resolution, palette, glow, flicker, grain, and AO only.
 
-OpenGL coordinates increase upward inside the sim texture. UI input, cursor drawing, touch, and paint commands are mapped through the shared `PlayRegion` before converting into grid coordinates.
-
-## GPU Neighborhood
-
-Each `simulateCell` fragment loads the neighboring cells it needs from `uSim` with `texelFetch`. The same material IDs are shared with `source/sim/materials.hpp`, and tunables are uploaded through the `PhysicsBlock` UBO defined in `source/sim/physics_gpu.hpp`.
+OpenGL coordinates increase upward inside the sim texture. UI input, cursor drawing, touch, and paint commands map through the shared `PlayRegion` before converting into grid coordinates.
 
 ## Material IDs
 
@@ -15,35 +11,95 @@ Each `simulateCell` fragment loads the neighboring cells it needs from `uSim` wi
 | 0 | Empty | Gas space |
 | 1 | Sand | Granular solid |
 | 2 | Water | Fluid |
-| 3 | Fire | Gas; spreads, becomes smoke |
-| 4 | Smoke | Gas; fades and rises |
+| 3 | Fire | Hot gas |
+| 4 | Smoke | Gas |
 | 5 | Wall | Static solid |
 | 6 | Acid | Corrosive fluid |
 | 7 | Plant | Grows with water or wall support |
 | 8 | Lava | Hot fluid |
 | 9 | Stone | Heavy solid |
-| 10 | Oil | Floats on water; ignites near heat |
-| 11 | Ice | Solid; melts/freezes |
-| 12-13 | Legacy | Reserved reference IDs; treated as empty |
+| 10 | Oil | Light fluid (floats on water) |
+| 11 | Ice | Cold solid |
+| 12–13 | Legacy | Treated as empty |
 
-## Material Rule List
+## Movement (Margolus swaps)
 
-Rules are intentionally local and stable: each fragment pass reads a 2x2 Margolus block plus direct cardinal neighbors for reactions.
+| Material | fallChance | flowChance / slide | Density | Static |
+|----------|------------|-------------------|---------|--------|
+| Sand | 1.0 | powder slide ~0.55–0.70 via `slideChance` | 4 | no |
+| Stone | 1.0 | powder slide | 5 | no |
+| Water | 0.96 | `water_flowRate` (default 0.38) | 3 | no |
+| Acid | 0.88 | `acid_flowRate` (default 0.28) | 3 | no |
+| Lava | `lava_flowRate+0.45` clamped | `lava_spreadRate` | 3 | no |
+| Oil | 0.72 | `oil_floatRate` (default 0.19) | 2 | no |
+| Fire / Smoke | `fire_speed` | `fire_spreadRate` / `smoke_driftRate` | 0 | no |
+| Wall / Plant / Ice | — | — | — | yes |
 
-| Material | Movement | Interactions |
-|----------|----------|--------------|
-| Sand | Falls through empty/gas/liquids and slides diagonally at edges. | Lava fuses it into Stone; Acid can dissolve it. |
-| Water | Fast downward liquid, slower sideways spread. | Strongly quenches Fire; Lava + Water creates Stone/Smoke; Ice can freeze it. |
-| Fire | Rises as a hot gas, drifts lightly, then becomes Smoke/Empty. | Ignites Plant and Oil; Water/Ice/Acid extinguish it. |
-| Smoke | Rises/drifts and fades out. | Ice can condense some smoke back into Water. |
-| Wall | Static support. | Acid burns/corrodes it into Empty; Lava can slowly scorch it into Stone. |
-| Acid | Corrosive liquid with restrained sideways spread. | Burns Sand, Plant, Ice, Stone, and Wall; Water dilutes some Acid into Smoke. |
-| Plant | Static growth material near Water or supported Wall. | Burns near Fire/Lava and is eaten by Acid. |
-| Lava | Heavy hot liquid, slower than Water. | Water/Ice quench it to Smoke/Stone; Sand becomes Stone; Oil can ignite nearby. |
-| Stone | Heavy granular solid; falls and slides at edges. | Acid burns it away; Lava/Water can crack it into Smoke in small amounts. |
-| Oil | Light liquid that floats on Water. | Fire/Lava ignite it; it spreads slower than Water. |
-| Ice | Static cold solid. | Fire/Lava melt it to Water; Acid weakens it; freezes nearby Water. |
+Liquids spread horizontally into empty or same-or-lighter liquid cells (density layering keeps oil above water). Powders use `slideChance` in diagonal swaps so sand and stone fall off ledges without horizontal “flow.”
+
+## Interaction matrix
+
+Each row is the **cell being updated** when a cardinal neighbor of the listed type is present. Probabilities are per-frame unless noted.
+
+| Cell | Neighbor | Outcome | Tunable / notes |
+|------|----------|---------|-----------------|
+| Empty | Plant + support | Plant | `plant_growthRate`, `plant_wallSupport` |
+| Wall | Acid | Empty | `acid_wallCorrode` (default 0.06) |
+| Wall | Lava | Stone | hardcoded 1.5% |
+| Plant | Acid | Empty | 35% |
+| Plant | Fire | Fire | `fire_ignitePlant` (default 0.10) |
+| Plant | Lava | Fire | always |
+| Oil | Fire | Fire | `max(oil_igniteRate, fire_igniteOil)` |
+| Oil | Lava | Fire | `oil_igniteRate` |
+| Water | Lava | Stone or 12% Smoke | quench feedback |
+| Water | Fire | Water | extinguish (fire cell reacts separately) |
+| Water | Acid | Smoke | 35% |
+| Water | Ice | Ice | `ice_freezeRate` |
+| Lava | Water / Ice | Smoke | |
+| Lava | Sand | Stone | |
+| Lava | Oil | Fire | `lava_igniteGas` |
+| Sand | Lava | Stone | 55% |
+| Sand | Acid | Empty | 12% |
+| Stone | Acid | Empty | `acid_stoneCorrode` (default 0.045) |
+| Stone | Lava + Water | Smoke | 4% |
+| Ice | Fire | Water | `ice_meltRate` |
+| Ice | Lava | Water | `max(ice_meltRate, 0.08)` |
+| Ice | Acid | Water | 20% |
+| Acid | Water | Smoke | 25% |
+| Acid | Fire / Lava | Smoke | 18% |
+| Acid | Wall / Stone | Smoke | 6% fizz |
+| Fire | Water / Ice / Acid | Smoke or Empty | 35% smoke |
+| Fire | Plant | Smoke | `fire_ignitePlant * 0.5` (fuel) |
+| Fire | — | Smoke | `fire_smokeRate` |
+| Smoke | Ice | Water | 40% |
+| Smoke | — | Empty | `smoke_fadeRate` |
+
+## Balance limits
+
+- All reactions are **local** (4-neighbor) and **probabilistic**—no global floods in one frame.
+- Acid corrosion is per-cell; pooling against walls increases contact rate via `acid_flowRate`, not instant deletion.
+- Fire spreads along plant via `fire_ignitePlant`; water and acid extinguish fire cells.
+- Lava + water: water often becomes stone; lava becomes smoke—stylized quench, not full thermodynamics.
+
+## Tuning guide
+
+| File | Contents |
+|------|----------|
+| `sdmc:/switch/nxsand/physics.json` (desktop: `./nxsand_save/physics.json`) | Element reaction rates |
+| `settings.json` | Performance, palette, glow, flicker, grain, AO, controls, accessibility |
+
+After editing Element Settings, params upload on the next sim frame. Engine settings apply via `App::applyRuntimeSettings()` on load, tab adjust, and shutdown flush.
+
+## Diagrams
+
+| Diagram | Source |
+|---------|--------|
+| Play frame pipeline | `docs/diagrams/sim-pipeline.mmd` |
+| Material reaction graph | `docs/diagrams/material-reactions.mmd` |
+| Lava/water quench | `docs/diagrams/lava-water-reaction.puml` |
+
+Regenerate SVG per `docs/DIAGRAMS.md` when `sim.frag` rules change.
 
 ## Tests
 
-Run `make test` for CPU unit tests covering materials, saves, settings, layout, grid policy, physics parameter serialization, brush-stroke command emission, menu scroll windows, and active-tile bounds. Runtime GPU behavior is validated through shader validation and Switch play testing.
+Run `make test` for CPU unit tests (materials, saves, settings, layout scroll windows, physics JSON). GPU behavior is validated on device and through shader compile checks.

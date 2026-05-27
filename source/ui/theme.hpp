@@ -33,13 +33,14 @@ inline int getSandBandH(int screenW, int screenH, bool paletteVisible) {
     return screenH - chrome;
 }
 
-inline float uiScale(int screenW, int screenH) {
+inline float uiScale(int screenW, int screenH, float accessibilityScale = 1.f) {
     float sx = float(screenW) / float(BASE_SCREEN_W);
     float sy = float(screenH) / float(BASE_SCREEN_H);
     float s  = sx < sy ? sx : sy;
     if (s < 0.5f) s = 0.5f;
     if (s > 2.0f) s = 2.0f;
-    return s;
+    const float a = accessibilityScale < 0.75f ? 0.75f : (accessibilityScale > 1.5f ? 1.5f : accessibilityScale);
+    return s * a;
 }
 
 } // namespace nx::theme

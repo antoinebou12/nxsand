@@ -7,8 +7,24 @@ on:
   workflow_dispatch:
 
 jobs:
+  unit-tests:
+    name: CPU unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential libsdl2-dev libgles2-mesa-dev
+
+      - name: Build and run unit tests
+        run: make test
+
+      - name: Build and run GPU unit tests
+        run: make test-gpu
+
   switch:
     name: Switch NRO
+    needs: unit-tests
     runs-on: ubuntu-latest
     container:
       image: devkitpro/devkita64:latest
@@ -18,37 +34,40 @@ jobs:
       - name: Install required portlibs
         run: |
           dkp-pacman -Sy --noconfirm switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz
+          pacman -Sy --noconfirm zip
 
-      - name: Build NRO
-        run: make
+      - name: Build NRO and stage dist
+        run: |
+          make
+          make dist
+
+      - name: Package switch zip
+        run: |
+          cd dist
+          zip -r ../NXSand-switch.zip switch
 
       - uses: actions/upload-artifact@v4
         with:
-          name: NXSand-nro
-          path: build/NXSand.nro
+          name: NXSand-switch
+          path: NXSand-switch.zip
           if-no-files-found: error
 
       - name: Install hint
         if: success()
         run: |
-          echo "Artifact: NXSand-nro (build/NXSand.nro)"
-          echo "Install: copy to sdmc:/switch/ on the SD card, or see docs/INSTALL.md"
-
-  unit-tests:
-    name: CPU unit tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build and run unit tests
-        run: make test
+          echo "Artifact: NXSand-switch.zip (switch/NXSand.nro inside)"
+          echo "Install: unzip at SD card root, or copy to sdmc:/switch/NXSand.nro"
+          echo "See docs/INSTALL.md"
 
   desktop:
     name: Desktop sanity build (Linux)
+    needs: unit-tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Install SDL2 + GLESv2 + FreeType (Mesa)
-        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgles2-mesa-dev libfreetype6-dev curl
+        run: sudo apt-get update && sudo apt-get install -y build-essential libsdl2-dev libgles2-mesa-dev libfreetype6-dev curl
 
       - name: Fetch UI font
         run: |
@@ -56,7 +75,12 @@ jobs:
           curl -fsSL -o romfs/fonts/NotoSans-Regular.ttf \
             https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf
           test -s romfs/fonts/NotoSans-Regular.ttf
+
       - name: Build desktop
         run: make desktop
+
+      - name: GPU unit tests
+        run: make test-gpu
+
       - name: Verify binary
         run: test -f build/NXSand

@@ -1,0 +1,42 @@
+flowchart TB
+  subgraph fluids [Fluids]
+    Water
+    Acid
+    Lava
+    Oil
+  end
+  subgraph solids [Solids]
+    Sand
+    Stone
+    Wall
+    Plant
+    Ice
+  end
+  subgraph gases [Gases]
+    Fire
+    Smoke
+    Empty
+  end
+
+  Acid -->|"acid_wallCorrode"| Wall
+  Acid -->|"acid_stoneCorrode"| Stone
+  Acid -->|"35% dissolve"| Plant
+  Acid -->|"12% dissolve"| Sand
+  Acid -->|"20% weaken"| Ice
+  Acid -->|"25% neutralize"| Water
+
+  Fire -->|"fire_ignitePlant"| Plant
+  Fire -->|"extinguish"| Water
+  Fire -->|"extinguish"| Ice
+  Fire -->|"extinguish"| Acid
+  Lava -->|"instant"| Plant
+  Lava -->|"quench"| Water
+  Lava -->|"quench"| Ice
+  Lava -->|"fuse"| Sand
+  Water -->|"lava contact"| Stone
+  Oil -->|"fire_igniteOil / oil_igniteRate"| Fire
+
+  Wall -->|"corrode"| Empty
+  Plant -->|"growth near water/wall"| Empty
+  Ice -->|"ice_freezeRate"| Water
+  Ice -->|"ice_meltRate"| Water

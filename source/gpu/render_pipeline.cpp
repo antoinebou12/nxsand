@@ -72,6 +72,9 @@ bool RenderPipeline::init(const std::string& shaderDir) {
     pal_uGrid  = palShader.uniformLocation("uGridSize");
     pal_uFrame = palShader.uniformLocation("uFrame");
     pal_uMode  = palShader.uniformLocation("uPaletteMode");
+    pal_uFlicker = palShader.uniformLocation("uFlicker");
+    pal_uGrain = palShader.uniformLocation("uGrain");
+    pal_uAo = palShader.uniformLocation("uAoStrength");
 
     std::string vui = shaderDir + "/ui_quad.vert";
     std::string fui = shaderDir + "/ui_quad.frag";
@@ -215,9 +218,10 @@ void RenderPipeline::drawSimulation(GLuint simR8UI, int simW, int simH, const Pl
 
     glUniform2i(pal_uGrid, simW, simH);
     glUniform1ui(pal_uFrame, frame);
-    if (pal_uMode >= 0) {
-        glUniform1i(pal_uMode, mode);
-    }
+    if (pal_uMode >= 0) glUniform1i(pal_uMode, mode);
+    if (pal_uFlicker >= 0) glUniform1i(pal_uFlicker, flickerEnabled_ ? 1 : 0);
+    if (pal_uGrain >= 0) glUniform1i(pal_uGrain, grainEnabled_ ? 1 : 0);
+    if (pal_uAo >= 0) glUniform1f(pal_uAo, aoStrength_);
 
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, 3);

@@ -8,7 +8,7 @@ namespace nx {
 void drawToastSolid(RenderPipeline& r, App& app) {
     if (!app.toast.active()) return;
     const int W = app.screenW, H = app.screenH;
-    float s = theme::uiScale(W, H);
+    float s = theme::uiScale(W, H, app.settings.accessibility.uiScale);
     float bw = float(W) * 0.55f;
     float bh = 56.f * s;
     float x = (float(W) - bw) * 0.5f;

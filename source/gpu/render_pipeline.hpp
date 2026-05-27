@@ -24,9 +24,15 @@ public:
     GLint pal_uGrid = -1;
     GLint pal_uFrame = -1;
     GLint pal_uMode = -1;
+    GLint pal_uFlicker = -1;
+    GLint pal_uGrain = -1;
+    GLint pal_uAo = -1;
 
     int paletteMode_ = 0; // 0 pretty, 1 fast, 2 debug
     bool glowEnabled_ = false;
+    bool flickerEnabled_ = true;
+    bool grainEnabled_ = false;
+    float aoStrength_ = 0.04f;
 
     GLint ui_uScreen = -1;
     GLint ui_uTex = -1;
@@ -48,6 +54,9 @@ public:
     int paletteMode() const { return paletteMode_; }
     void setGlowEnabled(bool on) { glowEnabled_ = on; }
     bool glowEnabled() const { return glowEnabled_; }
+    void setFlickerEnabled(bool on) { flickerEnabled_ = on; }
+    void setGrainEnabled(bool on) { grainEnabled_ = on; }
+    void setAoStrength(float v) { aoStrength_ = v; }
 
     // Solid / textured UI quads in pixel space (screen W/H).
     void drawSolidRect(float x, float y, float w, float h, float r, float g, float b, float a,

@@ -36,5 +36,10 @@ $nro = Join-Path $proj 'build\NXSand.nro'
 if (-not (Test-Path $nro)) {
     Write-Error "Build succeeded but missing: $nro"
 }
+$distSwitch = Join-Path $proj 'dist\switch'
+New-Item -ItemType Directory -Force -Path $distSwitch | Out-Null
+Copy-Item -Force $nro (Join-Path $distSwitch 'NXSand.nro')
+
 Write-Host "Output: $nro"
+Write-Host "Staged: dist\switch\NXSand.nro"
 & (Join-Path $PSScriptRoot 'verify-nro.ps1')

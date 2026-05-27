@@ -12,7 +12,7 @@ struct alignas(16) PhysicsParams {
     // Fire
     float fire_speed         = 1.0f;
     float fire_smokeRate     = 0.080f;
-    float fire_ignitePlant   = 0.025f;
+    float fire_ignitePlant   = 0.10f;
     float fire_igniteOil     = 0.025f;
     float fire_spreadRate    = 0.040f;
 
@@ -21,11 +21,12 @@ struct alignas(16) PhysicsParams {
     float smoke_driftRate    = 0.20f;
 
     // Water
-    float water_flowRate     = 0.32f;
+    float water_flowRate     = 0.38f;
 
     // Acid
-    float acid_wallCorrode   = 0.035f;
-    float acid_stoneCorrode  = 0.025f;
+    float acid_flowRate      = 0.28f;
+    float acid_wallCorrode   = 0.06f;
+    float acid_stoneCorrode  = 0.045f;
 
     // Plant
     float plant_growthRate   = 0.02f;
@@ -39,10 +40,10 @@ struct alignas(16) PhysicsParams {
 
     // Oil
     float oil_igniteRate     = 0.05f;
-    float oil_floatRate      = 0.16f;
+    float oil_floatRate      = 0.19f;
 
     // Ice
-    float ice_meltRate       = 0.005f;
+    float ice_meltRate       = 0.015f;
     float ice_freezeRate     = 0.030f;
 };
 

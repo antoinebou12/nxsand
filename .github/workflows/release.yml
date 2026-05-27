@@ -1,0 +1,62 @@
+name: Release NXSand
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (e.g. v0.1.0)
+        required: true
+        type: string
+      prerelease:
+        description: Mark as pre-release
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  unit-tests:
+    name: CPU unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Build and run unit tests
+        run: make test
+
+  release:
+    name: Build and publish
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    container:
+      image: devkitpro/devkita64:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install required portlibs
+        run: |
+          dkp-pacman -Sy --noconfirm switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz
+          pacman -Sy --noconfirm zip
+
+      - name: Build NRO and stage dist
+        run: |
+          make
+          make dist
+
+      - name: Package switch zip
+        run: |
+          cd dist
+          zip -r ../NXSand-switch.zip switch
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          name: NXSand ${{ github.event.inputs.tag }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          files: NXSand-switch.zip
+          generate_release_notes: true

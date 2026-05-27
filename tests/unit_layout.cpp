@@ -40,6 +40,24 @@ void run_layout_tests(TestContext& ctx) {
     CHECK(ctx, bottom.firstRow > 0);
     CHECK(ctx, bottom.firstRow + bottom.visibleRows >= 8);
 
+    const nx::MenuListWindow perfTab = nx::computeMenuListWindow(7, 6, 180.f, 46.f);
+    CHECK(ctx, perfTab.visibleRows >= 3);
+    CHECK(ctx, perfTab.visibleRows < 7);
+    CHECK(ctx, perfTab.firstRow > 0);
+    CHECK(ctx, perfTab.firstRow + perfTab.visibleRows >= 7);
+
+    const nx::PlayRegion frac =
+        nx::getPlayRegionForScene(1280, 720, 480, 270, true, false);
+    CHECK(ctx, frac.w > 0 && frac.h > 0);
+    const float cellW = float(frac.w) / 480.f;
+    const float cellH = float(frac.h) / 270.f;
+    const int wantX = 120, wantY = 80;
+    const int px = int(float(frac.x) + (float(wantX) + 0.5f) * cellW);
+    const int py = int(float(frac.y) + (float(wantY) + 0.5f) * cellH);
+    int rx = -1, ry = -1;
+    CHECK(ctx, nx::windowPxToGridCell(px, py, frac, 480, 270, rx, ry));
+    CHECK(ctx, rx == wantX && ry == wantY);
+
     nx::ActiveTileMap tiles;
     tiles.reset(128, 96);
     CHECK(ctx, tiles.activeCount() > 0);

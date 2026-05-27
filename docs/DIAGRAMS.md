@@ -7,6 +7,7 @@ Preferred sources:
 | Diagram | Source |
 |---------|--------|
 | Play frame pipeline | `docs/diagrams/sim-pipeline.mmd` |
+| Material reactions | `docs/diagrams/material-reactions.mmd` → `material-reactions.svg` |
 | Lava/water quench | `docs/diagrams/lava-water-reaction.puml` |
 
 The current runtime path is GLES 3.0 fragment based: `paint.frag`, four `sim.frag` Margolus passes, `palette_lookup.frag`, optional glow, then UI quads.

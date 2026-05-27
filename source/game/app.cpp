@@ -281,9 +281,17 @@ void App::applyRuntimeSettings() {
         }
     }
     sim.brush_radius = std::clamp(settings.controls.brushRadius, 1, 64);
+    SDL_GL_SetSwapInterval(settings.performance.targetFps == 60 ? 1 : 2);
     if (render) {
         render->setPaletteMode(settings.visuals.paletteMode);
         render->setGlowEnabled(settings.visuals.glowEnabled);
+        const bool reduceFlash = settings.accessibility.reduceFlashing;
+        render->setFlickerEnabled(settings.visuals.flicker && !reduceFlash);
+        render->setGrainEnabled(settings.visuals.grain);
+        float ao = 0.f;
+        if (settings.visuals.ao == VisualAo::Low) ao = 0.04f;
+        else if (settings.visuals.ao == VisualAo::High) ao = 0.08f;
+        render->setAoStrength(ao);
     }
     perf_.presetLabel = perfPresetLabel(settings.performance.mode);
 }

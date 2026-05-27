@@ -28,6 +28,11 @@ nro:
 test:
     $w = (wsl wslpath -a "{{ repo }}").Trim(); if (-not $w) { throw 'wslpath failed' }; wsl -e bash -lc "cd `"$w`" && make test"
 
+# GLES sim pipeline tests (SDL offscreen + Mesa)
+[group('test')]
+test-gpu:
+    $w = (wsl wslpath -a "{{ repo }}").Trim(); if (-not $w) { throw 'wslpath failed' }; wsl -e bash -lc "cd `"$w`" && make test-gpu"
+
 # Remove build/, dist/, and stray artifacts (uses Makefile clean in WSL)
 [group('maintain')]
 clean:

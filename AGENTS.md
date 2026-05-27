@@ -26,16 +26,16 @@ Instructions for coding agents working in this repository. Codex and similar too
 | Entry / SDL bootstrap | `source/platform/main.cpp` | Romfs checks include `sim.frag`, `paint.frag` |
 | Frame loop | `source/game/app.cpp` | Sim grid from `resolveSimGridSize` + `settings.json` performance; each frame calls `queryDrawableSize(..., settings.display.orientation)`; before world draw call `syncSimForSampling()` then `drawSimulation` |
 | Drawable / orientation | `source/platform/screen_size.hpp` | `SDL_GL_GetDrawableSize` + `ScreenOrientation` (Auto / Landscape / Portrait). Prefer `queryDrawableSize` over raw `SDL_GL_GetDrawableSize` wherever UI or input maps window pixels |
-| Fragment sim | `source/gpu/sim_pipeline.cpp`, `shaders/sim.frag` | Ping-pong `GL_R8UI`, Margolus 4 phases, **2x2 blocks rendered through FBOs** |
+| Fragment sim | `source/gpu/sim_pipeline.cpp`, `shaders/sim.frag` | Ping-pong `GL_R8UI`, Margolus 4 phases; acid/wall/stone, liquid layering, powder ledge slide; tunables in `physics.json` |
 | GPU brush | `shaders/paint.frag` | Dirty-rect fragment stamp with ping-pong copy/swap |
-| Render | `source/gpu/render_pipeline.cpp`, `shaders/palette_lookup.frag` | `uPaletteMode`: pretty / fast / debug; Switch default fast palette (`paletteMode=1`); auto-fast under sim stress |
+| Render | `source/gpu/render_pipeline.cpp`, `shaders/palette_lookup.frag` | `uPaletteMode`, flicker/grain/AO from `settings.json` via `applyRuntimeSettings`; glow optional |
 | Input | `source/platform/input/` | Joy-Con-first; Switch face buttons via `switch_face.hpp` (A/B/X/Y, not positional SDL enums on switch-sdl2); pointer mapping uses `queryDrawableSize(..., settings.display.orientation)` |
 | UI | `source/ui/` | GPU quads, not SDL renderer |
 | Perf HUD | `source/ui/perf_overlay.cpp`, `source/gpu/perf_stats.hpp` | FPS, ms breakdown, grid, substeps, fragment passes, brush commands, dirty rect, active-tile fallback |
-| Settings | `source/save/settings_io.cpp`, `source/game/game_settings.*` | Versioned `settings.json` with display/performance settings. Switch runtime is landscape-only until a real rotated framebuffer transform exists |
+| Settings | `source/save/settings_io.cpp`, `source/game/game_settings.*` | `settings.json` (engine) + `physics.json` (elements); flush on Engine tab back, Engine menu exit, shutdown |
 | Active tiles | `source/gpu/active_tiles.hpp` | CPU bitset on brush; fragment scissor optimization with full-grid fallback for stability |
 | CPU reference | `source/sim/cpu_reference.cpp` | Tests / parity tooling only |
-| Diagrams | `docs/diagrams/*.mmd`, `docs/DIAGRAMS.md` | Regenerate SVG when sim/render wiring changes |
+| Diagrams | `docs/diagrams/*.mmd`, `docs/DIAGRAMS.md` | Include `material-reactions.mmd`; regenerate SVG when `sim.frag` rules change |
 
 Longer narrative: **`docs/ARCHITECTURE.md`**, **`docs/NATIVE.md`**, **`docs/PHYSICS.md`**.
 
@@ -56,12 +56,14 @@ Do not default **1280x720** sim on handheld OLED.
 - **Switch (devkitPro shell):** `make` -> `build/NXSand.nro`. Requires `DEVKITPRO` set.
 - **Windows helper:** `scripts\build-native.ps1`
 - **Desktop:** `make desktop` - needs `g++` on PATH and pkg-config (or libs) for SDL2, GLESv2, FreeType. If `g++` is missing, add MSYS2 **MinGW64** `bin` to PATH or set `DESKTOP_CXX` to a full path to `g++.exe`.
-- **Unit tests:** `make test` / `make golden` - CPU-only, no GPU.
+- **Unit tests:** `make test` / `make golden` - CPU-only, no GPU. `make test-gpu` - SDL offscreen + GLES `SimPipeline` (upload/paint/step/readback).
 - **FTP deploy:** `scripts/serve-nro-ftp.ps1` stages **`dist/switch/NXSand.nro`**.
 
 ## CI
 
-- Workflow: `.github/workflows/native-nro.yml` - align artifact paths with README when they change.
+- **Build:** `.github/workflows/native-nro.yml` — `make test`, then Switch `make` + `make dist`, artifact `NXSand-switch.zip` (`switch/NXSand.nro`).
+- **Release:** `.github/workflows/release.yml` — `workflow_dispatch` with tag; same zip attached to GitHub Release.
+- Align artifact paths with README / `docs/INSTALL.md` when they change.
 
 ## Documentation touch list
 

@@ -37,8 +37,8 @@ Reactions follow the rules in `shaders/sim.frag` (for example, lava meeting wate
 
 You need a homebrew-ready Switch ([setup guide](https://switch.hacks.guide/)).
 
-1. Get **`NXSand.nro`** — build it yourself (below) or download the latest **NXSand-nro** artifact from [GitHub Actions](https://github.com/antoinebou12/nxsand/actions/workflows/native-nro.yml) on the `main` branch.
-2. Copy the file to the SD card: `sdmc:/switch/NXSand.nro` (folder `switch/` at the card root).
+1. Get **`NXSand.nro`** — build it yourself (below), download the latest **NXSand-switch** zip from [GitHub Actions](https://github.com/antoinebou12/nxsand/actions/workflows/native-nro.yml) (`switch/NXSand.nro` inside), or use a [release](https://github.com/antoinebou12/nxsand/releases) tag.
+2. Copy to the SD card: `sdmc:/switch/NXSand.nro` (unzip the artifact at the card root, or copy `switch/NXSand.nro` into `switch/`).
 3. Launch from the Homebrew Menu.
 
 Saves live in `sdmc:/switch/nxsand/`. Legacy `sdmc:/switch/nxengine/` data is migrated on first launch when possible. Full install notes: [docs/INSTALL.md](docs/INSTALL.md).
@@ -70,7 +70,7 @@ From the repository root:
 make
 ```
 
-Output: **`build/NXSand.nro`**. Copy to `sdmc:/switch/NXSand.nro`.
+Output: **`build/NXSand.nro`** (also **`dist/switch/NXSand.nro`** after `make dist`). Copy to `sdmc:/switch/NXSand.nro`.
 
 CI runs the same `make` on every push to `main`; see the workflow badge above for status.
 
@@ -100,10 +100,6 @@ Requires a C++20 toolchain plus SDL2, GLESv2, and FreeType (e.g. MSYS2 MinGW on 
 | `source/save/save.cpp` | JSON save slots |
 
 Deeper write-ups: [docs/NATIVE.md](docs/NATIVE.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/PHYSICS.md](docs/PHYSICS.md) · [docs/INSTALL.md](docs/INSTALL.md)
-
-## Reference
-
-Native C++ / SDL2 port aimed at the same play feel as the nx.js **nxsand** falling-sand prototype (material IDs, menus, Joy-Con-first UX, save format). Behavior is tuned for GPU Margolus steps, not bit-identical CPU frame order.
 
 ## License
 
