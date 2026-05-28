@@ -15,6 +15,7 @@ void run_brush_stroke_tests(TestContext& ctx);
 void run_active_tiles_tests(TestContext& ctx);
 void run_tpt_import_tests(TestContext& ctx);
 void run_perf_preset_physics_tests(TestContext& ctx);
+void run_menu_repeat_tests(TestContext& ctx);
 
 int main() {
     TestContext ctx{};
@@ -32,11 +33,12 @@ int main() {
     RUN_SUITE(ctx, "active_tiles", run_active_tiles_tests);
     RUN_SUITE(ctx, "tpt_import", run_tpt_import_tests);
     RUN_SUITE(ctx, "perf_preset_physics", run_perf_preset_physics_tests);
+    RUN_SUITE(ctx, "menu_repeat", run_menu_repeat_tests);
 
     if (ctx.failed > 0) {
         std::fprintf(stderr, "unit tests: %d failure(s)\n", ctx.failed);
         return 1;
     }
-    std::printf("unit tests: OK (%d suites)\n", 13);
+    std::printf("unit tests: OK (%d suites)\n", 14);
     return 0;
 }

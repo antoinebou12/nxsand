@@ -430,7 +430,7 @@ void App::shutdown() {
     SDL_Quit();
 }
 
-void App::tickMenu(double /*dtSec*/) {
+void App::tickMenu(double dtSec) {
     menu.tick++;
     menuSim.tick(menu.tick);
     tickMenuBackgroundFx(menu.tick, screenW, screenH);
@@ -454,27 +454,33 @@ void App::tickMenu(double /*dtSec*/) {
         menu.goBack(*this);
         input.menuBack = false;
     }
-    if (input.menuUp) {
-        menu.moveVertical(-1);
-        input.menuUp = false;
-    }
-    if (input.menuDown) {
-        menu.moveVertical(1);
-        input.menuDown = false;
-    }
-    if (input.menuLeft) {
-        menu.adjustHorizontal(*this, -1);
-        input.menuLeft = false;
-    }
-    if (input.menuRight) {
-        menu.adjustHorizontal(*this, 1);
-        input.menuRight = false;
+    static bool prevMenuLeftHeld = false;
+    static bool prevMenuRightHeld = false;
+    const bool edgeLeft = input.menuLeftHeld && !prevMenuLeftHeld;
+    const bool edgeRight = input.menuRightHeld && !prevMenuRightHeld;
+    prevMenuLeftHeld = input.menuLeftHeld;
+    prevMenuRightHeld = input.menuRightHeld;
+
+    const bool allowHRepeat = menuAllowsHorizontalRepeat(menu);
+    const MenuRepeatPulses nav = menuRepeat_.tick(
+        static_cast<float>(dtSec), input.menuUpHeld, input.menuDownHeld,
+        allowHRepeat ? input.menuLeftHeld : false, allowHRepeat ? input.menuRightHeld : false);
+    if (nav.up) menu.moveVertical(-1);
+    if (nav.down) menu.moveVertical(1);
+    if (allowHRepeat) {
+        if (nav.left) menu.adjustHorizontal(*this, -1);
+        if (nav.right) menu.adjustHorizontal(*this, 1);
+    } else {
+        if (edgeLeft) menu.adjustHorizontal(*this, -1);
+        if (edgeRight) menu.adjustHorizontal(*this, 1);
     }
 }
 
 void App::tickPlay(double dtSec) {
+    const bool profilerOn = settings.debug.profilerHud != ProfilerHud::Off;
     PlayRegion pr = getPlayRegionForScene(screenW, screenH, sim.grid_w, sim.grid_h,
-                                          settings.display.fullscreenSim, !sim.paletteHidden);
+                                          settings.display.fullscreenSim, !sim.paletteHidden,
+                                          false, profilerOn);
 
     pollInput(input, menu.materialWheelOpen, false, window, &pr, sim.grid_w, sim.grid_h,
               settings.controls.cursorSpeed, settings.controls.deadzone,
@@ -700,8 +706,10 @@ void App::renderFrame() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     if (scene == Scene::Play) {
+        const bool profilerOn = settings.debug.profilerHud != ProfilerHud::Off;
         PlayRegion pr = getPlayRegionForScene(screenW, screenH, sim.grid_w, sim.grid_h,
-                                              settings.display.fullscreenSim, !sim.paletteHidden);
+                                              settings.display.fullscreenSim, !sim.paletteHidden,
+                                              false, profilerOn);
         perf_.beginWorldRender();
         if (simPipeline) simPipeline->syncSimForSampling();
         render->drawSimulation(simPipeline->readTexture(), sim.grid_w, sim.grid_h, pr, screenH,
@@ -716,7 +724,8 @@ void App::renderFrame() {
         drawHudSolid(*render, *this, pr);
         drawBrushCursor(*render, *this, pr);
         drawActiveTilesOverlay(*render, *this, pr);
-        drawPerfOverlay(*render, font, perf_, settings.debug, screenW, screenH);
+        drawPerfOverlay(*render, font, perf_, settings.debug, pr, !sim.paletteHidden, screenW,
+                        screenH, settings.accessibility.uiScale);
         if (menu.materialWheelOpen) {
             drawMaterialWheel(*render, font, *this);
         }

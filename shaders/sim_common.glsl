@@ -73,7 +73,7 @@ float flowChance(uint m) {
 }
 
 float fallChance(uint m) {
-    if (m == M_WATER) return 0.99;
+    if (m == M_WATER) return 1.0;
     if (m == M_ACID) return 0.88;
     if (m == M_LAVA) return clamp(lava_flowRate + 0.45, 0.25, 0.95);
     if (m == M_OIL) return 0.55;
@@ -104,7 +104,7 @@ bool isPowder(uint m) {
 float slideChance(uint m) {
     if (isPowder(m)) return clamp(fallChance(m) * 0.62, 0.55, 0.70);
     if (m == M_SMOKE) return max(0.14, flowChance(m) * 0.90);
-    if (m == M_WATER) return max(0.40, flowChance(m));
+    if (m == M_WATER) return max(0.70, flowChance(m));
     return max(0.30, flowChance(m));
 }
 
@@ -112,13 +112,15 @@ bool isSolidSurface(uint m) {
     return m == M_WALL || m == M_STONE || m == M_SAND || m == M_PLANT || m == M_ICE;
 }
 
-// Horizontal gas drift: spread away from walls, less skimming along floors.
+// Horizontal gas drift: less skimming along floors; smoke clings beside wall.
 float gasHorizFlow(uint gas, ivec2 pos, ivec2 dir) {
     float ch = flowChance(gas);
     if (gas != M_SMOKE && gas != M_FIRE) return ch;
     if (isSolidSurface(cell(pos + ivec2(0, -1)))) ch *= 0.55;
-    uint block = cell(pos + ivec2(-dir.x, -dir.y));
-    if (block == M_WALL || block == M_STONE) ch = min(1.0, ch * 1.18);
+    if (gas == M_SMOKE) {
+        uint block = cell(pos + ivec2(-dir.x, -dir.y));
+        if (block == M_WALL) ch *= 0.42;
+    }
     return ch;
 }
 
@@ -131,6 +133,18 @@ bool anyNeighbor(ivec2 c, uint m) {
 
 bool neighborHas(uint right, uint left, uint up, uint down, uint m) {
     return right == m || left == m || up == m || down == m;
+}
+
+bool inGrid(ivec2 c) {
+    return c.x >= 0 && c.y >= 0 && c.x < uGridSize.x && c.y < uGridSize.y;
+}
+
+// Out-of-bounds reads are M_WALL for movement; plant wall support must ignore map edges.
+bool nearWallInGrid(ivec2 c) {
+    return (inGrid(c + ivec2( 1,  0)) && cell(c + ivec2( 1,  0)) == M_WALL) ||
+           (inGrid(c + ivec2(-1,  0)) && cell(c + ivec2(-1,  0)) == M_WALL) ||
+           (inGrid(c + ivec2( 0,  1)) && cell(c + ivec2( 0,  1)) == M_WALL) ||
+           (inGrid(c + ivec2( 0, -1)) && cell(c + ivec2( 0, -1)) == M_WALL);
 }
 
 bool neighborHas8Fire(ivec2 c) {
@@ -171,12 +185,19 @@ uint react(uint self, ivec2 c) {
 
     if (self == M_EMPTY) {
         if (nearPlant) {
-            bool wallSupport = plant_wallSupport >= 0.5 && nearWall;
+            bool wallSupport = plant_wallSupport >= 0.5 && nearWallInGrid(c);
+            uint below = cell(c + ivec2(0, -1));
+            bool waterBelow = below == M_WATER;
+            bool wallClimb = wallSupport && (below == M_WALL || below == M_PLANT);
             float chance = 0.0;
-            if (nearWater)
-                chance = min(1.0, plant_growthRate * 4.0);
-            else if (wallSupport)
-                chance = plant_growthRate * 0.30;
+            if (nearWater && waterBelow)
+                chance = min(1.0, plant_growthRate * 14.0);
+            else if (nearWater)
+                chance = min(1.0, plant_growthRate * 9.0);
+            if (wallSupport)
+                chance = max(chance, min(1.0, plant_growthRate * 4.0));
+            if (wallClimb)
+                chance = max(chance, min(1.0, plant_growthRate * 7.0));
             if (chance > 0.0 && rand01(c, 10u) < chance)
                 return M_PLANT;
         }
@@ -189,14 +210,20 @@ uint react(uint self, ivec2 c) {
     if (self == M_PLANT) {
         if (nearAcid && rand01(c, 27u) < 0.35) return M_EMPTY;
         if (nearLava) return M_FIRE;
-        if (nearFire && fire_ignitePlant > 0.0) return M_FIRE;
+        if (nearFire && fire_ignitePlant > 0.0) {
+            float ignite = min(1.0, fire_ignitePlant * 2.5);
+            if (countCardinal(nRight, nLeft, nUp, nDown, M_FIRE) >= 2)
+                ignite = 1.0;
+            if (rand01(c, 11u) < ignite) return M_FIRE;
+        }
         if (neighborHas8Fire(c)) {
             float ignite = fire_ignitePlant * 0.85;
             if (countCardinal(nRight, nLeft, nUp, nDown, M_FIRE) >= 2)
                 ignite = 1.0;
             if (rand01(c, 11u) < ignite) return M_FIRE;
         }
-        if (nearSmoke && rand01(c, 37u) < fire_ignitePlant * 0.40) return M_FIRE;
+        if (nearSmoke && fire_ignitePlant > 0.0 &&
+            rand01(c, 37u) < fire_ignitePlant * 0.40) return M_FIRE;
         return M_PLANT;
     }
     if (self == M_OIL) {
@@ -254,15 +281,17 @@ uint react(uint self, ivec2 c) {
         if (nearWater || nearIce || nearAcid) {
             return rand01(c, 24u) < 0.35 ? M_SMOKE : M_EMPTY;
         }
-        float burnout = (nearPlant || nearOil) ? fire_smokeRate * 0.55 : fire_smokeRate;
+        float burnout = (nearPlant || nearOil) ? fire_smokeRate * 0.35 : fire_smokeRate;
         if (rand01(c, 21u) < burnout) return M_SMOKE;
         return M_FIRE;
     }
     if (self == M_SMOKE) {
         if (nearIce && rand01(c, 22u) < 0.42) return M_WATER;
         float fade = smoke_fadeRate;
-        if (nearWall || nearStone || nearSand)
-            fade = min(1.0, fade + 0.10);
+        if (nearWall)
+            fade = smoke_fadeRate * 0.35;
+        else if (nearStone || nearSand)
+            fade = min(1.0, fade + 0.05);
         if (rand01(c, 23u) < fade) return M_EMPTY;
         return M_SMOKE;
     }
@@ -302,14 +331,11 @@ void verticalSwap(inout uint bottom, inout uint top, ivec2 c, uint salt) {
         top = t;
         return;
     }
-    if (isMovable(bottom) && (bottom == M_FIRE || bottom == M_SMOKE) && density(bottom) < density(top)) {
-        float rise = fallChance(bottom);
-        if (top == M_OIL) rise *= 0.35;
-        if (rand01(c, salt + 1u) < rise) {
-            uint t = bottom;
-            bottom = top;
-            top = t;
-        }
+    if (isMovable(bottom) && (bottom == M_FIRE || bottom == M_SMOKE) && top == M_EMPTY &&
+        rand01(c, salt + 1u) < fallChance(bottom)) {
+        uint t = bottom;
+        bottom = top;
+        top = t;
     }
 }
 
@@ -335,11 +361,11 @@ float boostedFlow(uint m, ivec2 pos, ivec2 dir) {
     float boost = levelBoost(m);
     if (boost <= 0.0) return base;
     if (cellEmpty(pos + dir) && cellEmpty(pos + dir * 2) && rand01(pos, 99u) < boost)
-        return min(1.0, base + 0.85);
+        return min(1.0, base + 0.95);
     if (m == M_WATER && cellEmpty(pos + dir)) {
         ivec2 ahead = pos + dir;
-        if (isSolidSurface(cell(ahead + ivec2(0, -1))) && rand01(pos, 100u) < boost * 2.0)
-            return min(1.0, base + 0.55);
+        if (isSolidSurface(cell(ahead + ivec2(0, -1))) && rand01(pos, 100u) < boost * 3.0)
+            return min(1.0, base + 0.70);
     }
     return base;
 }

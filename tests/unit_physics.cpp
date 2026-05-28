@@ -17,12 +17,14 @@ void run_physics_tests(TestContext& ctx) {
     nx::PhysicsParams p{};
     CHECK(ctx, std::fabs(nx::getParam(p, nx::MAT_FIRE, "fire_speed") - 1.f) < 1e-5f);
     CHECK(ctx, std::fabs(p.fire_smokeRate - 0.070f) < 1e-5f);
-    CHECK(ctx, std::fabs(p.fire_ignitePlant - 0.14f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.fire_ignitePlant - 0.08f) < 1e-5f);
     CHECK(ctx, std::fabs(p.fire_igniteOil - 0.045f) < 1e-5f);
-    CHECK(ctx, std::fabs(p.water_levelRate - 0.028f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.water_levelRate - 0.10f) < 1e-5f);
     CHECK(ctx, std::fabs(p.lava_spreadRate - 0.09f) < 1e-5f);
     CHECK(ctx, std::fabs(p.oil_igniteRate - 0.07f) < 1e-5f);
     CHECK(ctx, std::fabs(p.oil_floatRate - 0.16f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.smoke_driftRate - 0.12f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.smoke_fadeRate - 0.010f) < 1e-5f);
 
     nx::adjustParam(p, nx::MAT_FIRE, "fire_speed", 100);
     const auto* spec = nx::paramSpecAt(nx::MAT_FIRE, 0);

@@ -5,6 +5,7 @@
 #include "gpu/render_pipeline.hpp"
 #include "gpu/sim_pipeline.hpp"
 #include "platform/input/input.hpp"
+#include "platform/input/menu_repeat.hpp"
 #include "sim/physics_params.hpp"
 #include "sim/sim_state.hpp"
 #include "ui/menu.hpp"
@@ -65,6 +66,7 @@ private:
     int lastScreenH_ = 0;
 
     PerfStats perf_{};
+    MenuRepeatState menuRepeat_{};
 };
 
 } // namespace nx

@@ -21,6 +21,7 @@ int engineTabRowCount(EngineTab tab);
 const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settings,
                               bool computeSimSupported, char* buf, size_t bufSize);
 void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir);
+bool engineTabRowIsToggle(EngineTab tab, int row);
 
 void applySettingsToRuntime(App& app);
 

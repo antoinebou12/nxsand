@@ -20,17 +20,17 @@ Material settingsMaterialAt(int i) {
 static const ParamSpec kFire[] = {
     {"fire_speed", "Rise speed", 0.1f, 2.f, 0.1f, 1.f},
     {"fire_smokeRate", "Smoke out", 0.f, 0.20f, 0.005f, 0.070f},
-    {"fire_ignitePlant", "Ignite plant", 0.f, 0.35f, 0.005f, 0.14f},
+    {"fire_ignitePlant", "Ignite plant", 0.f, 0.35f, 0.005f, 0.08f},
     {"fire_igniteOil", "Ignite oil", 0.f, 0.25f, 0.005f, 0.045f},
     {"fire_spreadRate", "Drift", 0.f, 0.25f, 0.01f, 0.040f},
 };
 static const ParamSpec kWater[] = {
-    {"water_flowRate", "Spread", 0.05f, 0.85f, 0.025f, 0.74f},
-    {"water_levelRate", "Level", 0.f, 0.05f, 0.001f, 0.028f},
+    {"water_flowRate", "Spread", 0.05f, 0.85f, 0.025f, 0.85f},
+    {"water_levelRate", "Level", 0.f, 0.15f, 0.005f, 0.10f},
 };
 static const ParamSpec kSmoke[] = {
-    {"smoke_fadeRate", "Fade", 0.f, 0.15f, 0.005f, 0.028f},
-    {"smoke_driftRate", "Drift", 0.f, 0.7f, 0.025f, 0.20f},
+    {"smoke_fadeRate", "Fade", 0.f, 0.15f, 0.005f, 0.010f},
+    {"smoke_driftRate", "Drift", 0.f, 0.7f, 0.025f, 0.12f},
 };
 static const ParamSpec kAcid[] = {
     {"acid_flowRate", "Spread", 0.05f, 0.70f, 0.025f, 0.28f},
@@ -38,7 +38,7 @@ static const ParamSpec kAcid[] = {
     {"acid_stoneCorrode", "Burn stone", 0.f, 0.08f, 0.005f, 0.045f},
 };
 static const ParamSpec kPlant[] = {
-    {"plant_growthRate", "Growth", 0.002f, 0.12f, 0.002f, 0.06f},
+    {"plant_growthRate", "Growth", 0.002f, 0.20f, 0.005f, 0.12f},
     {"plant_wallSupport", "Wall support", 0.f, 1.f, 1.f, 1.f},
 };
 static const ParamSpec kLava[] = {

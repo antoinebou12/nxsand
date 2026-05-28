@@ -132,7 +132,11 @@ void FontAtlas::prewarmCommonGlyphs() {
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
         "SELECT MATERIALSand Water Wall Plant Fire Lava Acid Smoke Stone Oil Ice "
-        "ACTIVE D-PAD MOVE OK BACK TAB CLOSE";
+        "ACTIVE D-PAD MOVE OK BACK TAB CLOSE"
+        "New Sandbox Demo Load Save Game Element Engine Settings Clear Quit "
+        "Main Menu defaults Reset Visuals Performance Compute Shader Battery "
+        "Balanced Quality fullscreen orientation portrait landscape nearest "
+        "conservative sleeping substeps fragment upscale bloom grain flicker";
     for (const char* p = kWarm; *p; ++p) {
         ensureGlyph(static_cast<unsigned char>(*p));
     }
@@ -147,6 +151,7 @@ bool FontAtlas::growAtlas() const {
     penY_ = 2;
     rowH_ = 0;
     glyphs_.clear();
+    uploadAtlas();
     return true;
 }
 
@@ -154,9 +159,22 @@ bool FontAtlas::uploadAtlas() const {
     if (!tex) return false;
     glBindTexture(GL_TEXTURE_2D, tex);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, atlasW, atlasH, 0, GL_RED, GL_UNSIGNED_BYTE, atlasPixels_.data());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, atlasW, atlasH, 0, GL_RED, GL_UNSIGNED_BYTE,
+                  atlasPixels_.data());
     glBindTexture(GL_TEXTURE_2D, 0);
     return true;
+}
+
+void FontAtlas::uploadGlyphRegion(int x, int y, int w, int h) const {
+    if (!tex || w <= 0 || h <= 0) return;
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, atlasW);
+    const uint8_t* row = atlasPixels_.data() + static_cast<size_t>(y) * static_cast<size_t>(atlasW) +
+                         static_cast<size_t>(x);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, w, h, GL_RED, GL_UNSIGNED_BYTE, row);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 const FontAtlas::GlyphInfo& FontAtlas::ensureGlyph(uint32_t codepoint) const {
@@ -168,8 +186,11 @@ const FontAtlas::GlyphInfo& FontAtlas::ensureGlyph(uint32_t codepoint) const {
         return empty;
     }
 
+    const float invBake = 1.f / float(std::max(1, bakeScale));
+
     for (;;) {
-        FT_Error err = FT_Load_Char(g_ft.face, codepoint, FT_LOAD_RENDER);
+        const FT_Int32 loadFlags = FT_LOAD_RENDER | FT_LOAD_TARGET_NORMAL;
+        FT_Error err = FT_Load_Char(g_ft.face, codepoint, loadFlags);
         if (err) {
             GlyphInfo miss{};
             miss.advance = pixelSize / 2;
@@ -197,30 +218,33 @@ const FontAtlas::GlyphInfo& FontAtlas::ensureGlyph(uint32_t codepoint) const {
             continue;
         }
 
+        const int atlasX = penX_;
+        const int atlasY = penY_;
+
         GlyphInfo g{};
         g.width = bw;
         g.height = bh;
-        g.bearingX = slot->bitmap_left;
-        g.bearingY = slot->bitmap_top;
-        g.advance = std::max(1, int(slot->advance.x >> 6));
-        g.u0 = float(penX_) / float(atlasW);
-        g.v0 = float(penY_) / float(atlasH);
-        g.u1 = float(penX_ + bw) / float(atlasW);
-        g.v1 = float(penY_ + bh) / float(atlasH);
+        g.bearingX = float(slot->bitmap_left) * invBake;
+        g.bearingY = float(slot->bitmap_top) * invBake;
+        g.advance = std::max(1, int(std::lround(float(slot->advance.x >> 6) * invBake)));
+        g.u0 = float(atlasX) / float(atlasW);
+        g.v0 = float(atlasY) / float(atlasH);
+        g.u1 = float(atlasX + bw) / float(atlasW);
+        g.v1 = float(atlasY + bh) / float(atlasH);
 
         if (bitmap.pixel_mode == FT_PIXEL_MODE_GRAY && bw > 0 && bh > 0) {
             for (int y = 0; y < bh; ++y) {
-                const uint8_t* row = bitmap.buffer + y * bitmap.pitch;
+                const uint8_t* src = bitmap.buffer + y * bitmap.pitch;
                 for (int x = 0; x < bw; ++x) {
-                    atlasPixels_[static_cast<size_t>((penY_ + y) * atlasW + (penX_ + x))] = row[x];
+                    atlasPixels_[static_cast<size_t>((atlasY + y) * atlasW + (atlasX + x))] = src[x];
                 }
             }
+            uploadGlyphRegion(atlasX, atlasY, bw, bh);
         }
 
         penX_ += bw + 3;
         rowH_ = std::max(rowH_, bh);
         glyphs_[codepoint] = g;
-        uploadAtlas();
         return glyphs_[codepoint];
     }
 }
@@ -269,19 +293,24 @@ bool FontAtlas::init() {
         return false;
     }
 
-    pixelSize = 20;
-    err = FT_Set_Pixel_Sizes(g_ft.face, 0, pixelSize);
+    pixelSize = 22;
+    bakeScale = 2;
+    const int rasterPx = pixelSize * bakeScale;
+    err = FT_Set_Pixel_Sizes(g_ft.face, 0, rasterPx);
     if (err) {
         std::cerr << "FT_Set_Pixel_Sizes failed: " << err << "\n";
         releaseFontResources();
         return false;
     }
 
-    lineH = std::max(20, int(g_ft.face->size->metrics.height >> 6));
-    baseline = std::max(14, int(g_ft.face->size->metrics.ascender >> 6));
+    lineH = std::max(pixelSize, int(std::lround(float(g_ft.face->size->metrics.height >> 6) /
+                                                float(bakeScale))));
+    baseline = std::max(pixelSize * 7 / 10,
+                        int(std::lround(float(g_ft.face->size->metrics.ascender >> 6) /
+                                        float(bakeScale))));
 
-    atlasW = 512;
-    atlasH = 512;
+    atlasW = 1024;
+    atlasH = 1024;
     atlasPixels_.assign(static_cast<size_t>(atlasW * atlasH), 0);
     penX_ = 2;
     penY_ = 2;
@@ -290,8 +319,8 @@ bool FontAtlas::init() {
 
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, atlasW, atlasH, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
@@ -340,10 +369,11 @@ void FontAtlas::drawText(RenderPipeline& rp, float x, float y, float scale, cons
         }
         const GlyphInfo& g = ensureGlyph(cp);
         if (g.width > 0 && g.height > 0) {
-            const float dx = std::round(penX + float(g.bearingX) * scale);
-            const float dy = std::round(y + float(baseline - g.bearingY) * scale);
-            const float gw = std::max(1.f, std::round(float(g.width) * scale));
-            const float gh = std::max(1.f, std::round(float(g.height) * scale));
+            const float invBake = 1.f / float(std::max(1, bakeScale));
+            const float dx = penX + g.bearingX * scale;
+            const float dy = y + float(baseline) * scale - g.bearingY * scale;
+            const float gw = std::max(0.5f, float(g.width) * scale * invBake);
+            const float gh = std::max(0.5f, float(g.height) * scale * invBake);
             rp.drawAlphaMaskRect(dx, dy, gw, gh, g.u0, g.v0, g.u1, g.v1, cr, cg, cb, ca, screenW,
                                  screenH, tex);
         }

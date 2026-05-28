@@ -35,13 +35,12 @@ void MenuSim::shutdown() {
 
 void MenuSim::seed() {
     std::fill(std::begin(grid_), std::end(grid_), MAT_EMPTY);
-    for (int x = 8; x < kMenuSimW - 8; ++x) {
-        grid_[idx(x, 2)] = MAT_WATER;
-        if (x % 9 == 0) grid_[idx(x, 1)] = MAT_SAND;
+    for (int x = 12; x < kMenuSimW - 12; ++x) {
+        grid_[idx(x, kMenuSimH - 6)] = MAT_LAVA;
+        if (x % 5 == 0) grid_[idx(x, kMenuSimH - 7)] = MAT_LAVA;
     }
-    for (int x = 20; x < 44; ++x) grid_[idx(x, kMenuSimH - 6)] = MAT_LAVA;
-    grid_[idx(10, 8)] = MAT_PLANT;
-    grid_[idx(kMenuSimW - 12, 10)] = MAT_FIRE;
+    grid_[idx(10, kMenuSimH - 14)] = MAT_PLANT;
+    grid_[idx(kMenuSimW - 12, kMenuSimH - 12)] = MAT_FIRE;
     seeded_ = true;
 }
 

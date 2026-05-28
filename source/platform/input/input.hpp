@@ -14,6 +14,10 @@ struct InputState {
     bool menuDown = false;
     bool menuLeft = false;
     bool menuRight = false;
+    bool menuUpHeld = false;
+    bool menuDownHeld = false;
+    bool menuLeftHeld = false;
+    bool menuRightHeld = false;
     bool menuPointerActive = false;
     bool menuPointerConfirm = false;
     int menuPointerX = 0;

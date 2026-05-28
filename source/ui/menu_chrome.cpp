@@ -8,6 +8,45 @@
 
 namespace nx {
 
+float menuMarkTextScale(float uiScale) {
+#if defined(__SWITCH__)
+    return 1.35f * uiScale;
+#else
+    return 1.86f * uiScale;
+#endif
+}
+
+float menuCrumbTextScale(float uiScale) {
+#if defined(__SWITCH__)
+    return 0.62f * uiScale;
+#else
+    return 1.0f * uiScale;
+#endif
+}
+
+float menuMarkBoxHeight(const FontAtlas& font, float uiScale) {
+    const float textScale = menuMarkTextScale(uiScale);
+    const float linePx = float(font.lineH) * textScale;
+    const float padY = 10.f * uiScale;
+    return linePx + padY * 2.f;
+}
+
+float menuMarkBandHeight(const FontAtlas& font, float uiScale) {
+    return menuMarkBoxHeight(font, uiScale) + 8.f * uiScale;
+}
+
+float menuCrumbBandHeight(const FontAtlas& font, float uiScale) {
+    const float textScale = menuCrumbTextScale(uiScale);
+    const float linePx = float(font.lineH) * textScale;
+    const float padY = 8.f * uiScale;
+    return linePx + padY * 2.f;
+}
+
+float menuBaselineInBand(float boxTop, float bandH, const FontAtlas& font, float textScale) {
+    const float linePx = float(font.lineH) * textScale;
+    return boxTop + (bandH - linePx) * 0.5f;
+}
+
 void drawMenuChromeScrim(RenderPipeline& r, const MenuLayout& L, int W, int H, float topY,
                          float bottomY, float strength) {
     const float a = std::clamp(strength, 0.f, 1.f);
@@ -46,29 +85,23 @@ void drawMenuHeaderRule(RenderPipeline& r, const MenuLayout& L, int W, int H) {
 void drawMenuMark(RenderPipeline& r, FontAtlas& font, float cx, float markY, const MenuLayout& L,
                   int W, int H, float strength) {
     const float a = std::clamp(strength, 0.f, 1.f);
-#if defined(__SWITCH__)
-    const float textScale = 1.35f * L.s;
-#else
-    const float textScale = 1.86f * L.s;
-#endif
+    const float textScale = menuMarkTextScale(L.s);
     const float tw = font.textWidth(theme::APP_MARK, textScale);
     const float linePx = float(font.lineH) * textScale;
-    const float ascPx = float(font.baseline) * textScale;
     const float padX = 22.f * L.s;
     const float padY = 10.f * L.s;
     const float bw = tw + padX * 2.f;
     const float bh = linePx + padY * 2.f;
     const float bx = cx - bw * 0.5f;
     const float by = markY;
-    const float textY = by + padY + ascPx;
+    const float textY = by + padY;
     r.drawSolidRect(bx, by, bw, bh, 0.05f, 0.06f, 0.10f, 0.72f * a, W, H);
     r.drawSolidRect(bx, by, bw, 1.f, 0.30f, 0.79f, 0.77f, 0.45f * a, W, H);
     font.drawTextCentered(r, cx, textY, textScale, theme::APP_MARK, 0.30f, 0.86f, 0.82f, 1.f, W,
                           H);
-    drawMenuHeaderRuleAt(r, L, by + bh + 8.f * L.s, W, H);
 }
 
-static float uiTextTopInBox(float boxY, float boxH, const FontAtlas& font, float scale) {
+static float uiTextLineTopInBox(float boxY, float boxH, const FontAtlas& font, float scale) {
     const float linePx = float(font.lineH) * scale;
     return boxY + (boxH - linePx) * 0.5f;
 }
@@ -95,7 +128,7 @@ void drawMenuRow(RenderPipeline& r, FontAtlas& font, int W, int H, const MenuLay
     const float rowGap = 4.f * L.s;
     const float rowH = L.rowH - rowGap * 2.f;
     const float rowY = y + rowGap;
-    const float a = selected ? 0.98f : 0.78f;
+    const float a = selected ? 0.98f : 0.85f;
     r.drawSolidRect(x, rowY, rowW, rowH, selected ? 0.17f : 0.075f, selected ? 0.24f : 0.12f,
                     selected ? 0.32f : 0.18f, a, W, H);
     if (!selected) {
@@ -118,7 +151,7 @@ void drawMenuRow(RenderPipeline& r, FontAtlas& font, int W, int H, const MenuLay
     const float labelPad = 14.f * L.s;
 #endif
     const float textX = x + barW + labelPad;
-    const float textY = uiTextTopInBox(rowY, rowH, font, textScale);
+    const float textY = uiTextLineTopInBox(rowY, rowH, font, textScale);
     fitMenuLabel(fitted, sizeof(fitted), label, rowW - barW - labelPad - 8.f * L.s, textScale);
     float drawX = textX;
     if (fitted[0] == '<') drawX += 3.f * L.s;
@@ -143,7 +176,7 @@ void drawHintPill(RenderPipeline& r, FontAtlas& font, float cx, float y, float s
     const float bh = linePx + padY * 2.f;
     const float bx = cx - bw * 0.5f;
     const float by = y - padY - ascPx;
-    const float textY = by + padY + ascPx;
+    const float textY = by + padY;
     r.drawSolidRect(bx, by, bw, bh, 0.05f, 0.06f, 0.10f, 0.88f * a, W, H);
     r.drawSolidRect(bx, by, bw, 1.f, 0.30f, 0.79f, 0.77f, 0.30f * a, W, H);
     font.drawTextCentered(r, cx, textY, scale, hint, 0.58f, 0.64f, 0.74f, 0.95f, W, H);

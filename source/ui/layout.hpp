@@ -33,10 +33,19 @@ inline MenuListWindow computeMenuListWindow(int itemCount, int selectedIndex, fl
     return w;
 }
 
+// Top HUD band height in pixels (matches hud.cpp + optional profiler second line).
+inline float playHudTopBarPx(int screenW, int screenH, bool paletteVisible, bool profilerVisible,
+                             float uiScale = 1.f) {
+    const float s = theme::uiScale(screenW, screenH) * uiScale;
+    float top = (paletteVisible ? 42.f : 34.f) * s;
+    if (profilerVisible) top += 18.f * s;
+    return top;
+}
+
 // HUD bands reserved above/below the sand (matches hud.cpp top bar + optional palette).
-inline std::pair<int, int> playHudInsets(int screenW, int screenH, bool paletteVisible) {
-    const float s = theme::uiScale(screenW, screenH);
-    const int top = int((paletteVisible ? 42.f : 34.f) * s);
+inline std::pair<int, int> playHudInsets(int screenW, int screenH, bool paletteVisible,
+                                         bool profilerVisible = false) {
+    const int top = int(playHudTopBarPx(screenW, screenH, paletteVisible, profilerVisible));
     const int bottom = paletteVisible ? theme::getPaletteH(screenH) : 0;
     return {top, bottom};
 }
@@ -81,11 +90,11 @@ inline PlayRegion getPlayRegion(int screenW, int screenH, int gridW, int gridH,
 
 inline PlayRegion getPlayRegionForScene(int screenW, int screenH, int gridW, int gridH,
                                         bool fullscreenSim, bool paletteVisible,
-                                        bool withChrome = false) {
+                                        bool withChrome = false, bool profilerVisible = false) {
     int top = 0;
     int bottom = 0;
     if (fullscreenSim && !withChrome) {
-        const auto insets = playHudInsets(screenW, screenH, paletteVisible);
+        const auto insets = playHudInsets(screenW, screenH, paletteVisible, profilerVisible);
         top = insets.first;
         bottom = insets.second;
     }

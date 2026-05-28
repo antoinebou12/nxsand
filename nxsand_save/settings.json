@@ -5,7 +5,7 @@
     "uiScale": 1.0
   },
   "controls": {
-    "brushRadius": 7,
+    "brushRadius": 3,
     "cursorSpeed": 1.0,
     "deadzone": 0.18000000715255737,
     "invertY": false,
@@ -13,8 +13,8 @@
   },
   "debug": {
     "benchmarkScene": 0,
-    "profilerHud": 2,
-    "showActiveTiles": true,
+    "profilerHud": 1,
+    "showActiveTiles": false,
     "showMaterialIds": false
   },
   "display": {
@@ -24,12 +24,12 @@
   },
   "performance": {
     "activeTiles": 0,
-    "dynamicResolution": true,
-    "mode": 0,
+    "dynamicResolution": false,
+    "mode": 1,
     "simBackend": 1,
-    "simHeight": 270,
-    "simWidth": 480,
-    "substeps": 1,
+    "simHeight": 360,
+    "simWidth": 640,
+    "substeps": 2,
     "targetFps": 60
   },
   "version": 3,

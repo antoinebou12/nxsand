@@ -131,8 +131,8 @@ void main() {
         }
         if (m == M_SMOKE) {
             float openCount = openTop + openLeft + openRight + openBottom;
-            col += vec3(0.02, 0.03, 0.06) * openCount * 0.14;
-            col = mix(col, col * 1.12, 0.22);
+            col += vec3(0.02, 0.03, 0.06) * openCount * 0.10;
+            col = mix(col, col * 1.12, 0.15);
         }
         if (m == M_ICE) {
             if (openTop + openLeft + openRight + openBottom > 0.0)

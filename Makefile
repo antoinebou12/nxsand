@@ -42,6 +42,7 @@ UNIT_SRCS     := tests/unit_main.cpp \
                  tests/unit_active_tiles.cpp \
                  tests/unit_tpt_import.cpp \
                  tests/unit_perf_preset_physics.cpp \
+                 tests/unit_menu_repeat.cpp \
                  source/save/tpt_stamp_import.cpp \
                  source/game/game_settings.cpp \
                  source/save/settings_io.cpp \
@@ -50,7 +51,8 @@ UNIT_SRCS     := tests/unit_main.cpp \
                  source/sim/brush_stroke.cpp \
                  source/save/physics_params_io.cpp \
                  source/save/save_paths.cpp \
-                 source/save/base64.cpp
+                 source/save/base64.cpp \
+                 source/platform/input/menu_repeat.cpp
 
 GPU_UNIT_CXXFLAGS := -std=c++17 -O2 -Wall -Wno-missing-field-initializers \
                      -DNX_DESKTOP=1 -Isource -Ithird_party -Itests \

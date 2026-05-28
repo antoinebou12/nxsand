@@ -17,17 +17,19 @@ public:
         float v1 = 0.f;
         int width = 0;
         int height = 0;
-        int bearingX = 0;
-        int bearingY = 0;
+        float bearingX = 0.f;
+        float bearingY = 0.f;
         int advance = 8;
     };
 
     GLuint tex = 0;
-    mutable int atlasW = 512;
-    mutable int atlasH = 512;
+    mutable int atlasW = 1024;
+    mutable int atlasH = 1024;
     int lineH = 20;
     int baseline = 16;
     int pixelSize = 20;
+    /// Rasterize glyphs at pixelSize * bakeScale; layout metrics stay in pixelSize units.
+    int bakeScale = 2;
 
     bool init();
     void shutdown();
@@ -52,6 +54,7 @@ private:
     const GlyphInfo& ensureGlyph(uint32_t codepoint) const;
     bool growAtlas() const;
     bool uploadAtlas() const;
+    void uploadGlyphRegion(int x, int y, int w, int h) const;
 };
 
 } // namespace nx

@@ -6,6 +6,13 @@ namespace nx {
 class RenderPipeline;
 class FontAtlas;
 
+float menuMarkTextScale(float uiScale);
+float menuCrumbTextScale(float uiScale);
+float menuMarkBoxHeight(const FontAtlas& font, float uiScale);
+float menuMarkBandHeight(const FontAtlas& font, float uiScale);
+float menuCrumbBandHeight(const FontAtlas& font, float uiScale);
+float menuBaselineInBand(float boxTop, float bandH, const FontAtlas& font, float textScale);
+
 void drawMenuChromeScrim(RenderPipeline& r, const MenuLayout& L, int W, int H, float topY,
                          float bottomY, float strength = 1.f);
 void drawMenuGlassPanel(RenderPipeline& r, const MenuLayout& L, int W, int H,

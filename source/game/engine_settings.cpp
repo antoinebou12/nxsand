@@ -190,6 +190,23 @@ const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settin
 
 void applySettingsToRuntime(App& app) { app.applyRuntimeSettings(); }
 
+bool engineTabRowIsToggle(EngineTab tab, int row) {
+    switch (tab) {
+        case EngineTab::Performance:
+            return row == 5;
+        case EngineTab::Visuals:
+            return row == 3 || row == 4;
+        case EngineTab::Accessibility:
+            return row == 1 || row == 2;
+        case EngineTab::Display:
+            return row == 2;
+        case EngineTab::Debug:
+            return row == 1 || row == 2;
+        default:
+            return false;
+    }
+}
+
 void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir) {
     auto& s = app.settings;
     switch (tab) {

@@ -29,7 +29,7 @@ Instructions for coding agents working in this repository. Codex and similar too
 | Fragment / compute sim | `source/gpu/sim_pipeline.cpp`, `shaders/sim.frag`, `shaders/sim.comp`, `shaders/sim_common.glsl` | Ping-pong `GL_R8UI`; fragment or compute (GLES 3.1 when supported); 4 Margolus phases; tunables in `physics.json` |
 | GPU brush | `shaders/paint.frag` | Dirty-rect fragment stamp with ping-pong copy/swap |
 | Render | `source/gpu/render_pipeline.cpp`, `shaders/palette_lookup.frag`, `shaders/upscale.frag` | `uPaletteMode`, blob halos (pretty mode), flicker/grain/AO from `settings.json`; optional filtered upscale (`visuals.upscaleFilter`, default nearest); optional bloom (`VisualBloom::Low`, 4 blur passes, sim-sized glow FBO) |
-| Input | `source/platform/input/` | Joy-Con-first; Switch face buttons via `switch_face.hpp` (A/B/X/Y, not positional SDL enums on switch-sdl2); pointer mapping uses `queryDrawableSize(..., settings.display.orientation)` |
+| Input | `source/platform/input/` | Joy-Con-first; Switch face buttons via `switch_face.hpp` (A/B/X/Y, not positional SDL enums on switch-sdl2); pointer mapping uses `queryDrawableSize(..., settings.display.orientation)`; menus: hold D-pad / arrows for repeat navigation and value adjust on Element Settings + Engine Settings slider rows (`menu_repeat`, toggle rows single-step) |
 | UI | `source/ui/` | GPU quads, not SDL renderer |
 | Perf HUD | `source/ui/perf_overlay.cpp`, `source/gpu/perf_stats.hpp` | FPS, ms breakdown, grid, substeps, fragment passes, brush commands, dirty rect, active-tile fallback, idle sleep |
 | Settings | `source/save/settings_io.cpp`, `source/game/game_settings.*` | `settings.json` (engine) + `physics.json` (elements); flush on Engine tab back, Engine menu exit, shutdown |
@@ -47,7 +47,7 @@ Longer narrative: **`docs/ARCHITECTURE.md`**, **`docs/NATIVE.md`**, **`docs/PHYS
 4. **GPU passes** - keep FBO state restoration and texture sampling barriers boring and explicit.
 5. **Shader** - prefer simple `texelFetch` and branch-light 2x2 rules over wide caches or driver-risky constructs; micro-opts only after `docs/SWITCH_PERF_MATRIX.md` shows sim-bound frames.
 6. **Brush** - keep dirty-rect GPU stamp path.
-7. **Active tiles** - default **Conservative** on Switch and desktop; full-grid fallback when >45% tiles active or too many runs; idle **sim.sleeping** after 30 frames with zero active tiles (populated static scenes OK). **Active tiles Off** sleeps only on an empty grid; compute and fragment skip dispatches while sleeping.
+7. **Active tiles** - default **Off**; enable Conservative/Aggressive in Engine → Performance when needed. Full-grid fallback when >45% tiles active or too many runs; idle **sim.sleeping** after 30 frames with zero active tiles (populated static scenes OK). **Active tiles Off** sleeps only on an empty grid; compute and fragment skip dispatches while sleeping. **Dynamic resolution** defaults **Off** (optional Engine toggle on Switch/desktop).
 
 Do not default **1280x720** sim on handheld OLED.
 
@@ -76,7 +76,8 @@ Only commit when the user explicitly asks. Do not change `git config` or use des
 ## Learned User Preferences
 
 - LAN FTP deploy path for NRO: `scripts/serve-nro-ftp.ps1` -> `dist/switch/NXSand.nro`.
-- Match nxsand UX: main menu with no product title or version subtitle; live falling-sand animation visible through translucent menu chrome (`menu_chrome`, `menu_sim`); three slots, Joy-Con-first HUD, material picker, settings; touch on desktop where applicable.
+- Match nxsand UX: main menu with no product title or version subtitle; live falling-sand backdrop at the bottom edge only (`menu_sim` through `menu_chrome`); no top header/title panel box behind the list; three slots, Joy-Con-first HUD, material picker, settings; touch on desktop where applicable.
+- Engine and Element Settings: hold D-pad or arrow keys on slider rows for repeat adjust (`menu_repeat`); toggle rows stay single-step.
 - Desktop play: mouse brush and WASD movement; menu/HUD hints use desktop copy (`ui_copy`), not Switch Joy-Con strings.
 - Menu lists: keep row label text aligned and vertically centered with selection/highlight boxes on Switch and desktop; when fixing layout, verify both platforms.
 - Switch menus must use compact safe-area scroll lists; do not draw all rows when they exceed the visible panel.
@@ -92,3 +93,5 @@ Only commit when the user explicitly asks. Do not change `git config` or use des
 - Git remote: https://github.com/antoinebou12/nxsand (GitHub repo name `nxsand`; product/artifact NXSand).
 - Git root is the NXEngine workspace folder (no nested `nxsand/` subfolder with its own `.git`).
 - Switch: `SDL_GL_GetDrawableSize` can report portrait 720×1280 while the panel is landscape; use `nx::queryDrawableSize` from `screen_size.hpp` for UI, input, and render sizing.
+- TPT stamp import: `source/save/tpt_stamp_import.*` with material map in `source/save/tpt_material_map.hpp`; limits and JSON format in `docs/TPT_IMPORT.md` (not full TPT particle physics).
+- Desktop GLES compute default: set `NXSAND_ENABLE_COMPUTE=1` when running `make desktop` to build with `NXSAND_ENABLE_COMPUTE_DEFAULT` (Engine → Performance → Sim shader still selects fragment vs compute at runtime).

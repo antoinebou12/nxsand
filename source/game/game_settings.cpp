@@ -8,17 +8,13 @@ namespace nx {
 GameSettings defaultGameSettings() {
     GameSettings s{};
 #if defined(__SWITCH__)
-    // Handheld can't sustain Balanced (640x360) on the stock GLES driver. Start at the
-    // fast preset and let dynamic resolution raise it only if there's headroom.
+    // Handheld can't sustain Balanced (640x360) on the stock GLES driver.
     s.performance.mode = PerfPreset::BatterySaver;
-    s.performance.dynamicResolution = true;
     s.display.orientation = ScreenOrientation::Landscape;
     applyPerfPreset(s.performance, PerfPreset::BatterySaver, true);
-    s.performance.activeTiles = ActiveTileMode::Conservative;
     applyPerfPresetVisuals(s.visuals, PerfPreset::BatterySaver);
 #else
     applyPerfPreset(s.performance, PerfPreset::Balanced, false);
-    s.performance.activeTiles = ActiveTileMode::Conservative;
     s.performance.simBackend = SimBackend::Fragment;
     applyPerfPresetVisuals(s.visuals, PerfPreset::Balanced);
 #endif
@@ -46,11 +42,9 @@ void applyPerfPresetVisuals(VisualSettings& vis, PerfPreset preset) {
 void applyPerfPresetPhysics(PhysicsParams& phys, PerfPreset preset) {
     switch (preset) {
         case PerfPreset::BatterySaver:
-            phys.water_levelRate = 0.010f;
-            break;
         case PerfPreset::Balanced:
         case PerfPreset::Quality:
-            phys.water_levelRate = 0.028f;
+            phys.water_levelRate = 0.10f;
             break;
         case PerfPreset::Manual:
             break;

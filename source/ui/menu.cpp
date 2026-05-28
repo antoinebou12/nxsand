@@ -38,6 +38,20 @@ static int menuItemCount(const MenuState& m) {
     return 0;
 }
 
+bool menuAllowsHorizontalRepeat(const MenuState& m) {
+    if (m.screen == MenuScreen::SettingsEdit) {
+        const int pc = paramCountFor(m.settingsMat);
+        if (m.index <= 0 || m.index > pc) return false;
+        const ParamSpec* spec = paramSpecAt(m.settingsMat, m.index - 1);
+        return spec && spec->step < 1.f;
+    }
+    if (m.screen == MenuScreen::EngineSettingsTab) {
+        if (m.index <= 0) return false;
+        return !engineTabRowIsToggle(m.engineTab, m.index - 1);
+    }
+    return false;
+}
+
 static bool menuIsBackItem(const MenuState& m, int i) {
     if (m.screen == MenuScreen::Load || m.screen == MenuScreen::Save)
         return i == kSlotItemCount - 1;
@@ -233,10 +247,20 @@ static void formatSlotLabel(int slot, char* buf, size_t bufSize) {
 }
 
 static MenuLayout computeLayout(int W, int H, int itemCount, int selectedIndex,
-                                bool hasBreadcrumb, float accessibilityScale);
+                                bool hasBreadcrumb, bool mainMarkHeader,
+                                const FontAtlas& font, float accessibilityScale);
+
+static float mainMenuMarkY(const MenuLayout& L, const FontAtlas& font) {
+    const float panelInset = 4.f * L.s;
+    const float headerTop = L.panelY + panelInset;
+    const float markH = menuMarkBoxHeight(font, L.s);
+    const float markBand = menuMarkBandHeight(font, L.s);
+    return headerTop + (markBand - markH) * 0.5f;
+}
 
 static MenuLayout computeLayout(int W, int H, int itemCount, int selectedIndex,
-                                bool hasBreadcrumb, float accessibilityScale) {
+                                bool hasBreadcrumb, bool mainMarkHeader, const FontAtlas& font,
+                                float accessibilityScale) {
     MenuLayout L{};
     L.s = theme::uiScale(W, H, accessibilityScale);
     const bool portrait = W < H;
@@ -251,24 +275,30 @@ static MenuLayout computeLayout(int W, int H, int itemCount, int selectedIndex,
     const float safeTop = 22.f * L.s;
 #endif
     L.panelW = std::min(590.f * L.s, std::max(220.f * L.s, float(W) - sideMargin * 2.f));
-    L.titleY = safeTop + 18.f * L.s;
+    const float panelInset = 4.f * L.s;
+    const float headerGap = 12.f * L.s;
+    const float ruleMargin = 10.f * L.s;
+    float listPadTop = 46.f * L.s;
     if (hasBreadcrumb) {
-        L.markY = L.titleY;
-        L.logoY = std::max(10.f * L.s, L.titleY - 54.f * L.s);
-        L.panelY = L.titleY + 78.f * L.s;
+        const float crumbBand = menuCrumbBandHeight(font, L.s);
+        const float crumbScale = menuCrumbTextScale(L.s);
+        const float linePx = float(font.lineH) * crumbScale;
+        L.panelY = safeTop + 20.f * L.s;
+        L.markY = L.panelY;
+        L.titleY = L.panelY + panelInset + (crumbBand - linePx) * 0.5f;
+        listPadTop = panelInset + crumbBand + headerGap + ruleMargin;
+    } else if (mainMarkHeader) {
+        const float markBand = menuMarkBandHeight(font, L.s);
+        L.panelY = safeTop + 18.f * L.s;
+        L.markY = L.panelY;
+        L.titleY = L.panelY;
+        listPadTop = panelInset + markBand + headerGap;
     } else {
-        L.markY = safeTop + 10.f * L.s;
-#if defined(__SWITCH__)
-        const float markBand = 60.f * L.s;
-        L.logoY = L.markY + 30.f * L.s;
-#else
-        const float markBand = 64.f * L.s;
-        L.logoY = L.markY + 34.f * L.s;
-#endif
-        L.panelY = L.markY + markBand;
+        L.panelY = safeTop + 20.f * L.s;
+        L.markY = L.panelY;
+        L.titleY = L.panelY;
     }
     L.footerY = float(H) - safeBottom * 0.74f;
-    const float listPadTop = hasBreadcrumb ? 54.f * L.s : 46.f * L.s;
     const float listPadBottom = 30.f * L.s;
     const float panelChrome = listPadTop + listPadBottom;
     const float available = std::max(160.f * L.s, L.footerY - L.panelY - 32.f * L.s);
@@ -287,9 +317,10 @@ void MenuState::handlePointer(App& app, int px, int py, bool confirm) {
     const int total = menuItemCount(*this);
     if (total <= 0) return;
     const bool hasBreadcrumb = screen != MenuScreen::Main;
+    const bool mainMarkHeader = !hasBreadcrumb && screen == MenuScreen::Main;
     const MenuLayout L =
-        computeLayout(app.screenW, app.screenH, total, index, hasBreadcrumb,
-                      app.settings.accessibility.uiScale);
+        computeLayout(app.screenW, app.screenH, total, index, hasBreadcrumb, mainMarkHeader,
+                      app.font, app.settings.accessibility.uiScale);
     const float padX = 28.f * L.s;
     const float x0 = L.panelX + padX;
     const float x1 = L.panelX + L.panelW - padX;
@@ -319,36 +350,6 @@ static void drawSpaceGradient(RenderPipeline& rp, int W, int H) {
         rp.drawSolidRect(0.f, bh * float(i), float(W), bh + 1.f, rv, gv, bv, 1.f, W, H);
     }
 }
-
-#if !defined(__SWITCH__)
-static void drawAnimatedLogo(RenderPipeline& r, float cx, float cy, int tick, int W, int H) {
-    constexpr int n = 32;
-    for (int i = 0; i < n; ++i) {
-        const float a = (float(i) / float(n)) * 6.2831853f + tick * 0.018f;
-        const float wave = std::sin(tick * 0.04f + i * 0.6f) * 7.f;
-        const float rad = 36.f + wave;
-        const float x = cx + std::cos(a) * rad;
-        const float y = cy + std::sin(a) * rad * 0.55f + std::sin(tick * 0.07f + i * 0.4f) * 4.f;
-        const int phase = (i + tick / 2) % n;
-        float cr, cg, cb;
-        if (phase < n / 3) {
-            cr = 0.37f;
-            cg = 0.92f;
-            cb = 0.83f;
-        } else if (phase < (2 * n) / 3) {
-            cr = 0.78f;
-            cg = 0.63f;
-            cb = 0.31f;
-        } else {
-            cr = 0.23f;
-            cg = 0.60f;
-            cb = 0.91f;
-        }
-        const float sz = 2.0f + (i % 3 == 0 ? 1.0f : 0.f);
-        r.drawSolidRect(x - sz, y - sz, sz * 2.f, sz * 2.f, cr, cg, cb, 0.70f, W, H);
-    }
-}
-#endif
 
 static void fitLabel(char* dst, size_t dstSize, const char* label, float rowW, float textScale) {
     if (!dst || dstSize == 0) return;
@@ -389,8 +390,10 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
     const int W = app.screenW, H = app.screenH;
     const int items = menuItemCount(app.menu);
     const bool hasBreadcrumb = app.menu.screen != MenuScreen::Main;
-    const MenuLayout L =
-        computeLayout(W, H, items, app.menu.index, hasBreadcrumb, app.settings.accessibility.uiScale);
+    const bool mainMarkHeader =
+        !hasBreadcrumb && app.menu.screen == MenuScreen::Main;
+    const MenuLayout L = computeLayout(W, H, items, app.menu.index, hasBreadcrumb, mainMarkHeader,
+                                       font, app.settings.accessibility.uiScale);
     const int tick = app.menu.tick;
     const bool mainMenuFlow = app.menu.screen == MenuScreen::Main || app.menu.screen == MenuScreen::Load ||
                               app.menu.screen == MenuScreen::Save;
@@ -403,16 +406,11 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
     if (showBackdrop) {
         app.menuSim.draw(r, W, H, L.s);
         drawMenuBackgroundFx(r, W, H, tick);
-#if !defined(__SWITCH__)
-        if (showMainMark)
-            drawAnimatedLogo(r, float(W) * 0.5f, L.logoY, tick, W, H);
-#endif
     } else {
         drawMenuBackgroundFx(r, W, H, tick);
     }
 
-    const float scrimTop =
-        showMainMark ? L.markY - 16.f * L.s : L.panelY - 20.f * L.s;
+    const float scrimTop = L.panelY - 12.f * L.s;
     const float scrimBottom =
         std::max(L.panelY + L.panelH + 14.f * L.s, L.footerY + 32.f * L.s);
     const float chromeStrength = mainMenuFlow ? 0.38f : 1.f;
@@ -421,17 +419,16 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
 
     const float cx = float(W) * 0.5f;
 
-    if (showMainMark)
-        drawMenuMark(r, font, cx, L.markY, L, W, H, chromeStrength);
+    if (showMainMark) {
+        drawMenuMark(r, font, cx, mainMenuMarkY(L, font), L, W, H, chromeStrength);
+        drawMenuHeaderRuleAt(r, L, L.listY0 - 10.f * L.s, W, H);
+    }
 
     if (hasBreadcrumb) {
-#if defined(__SWITCH__)
-        const float crumbScale = 0.62f * L.s;
-        const float crumbY = L.titleY + 8.f * L.s;
-#else
-        const float crumbScale = 1.1f * L.s;
-        const float crumbY = L.titleY + 4.f * L.s;
-#endif
+        const float crumbScale = menuCrumbTextScale(L.s);
+        const float crumbBand = menuCrumbBandHeight(font, L.s);
+        const float headerTop = L.panelY + 4.f * L.s;
+        const float crumbY = menuBaselineInBand(headerTop, crumbBand, font, crumbScale);
         char crumb[96];
         if (app.menu.screen == MenuScreen::SettingsEdit) {
             std::snprintf(crumb, sizeof(crumb), "Main Menu  >  Element Settings  >  %s settings",
@@ -443,9 +440,10 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
             std::snprintf(crumb, sizeof(crumb), "Main Menu  >  %s", menuBreadcrumb(app.menu));
         }
         char crumbFit[96];
-        fitLabel(crumbFit, sizeof(crumbFit), crumb, L.panelW, crumbScale);
-        font.drawTextCentered(r, cx, crumbY, crumbScale, crumbFit, 0.50f, 0.55f, 0.65f, 1.f, W,
+        fitLabel(crumbFit, sizeof(crumbFit), crumb, L.panelW - 56.f * L.s, crumbScale);
+        font.drawTextCentered(r, cx, crumbY, crumbScale, crumbFit, 0.72f, 0.78f, 0.88f, 1.f, W,
                               H);
+        drawMenuHeaderRuleAt(r, L, L.listY0 - 10.f * L.s, W, H);
     }
 
     char buf[96];

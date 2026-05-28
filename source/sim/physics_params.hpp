@@ -12,17 +12,17 @@ struct alignas(16) PhysicsParams {
     // Fire
     float fire_speed         = 1.0f;
     float fire_smokeRate     = 0.070f;
-    float fire_ignitePlant   = 0.14f;
+    float fire_ignitePlant   = 0.08f;
     float fire_igniteOil     = 0.045f;
     float fire_spreadRate    = 0.040f;
 
     // Smoke
-    float smoke_fadeRate     = 0.028f;
-    float smoke_driftRate    = 0.20f;
+    float smoke_fadeRate     = 0.010f;
+    float smoke_driftRate    = 0.12f;
 
     // Water (high spread/level = very fast, pool-like flow)
-    float water_flowRate     = 0.74f;
-    float water_levelRate    = 0.028f;
+    float water_flowRate     = 0.85f;
+    float water_levelRate    = 0.10f;
 
     // Acid
     float acid_flowRate      = 0.28f;
@@ -30,7 +30,7 @@ struct alignas(16) PhysicsParams {
     float acid_stoneCorrode  = 0.045f;
 
     // Plant
-    float plant_growthRate   = 0.06f;
+    float plant_growthRate   = 0.12f;
     float plant_wallSupport  = 1.0f;
 
     // Lava: fall/spread/ignite gas; lava+water quench is hard-coded in sim.frag

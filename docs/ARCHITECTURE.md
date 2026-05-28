@@ -85,7 +85,7 @@ Regenerate those when reaction branches change; keep [`PHYSICS.md`](PHYSICS.md) 
 
 - Boot sim size: Battery Saver 480×270; Balanced 640×360 when dynamic resolution upgrades.
 - Substeps: 1–2 via `effectiveSubsteps`.
-- Active tiles: Conservative by default; idle sleep when active tile count is zero (settled matter allowed). Active tiles Off sleeps only on an empty grid.
+- Active tiles: Off by default; idle sleep when active tile count is zero (settled matter allowed). Conservative/Aggressive optional in Engine settings. Active tiles Off sleeps only on an empty grid.
 - Do not default 1280×720 sim on handheld OLED.
 
 See `docs/SWITCH_PERF_MATRIX.md` when tuning shader or pass count.

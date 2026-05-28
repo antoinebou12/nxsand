@@ -85,6 +85,7 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
     in.brushDx = in.brushDy = 0;
     in.menuConfirm = in.menuBack = in.menuUp = in.menuDown = false;
     in.menuLeft = in.menuRight = false;
+    in.menuUpHeld = in.menuDownHeld = in.menuLeftHeld = in.menuRightHeld = false;
     in.menuPointerActive = false;
     in.menuPointerConfirm = false;
     in.toggleMaterialRing = false;
@@ -107,7 +108,6 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
     static bool prevStart = false;
     static bool prevSelect = false;
     static bool prevQuickSave = false;
-    static bool prevUp = false, prevDown = false, prevLeft = false, prevRight = false;
     static bool prevRet = false, prevBk = false, prevKUp = false, prevKDn = false, prevKLeft = false,
                 prevKRight = false;
 #if !defined(__SWITCH__)
@@ -181,7 +181,7 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
     bool hKey = kb[SDL_SCANCODE_H] != 0;
 #endif
 
-    if (menuActive || materialWheelOpen) {
+    if (materialWheelOpen && !menuActive) {
         in.menuConfirm = ret && !prevRet;
         in.menuBack = bk && !prevBk;
         in.menuUp = ku && !prevKUp;
@@ -197,7 +197,17 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
     }
 
     if (menuActive) {
+        in.menuConfirm = ret && !prevRet;
+        in.menuBack = bk && !prevBk;
+        in.menuUpHeld = ku;
+        in.menuDownHeld = kd;
+        in.menuLeftHeld = kl;
+        in.menuRightHeld = kr;
 #if !defined(__SWITCH__)
+        if (kw) in.menuUpHeld = true;
+        if (ks) in.menuDownHeld = true;
+        if (ka) in.menuLeftHeld = true;
+        if (kdKey) in.menuRightHeld = true;
         if (window) {
             int lx = 0, ly = 0;
             const Uint32 mbtn = SDL_GetMouseState(&lx, &ly);
@@ -211,10 +221,10 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
 #if defined(__SWITCH__)
         if (nxDown & HidNpadButton_A) in.menuConfirm = true;
         if (nxDown & HidNpadButton_B) in.menuBack = true;
-        if (nxDown & HidNpadButton_Up) in.menuUp = true;
-        if (nxDown & HidNpadButton_Down) in.menuDown = true;
-        if (nxDown & HidNpadButton_Left) in.menuLeft = true;
-        if (nxDown & HidNpadButton_Right) in.menuRight = true;
+        if (nxUp) in.menuUpHeld = true;
+        if (nxDownBtn) in.menuDownHeld = true;
+        if (nxLeft) in.menuLeftHeld = true;
+        if (nxRight) in.menuRightHeld = true;
 #endif
         if (in.pad) {
             const bool fa = switch_face::confirm(in.pad);
@@ -224,23 +234,19 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
             bool lf = SDL_GameControllerGetButton(in.pad, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
             bool rt = SDL_GameControllerGetButton(in.pad, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
             const Sint16 ax = SDL_GameControllerGetAxis(in.pad, SDL_CONTROLLER_AXIS_LEFTX);
-            static Sint16 prevMenuAx = 0;
             const int dead = 12000;
             const bool stickL = ax < -dead;
             const bool stickR = ax > dead;
             if (edge(fa, prevFaceA)) in.menuConfirm = true;
             if (edge(fb, prevFaceB)) in.menuBack = true;
-            if (edge(up, prevUp)) in.menuUp = true;
-            if (edge(dn, prevDown)) in.menuDown = true;
-            if (edge(lf, prevLeft) || (stickL && prevMenuAx >= -dead)) in.menuLeft = true;
-            if (edge(rt, prevRight) || (stickR && prevMenuAx <= dead)) in.menuRight = true;
+            if (up) in.menuUpHeld = true;
+            if (dn) in.menuDownHeld = true;
+            if (lf) in.menuLeftHeld = true;
+            if (rt) in.menuRightHeld = true;
+            if (stickL) in.menuLeftHeld = true;
+            if (stickR) in.menuRightHeld = true;
             prevFaceA = fa;
             prevFaceB = fb;
-            prevUp = up;
-            prevDown = dn;
-            prevLeft = lf;
-            prevRight = rt;
-            prevMenuAx = ax;
         }
         prevRet = ret;
         prevBk = bk;
@@ -441,10 +447,6 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
         prevR = r;
         prevStart = st;
         prevSelect = sel;
-        prevUp = up;
-        prevDown = dn;
-        prevLeft = lf;
-        prevRight = rt;
     }
 
     if (!menuActive && !materialWheelOpen && window && play && gridW > 0 && gridH > 0) {

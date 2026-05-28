@@ -27,11 +27,14 @@ inline Material cpu_react_ice(bool nearWater, bool nearFire, bool nearLava, bool
     return MAT_ICE;
 }
 
-inline Material cpu_react_smoke(bool nearIce, bool nearSolid, float smokeFadeRate,
-                                float rollCondense, float rollFade) {
+inline Material cpu_react_smoke(bool nearIce, bool nearWall, bool nearStoneSand,
+                                float smokeFadeRate, float rollCondense, float rollFade) {
     if (nearIce && cpu_roll_lt(rollCondense, kSmokeCondenseOnIceRate)) return MAT_WATER;
-    const float fade = nearSolid ? (smokeFadeRate + 0.10f > 1.f ? 1.f : smokeFadeRate + 0.10f)
-                                 : smokeFadeRate;
+    float fade = smokeFadeRate;
+    if (nearWall)
+        fade = smokeFadeRate * 0.35f;
+    else if (nearStoneSand)
+        fade = smokeFadeRate + 0.05f > 1.f ? 1.f : smokeFadeRate + 0.05f;
     if (cpu_roll_lt(rollFade, fade)) return MAT_EMPTY;
     return MAT_SMOKE;
 }

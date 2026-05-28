@@ -28,14 +28,14 @@ OpenGL coordinates increase upward inside the sim texture. UI input, cursor draw
 |----------|------------|-------------------|---------|--------|
 | Sand | 1.0 | powder slide ~0.55–0.70 via `slideChance` | 4 | no |
 | Stone | 1.0 | powder slide | 5 | no |
-| Water | 0.99 | `water_flowRate` (default 0.74), `water_levelRate` wide spread + pocket fill under ledges (default 0.028) | 3 | no |
+| Water | 1.0 | `water_flowRate` (default 0.85), `water_levelRate` wide spread + pocket fill under ledges (default 0.10) | 3 | no |
 | Acid | 0.88 | `acid_flowRate` (default 0.28) | 3 | no |
 | Lava | `lava_flowRate+0.45` clamped (default fall ~0.61) | `lava_spreadRate` (default 0.09) | 3 | no |
 | Oil | 0.55 | `oil_floatRate` (default 0.16) | 2 | no |
-| Fire / Smoke | `fire_speed` | `fire_spreadRate` / `smoke_driftRate` | 0 | no |
+| Fire / Smoke | `fire_speed` | `fire_spreadRate` / `smoke_driftRate`; rise/drift only into **empty** cells (cannot displace wall, stone, plant, or ice) | 0 | no |
 | Wall / Plant / Ice | — | ice slow-thaw near water | — | yes |
 
-Liquids spread horizontally into empty or same-or-lighter liquid cells (density layering keeps oil above water). Water also gets a **pocket** boost in `boostedFlow()` when one empty cell lies ahead with solid ground below it. **Battery Saver** still overrides runtime `water_levelRate` to **0.010** (Balanced/Quality use **0.028**); see `applyPerfPresetPhysics` in `source/game/game_settings.cpp`. Powders use `slideChance` in diagonal swaps so sand and stone fall off ledges without horizontal “flow.”
+Liquids spread horizontally into empty or same-or-lighter liquid cells (density layering keeps oil above water). Water also gets a **pocket** boost in `boostedFlow()` when one empty cell lies ahead with solid ground below it. Presets set `water_levelRate` to **0.10** via `applyPerfPresetPhysics` in `source/game/game_settings.cpp`. Powders use `slideChance` in diagonal swaps so sand and stone fall off ledges without horizontal “flow.”
 
 ## Interaction matrix
 
@@ -43,12 +43,14 @@ Each row is the **cell being updated** when a cardinal neighbor of the listed ty
 
 | Cell | Neighbor | Outcome | Tunable / notes |
 |------|----------|---------|-----------------|
-| Empty | Plant + water | Plant | `min(1, plant_growthRate×4)` (default base 0.06) |
-| Empty | Plant + wall only | Plant | `plant_growthRate×0.3` if `plant_wallSupport` on |
+| Empty | Plant + water (surface) | Plant | `min(1, plant_growthRate×9)` (default base 0.12) |
+| Empty | Plant + water below cell | Plant | `min(1, plant_growthRate×14)` (submerged / deeper) |
+| Empty | Plant + in-grid wall | Plant | `min(1, plant_growthRate×4)` if `plant_wallSupport` on (max with water branch) |
+| Empty | Plant + wall/plant below | Plant | `min(1, plant_growthRate×7)` wall climb (longer vertical columns) |
 | Wall | Acid | Empty | `acid_wallCorrode` (default 0.06) |
 | Plant | Acid | Empty | 35% |
-| Plant | Fire (4- or 8-neighbor) | Fire | cardinal fire ignites when `fire_ignitePlant > 0`; `×0.85` diagonal-only; `1.0` if 2+ cardinal fire |
-| Plant | Smoke | Fire | `fire_ignitePlant × 0.55` |
+| Plant | Fire (4- or 8-neighbor) | Fire | cardinal roll `min(1, fire_ignitePlant×2.5)`; `×0.85` diagonal-only; instant if 2+ cardinal fire |
+| Plant | Smoke | Fire | `fire_ignitePlant × 0.40` when plant ignition is enabled |
 | Plant | Lava | Fire | always |
 | Oil | Fire (1 neighbor) | Fire | `max(oil_igniteRate, fire_igniteOil) × 3.0` |
 | Oil | Fire (2+ cardinal) | Fire | ignite rate `×2.5` (cap 1.0) |
@@ -72,17 +74,18 @@ Each row is the **cell being updated** when a cardinal neighbor of the listed ty
 | Acid | Fire / Lava | Smoke | 18% |
 | Acid | Wall / Stone | Smoke | 6% fizz |
 | Fire | Water / Ice / Acid | Smoke or Empty | 35% smoke |
-| Fire | Plant / Oil | Fire | fuel contact lowers burnout to `fire_smokeRate × 0.55` |
+| Fire | Plant / Oil | Fire | fuel contact suppresses burnout while flame is touching fuel |
 | Fire | — | Smoke | `fire_smokeRate` |
 | Smoke | Ice | Water | 42% |
-| Smoke | Wall / Stone / Sand | Empty | `smoke_fadeRate + 0.10` |
-| Smoke | — | Empty | `smoke_fadeRate` (default 0.040); drift `smoke_driftRate` (default 0.12) |
+| Smoke | Wall | Smoke | linger: `smoke_fadeRate × 0.35`; horizontal drift damped beside wall |
+| Smoke | Stone / Sand | Empty | `smoke_fadeRate + 0.05` |
+| Smoke | — | Empty | `smoke_fadeRate` (default 0.010); drift `smoke_driftRate` (default 0.12) |
 
 ## Balance limits
 
 - Most reactions are **4-neighbor** and **probabilistic**—no global floods in one frame. Plant ignition also checks **8-neighbors** (diagonal fire).
 - Acid corrosion is per-cell; pooling against walls increases contact rate via `acid_flowRate`, not instant deletion.
-- Fire spreads along plant via `fire_ignitePlant` (default **0.14**, cardinal `×2.5`, instant if two cardinal flame neighbors); oil pools use `fire_igniteOil` / `oil_igniteRate` (defaults **0.045** / **0.07**), with faster spread when two sides touch flame. Fire touching plant or oil burns out more slowly (`fire_smokeRate × 0.35`) so contact persists. Walls do not react to lava (acid corrosion only). Water and acid extinguish fire cells.
+- Fire spreads along plant via `fire_ignitePlant` (default **0.08**, cardinal `×2.5` per-frame roll, instant if two cardinal flame neighbors); oil pools use `fire_igniteOil` / `oil_igniteRate` (defaults **0.045** / **0.07**), with faster spread when two sides touch flame. Fire touching plant or oil burns out more slowly (`fire_smokeRate × 0.35`) so contact persists. Fire and smoke **rise and drift only into empty cells**—they never swap into wall, stone, plant, or ice. Fire has no wall-specific drift or reaction. Walls change only from acid (`acid_wallCorrode`); smoke lingers on wall faces. Water and acid extinguish fire cells.
 - Lava + water: water often becomes stone; lava becomes smoke—stylized quench, not full thermodynamics.
 
 ## Tuning guide

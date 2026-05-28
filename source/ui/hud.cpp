@@ -113,7 +113,9 @@ void drawHudSolid(RenderPipeline& r, App& app, const PlayRegion& pr) {
     char title[96];
     std::snprintf(title, sizeof(title), "%s  R%d  %s", theme::APP_TITLE,
                   app.sim.brush_radius, material_name(app.sim.brush_mat));
-    const float topH = app.sim.paletteHidden ? 34.f * s : 42.f * s;
+    const bool profilerOn = app.settings.debug.profilerHud != ProfilerHud::Off;
+    const float topH =
+        playHudTopBarPx(W, H, !app.sim.paletteHidden, profilerOn, app.settings.accessibility.uiScale);
     r.drawSolidRect(0, 0, float(W), topH, 0.04f, 0.055f, 0.085f, 0.62f, W, H);
     app.font.drawText(r, 14.f * s, 9.f * s, 0.92f * s, title,
                       0.88f, 0.94f, 1.0f, 0.92f, W, H);

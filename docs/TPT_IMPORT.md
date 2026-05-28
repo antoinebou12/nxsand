@@ -72,10 +72,10 @@ Shader rules in [`shaders/sim_common.glsl`](../shaders/sim_common.glsl) borrow *
 
 | Engine → Performance | Typical sim | Substeps | `water_levelRate` (runtime) |
 |----------------------|------------|----------|-------------------------------|
-| Battery Saver | 480×270 | 1 | **0.010** (reduced wide/pocket fill) |
-| Balanced | 640×360 | 2 | **0.028** (default) |
-| Quality | 720×405 | 1 | **0.028** (default) |
+| Battery Saver | 480×270 | 1 | **0.10** |
+| Balanced | 640×360 | 2 | **0.10** |
+| Quality | 720×405 | 1 | **0.10** |
 
-Also prefer **Active tiles: Stable fallback**, **Bloom Off**, and **Upscale filter: nearest** when profiling on Switch. Fill measured FPS / sim ms in [`SWITCH_PERF_MATRIX.md`](SWITCH_PERF_MATRIX.md).
+Also prefer **Active tiles: Off** unless profiling needs Stable fallback, **Bloom Off**, and **Upscale filter: nearest** when profiling on Switch. Fill measured FPS / sim ms in [`SWITCH_PERF_MATRIX.md`](SWITCH_PERF_MATRIX.md).
 
 Preset physics overrides are **runtime only** (`applyPerfPresetPhysics` in [`source/game/game_settings.cpp`](../source/game/game_settings.cpp)); they do not rewrite `physics.json` until you save from Element Settings.

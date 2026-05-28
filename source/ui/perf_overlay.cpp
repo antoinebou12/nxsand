@@ -2,6 +2,7 @@
 #include "../gpu/render_pipeline.hpp"
 #include "../gpu/font_atlas.hpp"
 #include "../gpu/perf_stats.hpp"
+#include "layout.hpp"
 #include "theme.hpp"
 #include <algorithm>
 #include <cstdio>
@@ -9,7 +10,8 @@
 namespace nx {
 
 void drawPerfOverlay(RenderPipeline& r, FontAtlas& font, const PerfStats& perf,
-                     const DebugSettings& debug, int screenW, int screenH) {
+                     const DebugSettings& debug, const PlayRegion& pr, bool paletteVisible,
+                     int screenW, int screenH, float uiScale) {
     if (debug.profilerHud == ProfilerHud::Off) return;
 
     char line1[160];
@@ -63,14 +65,22 @@ void drawPerfOverlay(RenderPipeline& r, FontAtlas& font, const PerfStats& perf,
                   paintHeld ? "on" : "off", eraseHeld ? "on" : "off",
                   brushMaterial, brushRadius, cmds, dirtyW, dirtyH);
 
-    const float s = theme::uiScale(screenW, screenH);
-    const float pad = 8.f * s;
+    const float s = theme::uiScale(screenW, screenH, uiScale);
+    const float pad = 6.f * s;
     const float x0 = 18.f * s;
-    const float y0 = 48.f * s;
-    const float lineH = 16.f * s;
+    const float lineH = 14.f * s;
     const int lines = debug.profilerHud == ProfilerHud::Full ? 4 : 2;
     const float boxH = lineH * float(lines) + pad * 2.f;
-    const float boxW = 620.f * s;
+    const float boxW = std::min(620.f * s, float(screenW) - 36.f * s);
+
+    const int topInset = playHudInsets(screenW, screenH, paletteVisible, true).first;
+    const float gap = 6.f * s;
+    float y0;
+    if (float(pr.y) > float(topInset) + boxH + gap) {
+        y0 = float(pr.y) - boxH - gap;
+    } else {
+        y0 = 22.f * s;
+    }
 
     r.drawSolidRect(x0, y0, boxW, boxH, 0.02f, 0.03f, 0.05f, 0.75f, screenW, screenH);
     font.drawText(r, x0 + 6.f * s, y0 + 4.f * s, 0.72f * s, line1, 0.75f, 0.88f, 0.95f, 1.f,

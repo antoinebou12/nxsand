@@ -26,9 +26,8 @@ struct MenuLayout {
     float panelH;
     float rowH;
     float listY0;
-    float titleY;
+    float titleY; // breadcrumb line-box top (inside panel header when hasBreadcrumb)
     float markY;
-    float logoY;
     float footerY;
     int visibleRows;
     int firstRow;
@@ -54,5 +53,7 @@ struct MenuState {
 };
 
 void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app);
+
+bool menuAllowsHorizontalRepeat(const MenuState& menu);
 
 } // namespace nx
