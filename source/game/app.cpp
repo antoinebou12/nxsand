@@ -336,15 +336,15 @@ void App::applyRuntimeSettings() {
     sim.brush_radius = std::clamp(settings.controls.brushRadius, 1, 64);
     SDL_GL_SetSwapInterval(settings.performance.targetFps == 60 ? 1 : 2);
     if (render) {
-        render->setPaletteMode(settings.visuals.paletteMode);
+        render->setPaletteMode(settings.debug.showMaterialIds ? 3 : settings.visuals.paletteMode);
         render->setBlobEnabled(settings.visuals.paletteMode == 0);
         render->setBloomLevel(settings.visuals.bloom);
         const bool reduceFlash = settings.accessibility.reduceFlashing;
         render->setFlickerEnabled(settings.visuals.flicker && !reduceFlash);
         render->setGrainEnabled(settings.visuals.grain);
         float ao = 0.f;
-        if (settings.visuals.ao == VisualAo::Low) ao = 0.04f;
-        else if (settings.visuals.ao == VisualAo::High) ao = 0.08f;
+        if (settings.visuals.ao == VisualAo::Low) ao = 0.025f;
+        else if (settings.visuals.ao == VisualAo::High) ao = 0.045f;
         render->setAoStrength(ao);
         render->setUpscaleFilter(settings.visuals.upscaleFilter);
     }
@@ -430,9 +430,98 @@ void App::shutdown() {
     SDL_Quit();
 }
 
+void App::onEnterPlayFromMenu() {
+    playSaveSuppressFrames_ = kPlaySaveSuppressFrames;
+}
+
+void App::executePendingSave() {
+    switch (pendingSave_) {
+        case PendingSaveKind::Slot: {
+            const bool ok = saveGame(*this, pendingSlot_);
+            if (pendingSlot_ == 1)
+                toast.show(ok ? "Saved slot 1" : "Save failed", ok ? 1.0f : 1.4f);
+            else
+                toast.show(ok ? "Saved" : "Save failed", ok ? 1.2f : 1.5f);
+            break;
+        }
+        case PendingSaveKind::GameSettings: {
+            const bool wasDirty = gameSettingsDirty();
+            const bool ok = flushGameSettingsIfDirty(settings);
+            if (wasDirty)
+                toast.show(ok ? "Settings saved" : "Save settings failed", ok ? 1.0f : 1.5f);
+            break;
+        }
+        case PendingSaveKind::PhysicsSettings: {
+            const bool wasDirty = physicsParamsDirty();
+            const bool ok = flushPhysicsParamsIfDirty(physics);
+            if (wasDirty)
+                toast.show(ok ? "Element settings saved" : "Save settings failed",
+                           ok ? 1.0f : 1.5f);
+            break;
+        }
+        default: break;
+    }
+}
+
+void App::tickPendingSave(double dtSec) {
+    if (pendingSave_ == PendingSaveKind::None) return;
+#if !defined(__SWITCH__)
+    saveOverlay.tick(static_cast<float>(dtSec));
+    if (!saveOverlay.readyForIo()) return;
+#else
+    (void)dtSec;
+#endif
+    executePendingSave();
+#if !defined(__SWITCH__)
+    saveOverlay.end();
+#endif
+    pendingSave_ = PendingSaveKind::None;
+}
+
+void App::requestSlotSave(int slot, bool fromQuickSave) {
+    if (fromQuickSave && playSaveSuppressFrames_ > 0) return;
+#if defined(__SWITCH__)
+    const bool ok = saveGame(*this, slot);
+    if (slot == 1)
+        toast.show(ok ? "Saved slot 1" : "Save failed", ok ? 1.0f : 1.4f);
+    else
+        toast.show(ok ? "Saved" : "Save failed", ok ? 1.2f : 1.5f);
+    return;
+#endif
+    if (pendingSave_ != PendingSaveKind::None) return;
+    pendingSave_ = PendingSaveKind::Slot;
+    pendingSlot_ = slot;
+    saveOverlay.begin("Saving...");
+}
+
+void App::requestFlushGameSettings() {
+    if (!gameSettingsDirty()) return;
+#if defined(__SWITCH__)
+    const bool ok = flushGameSettingsIfDirty(settings);
+    toast.show(ok ? "Settings saved" : "Save settings failed", ok ? 1.0f : 1.5f);
+    return;
+#endif
+    if (pendingSave_ != PendingSaveKind::None) return;
+    pendingSave_ = PendingSaveKind::GameSettings;
+    saveOverlay.begin("Saving settings...");
+}
+
+void App::requestFlushPhysicsSettings() {
+    if (!physicsParamsDirty()) return;
+#if defined(__SWITCH__)
+    const bool ok = flushPhysicsParamsIfDirty(physics);
+    toast.show(ok ? "Element settings saved" : "Save settings failed", ok ? 1.0f : 1.5f);
+    return;
+#endif
+    if (pendingSave_ != PendingSaveKind::None) return;
+    pendingSave_ = PendingSaveKind::PhysicsSettings;
+    saveOverlay.begin("Saving settings...");
+}
+
 void App::tickMenu(double dtSec) {
     menu.tick++;
-    menuSim.tick(menu.tick);
+    menuSim.tick(menu.tick,
+                 settings.visuals.flicker && !settings.accessibility.reduceFlashing);
     tickMenuBackgroundFx(menu.tick, screenW, screenH);
     pollInput(input, false, true, window, nullptr, 0, 0, settings.controls.cursorSpeed,
               settings.controls.deadzone, settings.controls.invertY, settings.display.orientation,
@@ -449,8 +538,8 @@ void App::tickMenu(double dtSec) {
         input.menuConfirm = false;
     }
     if (input.menuBack) {
-        if (menu.screen == MenuScreen::SettingsEdit) flushPhysicsParamsIfDirty(physics);
-        if (menu.screen == MenuScreen::EngineSettingsTab) flushGameSettingsIfDirty(settings);
+        if (menu.screen == MenuScreen::SettingsEdit) requestFlushPhysicsSettings();
+        if (menu.screen == MenuScreen::EngineSettingsTab) requestFlushGameSettings();
         menu.goBack(*this);
         input.menuBack = false;
     }
@@ -493,6 +582,7 @@ void App::tickPlay(double dtSec) {
     perf_.brushRadius = sim.brush_radius;
 
     if (input.openMenu) {
+        requestFlushGameSettings();
         menu.materialWheelOpen = false;
         scene = Scene::Menu;
         menu.resetMain();
@@ -500,6 +590,8 @@ void App::tickPlay(double dtSec) {
         input.openMenu = false;
         return;
     }
+
+    if (playSaveSuppressFrames_ > 0) --playSaveSuppressFrames_;
 
     const int n = selectorMaterialCount();
     const int maxI = std::max(0, n - 1);
@@ -591,10 +683,7 @@ void App::tickPlay(double dtSec) {
         }
 
         if (input.quickSave) {
-            if (saveGame(*this, 1))
-                toast.show("Saved slot 1", 1.0f);
-            else
-                toast.show("Save failed", 1.4f);
+            requestSlotSave(1, true);
             input.quickSave = false;
         }
 
@@ -735,6 +824,9 @@ void App::renderFrame() {
     }
 
     drawToastSolid(*render, *this);
+#if !defined(__SWITCH__)
+    saveOverlay.draw(*render, font, screenW, screenH, settings.accessibility.uiScale);
+#endif
     render->endUiFrame();
     perf_.endUi();
     perf_.beginPresent();
@@ -744,6 +836,7 @@ void App::renderFrame() {
 
 void App::frame(double dtSec) {
     perf_.beginFrame();
+    tickPendingSave(dtSec);
     if (window) queryDrawableSize(window, screenW, screenH, settings.display.orientation);
     if (screenW > 0 && screenH > 0 &&
         (screenW != lastScreenW_ || screenH != lastScreenH_)) {
@@ -770,10 +863,8 @@ void App::frame(double dtSec) {
                                 false
 #endif
                 );
-                applyPerfPresetVisuals(settings.visuals, PerfPreset::BatterySaver);
                 applyPerfPresetPhysics(physics, PerfPreset::BatterySaver);
                 applyRuntimeSettings();
-                markGameSettingsDirty();
             }
         } else if (perf_.frameMs < 13.0) {
             if (++stableFast > 300 && settings.performance.mode == PerfPreset::BatterySaver) {
@@ -784,10 +875,8 @@ void App::frame(double dtSec) {
                                 false
 #endif
                 );
-                applyPerfPresetVisuals(settings.visuals, PerfPreset::Balanced);
                 applyPerfPresetPhysics(physics, PerfPreset::Balanced);
                 applyRuntimeSettings();
-                markGameSettingsDirty();
                 stableFast = 0;
             }
         }

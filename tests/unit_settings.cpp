@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 
 void run_settings_tests(TestContext& ctx) {
     CHECK(ctx, nx::saveDirectory().find("nxsand") != std::string::npos);
@@ -92,4 +93,30 @@ void run_settings_tests(TestContext& ctx) {
     CHECK(ctx, loaded.display.fullscreenSim == false);
 
     std::filesystem::remove(path, ec);
+
+    nx::VisualSettings vis{};
+    nx::applyPerfPresetVisuals(vis, nx::PerfPreset::Balanced);
+    CHECK(ctx, vis.flicker == false);
+    CHECK(ctx, vis.ao == nx::VisualAo::Low);
+    nx::applyPerfPresetVisuals(vis, nx::PerfPreset::BatterySaver);
+    CHECK(ctx, vis.flicker == false);
+    CHECK(ctx, vis.ao == nx::VisualAo::Off);
+
+    CHECK(ctx, nx::flushGameSettingsIfDirty(s));
+    CHECK(ctx, !nx::gameSettingsDirty());
+    nx::markGameSettingsDirty();
+    CHECK(ctx, nx::gameSettingsDirty());
+    CHECK(ctx, nx::flushGameSettingsIfDirty(s));
+    CHECK(ctx, !nx::gameSettingsDirty());
+
+    std::filesystem::remove_all(path, ec);
+    std::filesystem::create_directories(path + "/blocked", ec);
+    {
+        std::ofstream keep(path + "/blocked/keep", std::ios::out);
+        keep << "x";
+    }
+    nx::markGameSettingsDirty();
+    CHECK(ctx, !nx::flushGameSettingsIfDirty(s));
+    CHECK(ctx, nx::gameSettingsDirty());
+    std::filesystem::remove_all(path, ec);
 }

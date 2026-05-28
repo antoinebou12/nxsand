@@ -183,9 +183,11 @@ bool saveGameSettings(const GameSettings& s) {
 
 void markGameSettingsDirty() { g_dirty = true; }
 
-void flushGameSettingsIfDirty(const GameSettings& settings) {
-    if (!g_dirty) return;
-    saveGameSettings(settings);
+bool gameSettingsDirty() { return g_dirty; }
+
+bool flushGameSettingsIfDirty(const GameSettings& settings) {
+    if (!g_dirty) return true;
+    return saveGameSettings(settings);
 }
 
 } // namespace nx

@@ -84,9 +84,11 @@ bool savePhysicsParams(const PhysicsParams& p) {
 
 void markPhysicsParamsDirty() { g_dirty = true; }
 
-void flushPhysicsParamsIfDirty(const PhysicsParams& params) {
-    if (!g_dirty) return;
-    savePhysicsParams(params);
+bool physicsParamsDirty() { return g_dirty; }
+
+bool flushPhysicsParamsIfDirty(const PhysicsParams& params) {
+    if (!g_dirty) return true;
+    return savePhysicsParams(params);
 }
 
 } // namespace nx

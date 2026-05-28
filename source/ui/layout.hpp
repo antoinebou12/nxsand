@@ -33,11 +33,31 @@ inline MenuListWindow computeMenuListWindow(int itemCount, int selectedIndex, fl
     return w;
 }
 
+// Title + hint pill band (matches hud.cpp; uses default font line metrics).
+inline float playHudMainBandPx(float s) {
+#if defined(__SWITCH__)
+    const float hintScale = 0.88f;
+#else
+    const float hintScale = 0.90f;
+#endif
+    const float titleScale = 0.92f;
+    constexpr float kFontLineH = 22.f;
+    const float hintPillH = kFontLineH * hintScale * s + 12.f * s;
+    const float titleLine = kFontLineH * titleScale * s;
+    return std::max(titleLine, hintPillH) + 8.f * s;
+}
+
 // Top HUD band height in pixels (matches hud.cpp + optional profiler second line).
 inline float playHudTopBarPx(int screenW, int screenH, bool paletteVisible, bool profilerVisible,
                              float uiScale = 1.f) {
     const float s = theme::uiScale(screenW, screenH) * uiScale;
+    const float topMargin = 12.f * s;
+#if defined(__SWITCH__)
     float top = (paletteVisible ? 42.f : 34.f) * s;
+#else
+    float top = (paletteVisible ? 50.f : 46.f) * s;
+#endif
+    top = std::max(top, topMargin + playHudMainBandPx(s));
     if (profilerVisible) top += 18.f * s;
     return top;
 }

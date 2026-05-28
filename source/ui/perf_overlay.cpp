@@ -79,7 +79,7 @@ void drawPerfOverlay(RenderPipeline& r, FontAtlas& font, const PerfStats& perf,
     if (float(pr.y) > float(topInset) + boxH + gap) {
         y0 = float(pr.y) - boxH - gap;
     } else {
-        y0 = 22.f * s;
+        y0 = float(topInset) + 4.f * s;
     }
 
     r.drawSolidRect(x0, y0, boxW, boxH, 0.02f, 0.03f, 0.05f, 0.75f, screenW, screenH);

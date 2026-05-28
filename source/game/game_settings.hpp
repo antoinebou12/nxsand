@@ -60,7 +60,7 @@ struct VisualSettings {
 #endif
     VisualAo ao = VisualAo::Low;
     VisualBloom bloom = VisualBloom::Off;
-    bool flicker = true;
+    bool flicker = false;
     bool grain = false;
     UpscaleFilter upscaleFilter = UpscaleFilter::Nearest;
 };
@@ -111,6 +111,7 @@ const char* profilerHudLabel(ProfilerHud h);
 const char* menuChromeLabel(MenuChrome m);
 const char* screenOrientationLabel(ScreenOrientation o);
 const char* upscaleFilterName(UpscaleFilter f);
+const char* paletteModeLabel(int mode);
 
 void applyPerfPreset(PerformanceSettings& perf, PerfPreset preset, bool onSwitch);
 void applyPerfPresetVisuals(VisualSettings& vis, PerfPreset preset);

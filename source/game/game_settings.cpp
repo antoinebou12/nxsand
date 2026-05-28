@@ -30,9 +30,11 @@ void applyPerfPresetVisuals(VisualSettings& vis, PerfPreset preset) {
             break;
         case PerfPreset::Balanced:
             vis.ao = VisualAo::Low;
+            vis.flicker = false;
             break;
         case PerfPreset::Quality:
             vis.ao = VisualAo::Low;
+            vis.flicker = false;
             break;
         case PerfPreset::Manual:
             break;
@@ -102,6 +104,15 @@ const char* upscaleFilterName(UpscaleFilter f) {
         case UpscaleFilter::Count: break;
     }
     return "nearest";
+}
+
+const char* paletteModeLabel(int mode) {
+    switch (mode) {
+        case 0: return "Pretty";
+        case 1: return "Fast";
+        case 2: return "Classic";
+        default: return "Pretty";
+    }
 }
 
 void applyPerfPreset(PerformanceSettings& perf, PerfPreset preset, bool onSwitch) {

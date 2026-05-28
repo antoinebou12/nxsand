@@ -114,19 +114,38 @@ void drawHudSolid(RenderPipeline& r, App& app, const PlayRegion& pr) {
     std::snprintf(title, sizeof(title), "%s  R%d  %s", theme::APP_TITLE,
                   app.sim.brush_radius, material_name(app.sim.brush_mat));
     const bool profilerOn = app.settings.debug.profilerHud != ProfilerHud::Off;
+#if defined(__SWITCH__)
+    const float hintScale = 0.88f * s;
+#else
+    const float hintScale = 0.90f * s;
+#endif
+    const float titleScale = 0.92f * s;
+    const float hintPadY = 6.f * s;
+    const float hintAsc = float(app.font.baseline) * hintScale;
+    const float hintLine = float(app.font.lineH) * hintScale;
+    const float hintPillH = hintLine + hintPadY * 2.f;
+    const float topMargin = 12.f * s;
+    const float profilerBand = profilerOn ? 18.f * s : 0.f;
+
     const float topH =
         playHudTopBarPx(W, H, !app.sim.paletteHidden, profilerOn, app.settings.accessibility.uiScale);
+
     r.drawSolidRect(0, 0, float(W), topH, 0.04f, 0.055f, 0.085f, 0.62f, W, H);
-    app.font.drawText(r, 14.f * s, 9.f * s, 0.92f * s, title,
-                      0.88f, 0.94f, 1.0f, 0.92f, W, H);
+
+    const float bandTop = topMargin;
+    const float bandH = std::max(hintPillH, topH - profilerBand - bandTop);
+    const float titleY = menuBaselineInBand(bandTop, bandH, app.font, titleScale);
+    app.font.drawText(r, 14.f * s, titleY, titleScale, title, 0.88f, 0.94f, 1.0f, 0.92f, W, H);
+
     {
         const char* hint = ui_copy::playHudHint();
-        const float hintScale = 0.66f * s;
+        const float hintPadX = 14.f * s;
         const float hintW = app.font.textWidth(hint, hintScale);
-        const float hintX = std::max(14.f * s, float(W) - hintW - 14.f * s);
-        const float hintY = 8.f * s;
-        const float pillCx = hintX + hintW * 0.5f;
-        drawHintPill(r, app.font, pillCx, hintY, s, hint, W, H);
+        const float pillW = hintW + hintPadX * 2.f;
+        const float pillCx = std::max(pillW * 0.5f + 10.f * s, float(W) - 10.f * s - pillW * 0.5f);
+        const float pillTop = bandTop + (bandH - hintPillH) * 0.5f;
+        const float hintPillY = pillTop + hintPadY + hintAsc;
+        drawHintPill(r, app.font, pillCx, hintPillY, s, hint, W, H);
     }
 
     if (!app.sim.paletteHidden) {

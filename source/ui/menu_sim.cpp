@@ -20,7 +20,7 @@ bool MenuSim::init() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
     seed();
-    uploadTexture(0);
+    uploadTexture(0, true);
     return tex_ != 0;
 }
 
@@ -44,7 +44,7 @@ void MenuSim::seed() {
     seeded_ = true;
 }
 
-void MenuSim::uploadTexture(int animTick) {
+void MenuSim::uploadTexture(int animTick, bool flickerEnabled) {
     if (tex_ == 0) return;
     const auto pal = build_palette();
     for (int y = 0; y < kMenuSimH; ++y) {
@@ -52,7 +52,7 @@ void MenuSim::uploadTexture(int animTick) {
             const int i = idx(x, y);
             const Material m = static_cast<Material>(grid_[i]);
             uint32_t c = pal[grid_[i]];
-            if (m == MAT_LAVA) {
+            if (m == MAT_LAVA && flickerEnabled) {
                 int r = int(c & 0xff);
                 int g = int((c >> 8) & 0xff);
                 int b = int((c >> 16) & 0xff);
@@ -78,12 +78,12 @@ void MenuSim::uploadTexture(int animTick) {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void MenuSim::tick(int animTick) {
+void MenuSim::tick(int animTick, bool flickerEnabled) {
     if (!seeded_) seed();
     // Static decorative grid: only refresh RGBA for lava shimmer (no CPU sand stepping).
     if (++frameAccum_ < 3) return;
     frameAccum_ = 0;
-    uploadTexture(animTick);
+    uploadTexture(animTick, flickerEnabled);
 }
 
 void MenuSim::draw(RenderPipeline& r, int screenW, int screenH, float /*uiScale*/) {

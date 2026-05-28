@@ -373,7 +373,8 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
         if ((nxDown & HidNpadButton_Plus) != 0) in.openMenu = true;
         if ((nxDown & HidNpadButton_Minus) != 0) in.clearSandbox = true;
         if ((nxDown & HidNpadButton_X) != 0) in.toggleMaterialRing = true;
-        if ((nxDown & HidNpadButton_Y) != 0) in.quickSave = true;
+        const bool quickNxY = (nxDown & HidNpadButton_Y) != 0;
+        if (edge(quickNxY, prevQuickSave)) in.quickSave = true;
         if ((nxDown & HidNpadButton_StickL) != 0) in.dropper = true;
         if ((nxDown & HidNpadButton_L) != 0) in.brushRadiusDelta = -1;
         if ((nxDown & HidNpadButton_R) != 0) in.brushRadiusDelta = 1;

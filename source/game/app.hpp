@@ -10,6 +10,7 @@
 #include "sim/sim_state.hpp"
 #include "ui/menu.hpp"
 #include "ui/menu_sim.hpp"
+#include "ui/save_overlay.hpp"
 #include "ui/toast.hpp"
 #include "gpu/font_atlas.hpp"
 #include "gpu/perf_stats.hpp"
@@ -19,8 +20,17 @@ namespace nx {
 
 enum class Scene { Menu, Play };
 
+enum class PendingSaveKind {
+    None,
+    Slot,
+    GameSettings,
+    PhysicsSettings,
+};
+
 class App {
 public:
+    static constexpr int kPlaySaveSuppressFrames = 30;
+
     SDL_Window* window = nullptr;
     SDL_GLContext glCtx = nullptr;
     int screenW = 1280;
@@ -36,6 +46,7 @@ public:
     MenuState menu{};
     MenuSim   menuSim{};
     Toast toast{};
+    SaveOverlay saveOverlay{};
 
     std::unique_ptr<SimPipeline> simPipeline;
     std::unique_ptr<RenderPipeline> render;
@@ -52,6 +63,11 @@ public:
 
     bool computeSimSupported() const { return computeSimSupported_; }
 
+    void onEnterPlayFromMenu();
+    void requestSlotSave(int slot, bool fromQuickSave = false);
+    void requestFlushGameSettings();
+    void requestFlushPhysicsSettings();
+
 private:
     bool computeSimSupported_ = false;
     bool forceComputeBackend_ = false;
@@ -61,9 +77,15 @@ private:
     void tickPlay(double dtSec);
     void renderFrame();
     std::string resolveShaderDir() const;
+    void tickPendingSave(double dtSec);
+    void executePendingSave();
 
     int lastScreenW_ = 0;
     int lastScreenH_ = 0;
+    int playSaveSuppressFrames_ = 0;
+
+    PendingSaveKind pendingSave_ = PendingSaveKind::None;
+    int pendingSlot_ = 1;
 
     PerfStats perf_{};
     MenuRepeatState menuRepeat_{};

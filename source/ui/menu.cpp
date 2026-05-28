@@ -5,7 +5,6 @@
 #include "../gpu/font_atlas.hpp"
 #include "../gpu/render_pipeline.hpp"
 #include "../save/save.hpp"
-#include "../save/settings_io.hpp"
 #include "../save/physics_params_io.hpp"
 #include "../sim/physics_params.hpp"
 #include "../sim/physics_settings.hpp"
@@ -93,7 +92,10 @@ void MenuState::goBack(App& app) {
         return;
     }
     if (screen == MenuScreen::EngineSettings) {
-        flushGameSettingsIfDirty(app.settings);
+        app.requestFlushGameSettings();
+    }
+    if (screen == MenuScreen::Settings) {
+        app.requestFlushPhysicsSettings();
     }
     if (screen != MenuScreen::Main) {
         screen = MenuScreen::Main;
@@ -106,8 +108,8 @@ void MenuState::goBack(App& app) {
 
 void MenuState::handleConfirm(App& app) {
     if (menuIsBackItem(*this, index)) {
-        if (screen == MenuScreen::SettingsEdit) flushPhysicsParamsIfDirty(app.physics);
-        if (screen == MenuScreen::EngineSettingsTab) flushGameSettingsIfDirty(app.settings);
+        if (screen == MenuScreen::SettingsEdit) app.requestFlushPhysicsSettings();
+        if (screen == MenuScreen::EngineSettingsTab) app.requestFlushGameSettings();
         goBack(app);
         return;
     }
@@ -121,6 +123,7 @@ void MenuState::handleConfirm(App& app) {
                 app.hasEnteredPlay = true;
                 app.scene = Scene::Play;
                 app.sim.tick = 0;
+                app.onEnterPlayFromMenu();
                 app.toast.show("New empty sandbox", 1.0f);
                 break;
             case 1:
@@ -128,6 +131,7 @@ void MenuState::handleConfirm(App& app) {
                 app.hasEnteredPlay = true;
                 app.scene = Scene::Play;
                 app.sim.tick = 0;
+                app.onEnterPlayFromMenu();
                 break;
             case 2:
                 screen = MenuScreen::Load;
@@ -163,15 +167,13 @@ void MenuState::handleConfirm(App& app) {
         } else if (loadGame(app, index + 1)) {
             app.hasEnteredPlay = true;
             app.scene = Scene::Play;
+            app.onEnterPlayFromMenu();
             app.toast.show("Loaded", 1.2f);
         } else {
             app.toast.show("Load failed", 1.5f);
         }
     } else if (screen == MenuScreen::Save) {
-        if (saveGame(app, index + 1))
-            app.toast.show("Saved", 1.2f);
-        else
-            app.toast.show("Save failed", 1.5f);
+        app.requestSlotSave(index + 1);
     } else if (screen == MenuScreen::Settings) {
         settingsMat = settingsMaterialAt(index);
         settingsParamRow = 0;
@@ -199,7 +201,6 @@ void MenuState::handleConfirm(App& app) {
 void MenuState::adjustHorizontal(App& app, int dir) {
     if (screen == MenuScreen::EngineSettingsTab && index > 0) {
         adjustEngineTabRow(app, engineTab, index - 1, dir);
-        flushGameSettingsIfDirty(app.settings);
         return;
     }
     if (screen != MenuScreen::SettingsEdit) return;
@@ -209,7 +210,6 @@ void MenuState::adjustHorizontal(App& app, int dir) {
     if (!spec) return;
     adjustParam(app.physics, settingsMat, spec->id, dir);
     markPhysicsParamsDirty();
-    flushPhysicsParamsIfDirty(app.physics);
 }
 
 static void clampIndex(MenuState& m) {

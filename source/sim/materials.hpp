@@ -49,7 +49,7 @@ inline std::array<uint32_t, PALETTE_SIZE> build_palette() {
     p[MAT_SMOKE]     = 0xff555555u;
     p[MAT_WALL]      = 0xff888888u;
     p[MAT_ACID]      = pack_rgb(80, 230, 80);
-    p[MAT_PLANT]     = pack_rgb(70, 195, 65);
+    p[MAT_PLANT]     = pack_rgb(38, 210, 48);
     p[MAT_LAVA]      = pack_rgb(255, 70, 15);
     p[MAT_STONE]     = pack_rgb(90, 105, 125);
     p[MAT_OIL]       = pack_rgb(25, 45, 95);

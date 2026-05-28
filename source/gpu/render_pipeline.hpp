@@ -36,7 +36,7 @@ public:
     GLint up_uDstSize = -1;
     GLint up_uFilter = -1;
 
-    int paletteMode_ = 0; // 0 pretty, 1 fast, 2 debug
+    int paletteMode_ = 0; // 0 pretty, 1 fast, 2 classic; 3 = material IDs (debug only)
     UpscaleFilter upscaleFilter_ = UpscaleFilter::Nearest;
     bool blobEnabled_ = true;
     VisualBloom bloom_ = VisualBloom::Off;

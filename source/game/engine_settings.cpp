@@ -94,7 +94,7 @@ const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settin
         case EngineTab::Visuals:
             switch (row) {
                 case 0:
-                    std::snprintf(buf, bufSize, "Palette mode: %d", v.paletteMode);
+                    std::snprintf(buf, bufSize, "Palette mode: %s", paletteModeLabel(v.paletteMode));
                     break;
                 case 1:
                     std::snprintf(buf, bufSize, "AO: %s",
@@ -376,8 +376,6 @@ void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir) {
                     break;
                 case 2:
                     s.debug.showMaterialIds = !s.debug.showMaterialIds;
-                    if (s.debug.showMaterialIds) s.visuals.paletteMode = 2;
-                    else if (s.visuals.paletteMode == 2) s.visuals.paletteMode = 0;
                     break;
                 case 3:
                     s.debug.benchmarkScene = std::clamp(s.debug.benchmarkScene + dir, 0, 2);
