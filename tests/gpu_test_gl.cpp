@@ -17,7 +17,8 @@ bool fileExists(const std::string& path) {
 std::string GpuTestGl::findShaderDir() {
     static const char* kCandidates[] = {"shaders", "../shaders", "../../shaders"};
     for (const char* dir : kCandidates) {
-        if (fileExists(std::string(dir) + "/sim.frag") && fileExists(std::string(dir) + "/paint.frag") &&
+        if (fileExists(std::string(dir) + "/sim.frag") && fileExists(std::string(dir) + "/sim.comp") &&
+            fileExists(std::string(dir) + "/paint.frag") &&
             fileExists(std::string(dir) + "/fullscreen.vert")) {
             return dir;
         }
@@ -46,7 +47,7 @@ bool GpuTestGl::init(int winW, int winH) {
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 
@@ -59,6 +60,10 @@ bool GpuTestGl::init(int winW, int winH) {
     }
 
     ctx = SDL_GL_CreateContext(window);
+    if (!ctx) {
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+        ctx = SDL_GL_CreateContext(window);
+    }
     if (!ctx) {
         std::fprintf(stderr, "gpu tests: SDL_GL_CreateContext failed: %s\n", SDL_GetError());
         SDL_DestroyWindow(window);

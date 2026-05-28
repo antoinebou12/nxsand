@@ -12,6 +12,8 @@
 #include "../ui/menu_fx.hpp"
 #include "../ui/theme.hpp"
 #include "menu_sim.hpp"
+#include "menu_chrome.hpp"
+#include "ui_copy.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -100,6 +102,8 @@ void MenuState::handleConfirm(App& app) {
         switch (index) {
             case 0:
                 app.simPipeline->clearAll(MAT_EMPTY);
+                app.sim.gridHasMatter = false;
+                app.sim.sleeping = false;
                 app.hasEnteredPlay = true;
                 app.scene = Scene::Play;
                 app.sim.tick = 0;
@@ -129,6 +133,8 @@ void MenuState::handleConfirm(App& app) {
                 break;
             case 6:
                 app.simPipeline->clearAll(MAT_EMPTY);
+                app.sim.gridHasMatter = false;
+                app.sim.sleeping = false;
                 app.toast.show("Cleared", 1.0f);
                 break;
             case 7:
@@ -226,20 +232,8 @@ static void formatSlotLabel(int slot, char* buf, size_t bufSize) {
     std::snprintf(buf, bufSize, "Slot %d - saved", slot);
 }
 
-struct MenuLayout {
-    float s;
-    float panelX;
-    float panelY;
-    float panelW;
-    float panelH;
-    float rowH;
-    float listY0;
-    float titleY;
-    float logoY;
-    float footerY;
-    int visibleRows;
-    int firstRow;
-};
+static MenuLayout computeLayout(int W, int H, int itemCount, int selectedIndex,
+                                bool hasBreadcrumb, float accessibilityScale);
 
 static MenuLayout computeLayout(int W, int H, int itemCount, int selectedIndex,
                                 bool hasBreadcrumb, float accessibilityScale) {
@@ -251,17 +245,32 @@ static MenuLayout computeLayout(int W, int H, int itemCount, int selectedIndex,
     const float safeBottom = 132.f * L.s;
     const float safeTop = 34.f * L.s;
 #else
+    (void)portrait;
     const float sideMargin = 42.f * L.s;
     const float safeBottom = 64.f * L.s;
     const float safeTop = 22.f * L.s;
 #endif
     L.panelW = std::min(590.f * L.s, std::max(220.f * L.s, float(W) - sideMargin * 2.f));
     L.titleY = safeTop + 18.f * L.s;
-    L.logoY = std::max(10.f * L.s, L.titleY - 54.f * L.s);
-    const float titleBlock = hasBreadcrumb ? 128.f * L.s : 108.f * L.s;
-    L.panelY = L.titleY + titleBlock;
+    if (hasBreadcrumb) {
+        L.markY = L.titleY;
+        L.logoY = std::max(10.f * L.s, L.titleY - 54.f * L.s);
+        L.panelY = L.titleY + 78.f * L.s;
+    } else {
+        L.markY = safeTop + 10.f * L.s;
+#if defined(__SWITCH__)
+        const float markBand = 60.f * L.s;
+        L.logoY = L.markY + 30.f * L.s;
+#else
+        const float markBand = 64.f * L.s;
+        L.logoY = L.markY + 34.f * L.s;
+#endif
+        L.panelY = L.markY + markBand;
+    }
     L.footerY = float(H) - safeBottom * 0.74f;
-    const float panelChrome = 72.f * L.s;
+    const float listPadTop = hasBreadcrumb ? 54.f * L.s : 46.f * L.s;
+    const float listPadBottom = 30.f * L.s;
+    const float panelChrome = listPadTop + listPadBottom;
     const float available = std::max(160.f * L.s, L.footerY - L.panelY - 32.f * L.s);
     L.rowH = std::clamp(46.f * L.s, 38.f * L.s, 54.f * L.s);
     const MenuListWindow win =
@@ -270,8 +279,32 @@ static MenuLayout computeLayout(int W, int H, int itemCount, int selectedIndex,
     L.firstRow = win.firstRow;
     L.panelH = L.rowH * float(L.visibleRows) + panelChrome;
     L.panelX = (float(W) - L.panelW) * 0.5f;
-    L.listY0 = L.panelY + 42.f * L.s;
+    L.listY0 = L.panelY + listPadTop;
     return L;
+}
+
+void MenuState::handlePointer(App& app, int px, int py, bool confirm) {
+    const int total = menuItemCount(*this);
+    if (total <= 0) return;
+    const bool hasBreadcrumb = screen != MenuScreen::Main;
+    const MenuLayout L =
+        computeLayout(app.screenW, app.screenH, total, index, hasBreadcrumb,
+                      app.settings.accessibility.uiScale);
+    const float padX = 28.f * L.s;
+    const float x0 = L.panelX + padX;
+    const float x1 = L.panelX + L.panelW - padX;
+    if (float(px) < x0 || float(px) > x1) return;
+    for (int row = 0; row < L.visibleRows; ++row) {
+        const int i = L.firstRow + row;
+        if (i < 0 || i >= total) continue;
+        const float y0 = L.listY0 + float(row) * L.rowH;
+        const float y1 = y0 + L.rowH;
+        if (float(py) >= y0 && float(py) < y1) {
+            index = i;
+            if (confirm) handleConfirm(app);
+            return;
+        }
+    }
 }
 
 static void drawSpaceGradient(RenderPipeline& rp, int W, int H) {
@@ -280,50 +313,11 @@ static void drawSpaceGradient(RenderPipeline& rp, int W, int H) {
     for (int i = 0; i < bands; ++i) {
         const float t = float(i) / float(bands - 1);
         const float u = std::fabs(t - 0.5f) * 2.f;
-        const float rv = 0.08f + u * 0.02f;
-        const float gv = 0.06f + u * 0.02f;
-        const float bv = 0.14f + u * 0.04f;
+        const float rv = 0.060f + u * 0.010f;
+        const float gv = 0.052f + u * 0.008f;
+        const float bv = 0.105f + u * 0.018f;
         rp.drawSolidRect(0.f, bh * float(i), float(W), bh + 1.f, rv, gv, bv, 1.f, W, H);
     }
-}
-
-#if !defined(__SWITCH__)
-static void drawCornerGlows(RenderPipeline& r, int W, int H) {
-    const float gw = float(W) * 0.55f;
-    const float gh = float(H) * 0.5f;
-    r.drawSolidRect(-gw * 0.2f, float(H) - gh, gw, gh, 0.30f, 0.92f, 0.77f, 0.07f, W, H);
-    r.drawSolidRect(float(W) - gw * 0.8f, -gh * 0.15f, gw, gh * 0.85f, 0.63f, 0.31f, 1.f, 0.06f, W, H);
-}
-
-static void drawLavaGradient(RenderPipeline& r, int W, int H) {
-    const float gh = float(H) * 0.35f;
-    const float y0 = float(H) - gh;
-    r.drawSolidRect(0.f, y0, float(W), gh * 0.4f, 1.f, 0.35f, 0.12f, 0.04f, W, H);
-    r.drawSolidRect(0.f, y0 + gh * 0.4f, float(W), gh * 0.35f, 1.f, 0.24f, 0.08f, 0.10f, W, H);
-    r.drawSolidRect(0.f, y0 + gh * 0.75f, float(W), gh * 0.25f, 1.f, 0.16f, 0.04f, 0.18f, W, H);
-}
-#endif
-
-static void drawMenuChromeScrim(RenderPipeline& r, const MenuLayout& L, int W, int H, float topY,
-                                float bottomY) {
-    const float padX = 28.f * L.s;
-    const float x = L.panelX - padX;
-    const float w = L.panelW + padX * 2.f;
-    const float y = topY;
-    const float h = std::max(8.f, bottomY - topY);
-    r.drawSolidRect(x, y, w, h, 0.05f, 0.06f, 0.10f, 0.94f, W, H);
-}
-
-static void drawGlassPanel(RenderPipeline& r, const MenuLayout& L, int W, int H) {
-    const float inset = 4.f * L.s;
-    const float x = L.panelX + inset;
-    const float y = L.panelY + inset;
-    const float w = L.panelW - inset * 2.f;
-    const float h = L.panelH - inset * 2.f;
-    r.drawSolidRect(x, y, w, h, 0.08f, 0.09f, 0.14f, 0.55f, W, H);
-    r.drawSolidRect(x, y, w, h, 0.22f, 0.18f, 0.45f, 0.18f, W, H);
-    r.drawSolidRect(x, y, w, h * 0.22f, 1.f, 1.f, 1.f, 0.06f, W, H);
-    r.drawSolidRect(x, y + h - 2.f, w, 2.f, 0.30f, 0.92f, 0.77f, 0.22f, W, H);
 }
 
 #if !defined(__SWITCH__)
@@ -332,7 +326,7 @@ static void drawAnimatedLogo(RenderPipeline& r, float cx, float cy, int tick, in
     for (int i = 0; i < n; ++i) {
         const float a = (float(i) / float(n)) * 6.2831853f + tick * 0.018f;
         const float wave = std::sin(tick * 0.04f + i * 0.6f) * 7.f;
-        const float rad = 40.f + wave;
+        const float rad = 36.f + wave;
         const float x = cx + std::cos(a) * rad;
         const float y = cy + std::sin(a) * rad * 0.55f + std::sin(tick * 0.07f + i * 0.4f) * 4.f;
         const int phase = (i + tick / 2) % n;
@@ -350,8 +344,8 @@ static void drawAnimatedLogo(RenderPipeline& r, float cx, float cy, int tick, in
             cg = 0.60f;
             cb = 0.91f;
         }
-        const float sz = 2.5f + (i % 3 == 0 ? 1.5f : 0.f);
-        r.drawSolidRect(x - sz, y - sz, sz * 2.f, sz * 2.f, cr, cg, cb, 1.f, W, H);
+        const float sz = 2.0f + (i % 3 == 0 ? 1.0f : 0.f);
+        r.drawSolidRect(x - sz, y - sz, sz * 2.f, sz * 2.f, cr, cg, cb, 0.70f, W, H);
     }
 }
 #endif
@@ -370,36 +364,6 @@ static void fitLabel(char* dst, size_t dstSize, const char* label, float rowW, f
     dst[keep + 3] = '\0';
 }
 
-static void drawRow(RenderPipeline& r, FontAtlas& font, int W, int H, const MenuLayout& L, float y,
-                    const char* label, bool selected) {
-    const float padX = 28.f * L.s;
-    const float x = L.panelX + padX;
-    const float rowW = L.panelW - padX * 2.f;
-    const float rowH = L.rowH - 8.f * L.s;
-    const float a = selected ? 0.96f : 0.70f;
-    r.drawSolidRect(x, y, rowW, rowH, selected ? 0.16f : 0.09f, selected ? 0.22f : 0.13f,
-                    selected ? 0.30f : 0.19f, a, W, H);
-    // Subtle bottom hairline gives each row a visible baseline so they don't run
-    // into each other when the panel sits over a busy backdrop.
-    if (!selected) {
-        r.drawSolidRect(x + 8.f * L.s, y + rowH - 1.f, rowW - 16.f * L.s, 1.f,
-                        0.35f, 0.42f, 0.55f, 0.18f, W, H);
-    }
-    if (selected) {
-        r.drawSolidRect(x, y, 6.f * L.s, rowH, 0.30f, 0.79f, 0.77f, 1.f, W, H);
-    }
-    char fitted[96];
-#if defined(__SWITCH__)
-    const float textScale = 1.24f * L.s;
-    const float textY = y + 11.f * L.s;
-#else
-    const float textScale = 1.46f * L.s;
-    const float textY = y + 12.f * L.s;
-#endif
-    fitLabel(fitted, sizeof(fitted), label, rowW - 46.f * L.s, textScale);
-    font.drawText(r, x + 32.f * L.s, textY, textScale, fitted, 0.92f, 0.96f, 1.f, 1.f, W, H);
-}
-
 template <typename Fn>
 static void drawVisibleRows(RenderPipeline& r, FontAtlas& font, int W, int H, const MenuLayout& L,
                             int totalRows, int selected, Fn labelFor) {
@@ -407,7 +371,7 @@ static void drawVisibleRows(RenderPipeline& r, FontAtlas& font, int W, int H, co
         const int i = L.firstRow + row;
         if (i < 0 || i >= totalRows) continue;
         const float y = L.listY0 + float(row) * L.rowH;
-        drawRow(r, font, W, H, L, y, labelFor(i), i == selected);
+        drawMenuRow(r, font, W, H, L, y, labelFor(i), i == selected);
     }
     const float x = L.panelX + L.panelW - 18.f * L.s;
     const float top = L.listY0;
@@ -418,31 +382,6 @@ static void drawVisibleRows(RenderPipeline& r, FontAtlas& font, int W, int H, co
     if (L.firstRow + L.visibleRows < totalRows) {
         r.drawSolidRect(x, top + h - 12.f * L.s, 8.f * L.s, 8.f * L.s, 0.65f, 0.76f, 0.86f, 0.65f,
                         W, H);
-    }
-}
-
-static const char* navHintFor(MenuScreen screen, bool hasEnteredPlay) {
-    switch (screen) {
-        case MenuScreen::Main:
-#if defined(__SWITCH__)
-            return hasEnteredPlay ? "D-pad move   A select   B resume" : "D-pad move   A select";
-#else
-            return hasEnteredPlay ? "Arrows move   Enter select   Esc resume"
-                                    : "Arrows move   Enter select";
-#endif
-        case MenuScreen::SettingsEdit:
-        case MenuScreen::EngineSettingsTab:
-#if defined(__SWITCH__)
-            return "D-pad adjust   A confirm   B back";
-#else
-            return "Up/Down pick   Left/Right adjust   Enter confirm   Esc back";
-#endif
-        default:
-#if defined(__SWITCH__)
-            return "D-pad move   A select   B back";
-#else
-            return "Arrows move   Enter select   Esc back";
-#endif
     }
 }
 
@@ -459,53 +398,40 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
         app.settings.display.menuChrome == MenuChrome::Full && mainMenuFlow;
 
     drawSpaceGradient(r, W, H);
+    const bool showMainMark =
+        app.menu.screen == MenuScreen::Main && mainMenuFlow;
     if (showBackdrop) {
         app.menuSim.draw(r, W, H, L.s);
         drawMenuBackgroundFx(r, W, H, tick);
 #if !defined(__SWITCH__)
-        drawCornerGlows(r, W, H);
-        drawLavaGradient(r, W, H);
-        drawAnimatedLogo(r, float(W) * 0.5f, L.logoY, tick, W, H);
+        if (showMainMark)
+            drawAnimatedLogo(r, float(W) * 0.5f, L.logoY, tick, W, H);
 #endif
     } else {
         drawMenuBackgroundFx(r, W, H, tick);
     }
 
-    const float scrimTop = L.logoY - 24.f * L.s;
-    const float scrimBottom = L.panelY + L.panelH + 14.f * L.s;
-    drawMenuChromeScrim(r, L, W, H, scrimTop, scrimBottom);
-    drawGlassPanel(r, L, W, H);
+    const float scrimTop =
+        showMainMark ? L.markY - 16.f * L.s : L.panelY - 20.f * L.s;
+    const float scrimBottom =
+        std::max(L.panelY + L.panelH + 14.f * L.s, L.footerY + 32.f * L.s);
+    const float chromeStrength = mainMenuFlow ? 0.38f : 1.f;
+    drawMenuChromeScrim(r, L, W, H, scrimTop, scrimBottom, chromeStrength);
+    drawMenuGlassPanel(r, L, W, H, chromeStrength);
 
     const float cx = float(W) * 0.5f;
 
-#if defined(__SWITCH__)
-    const float titleScale = 1.28f * L.s;
-    const float subScale = 0.74f * L.s;
-    const float crumbScale = 0.62f * L.s;
-#else
-    const float titleScale = 2.2f * L.s;
-    const float subScale = 1.3f * L.s;
-    const float crumbScale = 1.1f * L.s;
-#endif
-    font.drawTextCentered(r, cx, L.titleY, titleScale, theme::APP_TITLE, 0.30f, 0.86f, 0.82f, 1.f,
-                          W, H);
-    {
-#if defined(__SWITCH__)
-        const float subY = L.titleY + 30.f * L.s;
-        const float crumbY = L.titleY + 52.f * L.s;
-#else
-        const float subY = L.titleY + 24.f * L.s;
-        const float crumbY = L.titleY + 46.f * L.s;
-#endif
-        char sub[80];
-#if defined(__SWITCH__)
-        std::snprintf(sub, sizeof(sub), "v%s", theme::APP_VERSION);
-#else
-        std::snprintf(sub, sizeof(sub), "Sand Simulation  |  v%s", theme::APP_VERSION);
-#endif
-        font.drawTextCentered(r, cx, subY, subScale, sub, 0.58f, 0.63f, 0.69f, 1.f, W, H);
+    if (showMainMark)
+        drawMenuMark(r, font, cx, L.markY, L, W, H, chromeStrength);
 
-    if (app.menu.screen != MenuScreen::Main) {
+    if (hasBreadcrumb) {
+#if defined(__SWITCH__)
+        const float crumbScale = 0.62f * L.s;
+        const float crumbY = L.titleY + 8.f * L.s;
+#else
+        const float crumbScale = 1.1f * L.s;
+        const float crumbY = L.titleY + 4.f * L.s;
+#endif
         char crumb[96];
         if (app.menu.screen == MenuScreen::SettingsEdit) {
             std::snprintf(crumb, sizeof(crumb), "Main Menu  >  Element Settings  >  %s settings",
@@ -520,7 +446,6 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
         fitLabel(crumbFit, sizeof(crumbFit), crumb, L.panelW, crumbScale);
         font.drawTextCentered(r, cx, crumbY, crumbScale, crumbFit, 0.50f, 0.55f, 0.65f, 1.f, W,
                               H);
-    }
     }
 
     char buf[96];
@@ -569,14 +494,15 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
         char rowBuf[96];
         drawVisibleRows(r, font, W, H, L, rows + 1, app.menu.index, [&](int i) {
             if (i == 0) return static_cast<const char*>("< Back");
-            engineTabRowLabel(app.menu.engineTab, i - 1, app.settings, rowBuf, sizeof(rowBuf));
+            engineTabRowLabel(app.menu.engineTab, i - 1, app.settings, app.computeSimSupported(),
+                              rowBuf, sizeof(rowBuf));
             return static_cast<const char*>(rowBuf);
         });
     }
 
-    font.drawTextCentered(r, cx, L.footerY, 0.90f * L.s,
-                          navHintFor(app.menu.screen, app.hasEnteredPlay), 0.45f, 0.50f, 0.58f, 0.85f,
-                          W, H);
+    drawHintPill(r, font, cx, L.footerY, L.s,
+                 ui_copy::menuNavHint(app.menu.screen, app.hasEnteredPlay), W, H,
+                 mainMenuFlow ? chromeStrength : 1.f);
 }
 
 } // namespace nx

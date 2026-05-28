@@ -7,6 +7,7 @@ namespace nx {
 void seedBenchmarkScene(App& app, int sceneId) {
     if (!app.simPipeline) return;
     app.simPipeline->clearAll(MAT_EMPTY);
+    app.sim.gridHasMatter = false;
     const int w = app.sim.grid_w;
     const int h = app.sim.grid_h;
     switch (sceneId) {
@@ -24,6 +25,8 @@ void seedBenchmarkScene(App& app, int sceneId) {
         default:
             break;
     }
+    app.sim.gridHasMatter = sceneId >= 0 && sceneId <= 2;
+    app.sim.sleeping = false;
     app.toast.show("Benchmark scene loaded", 1.2f);
 }
 
@@ -52,6 +55,8 @@ void seedStarterScene(App& app) {
     app.simPipeline->paintDisk(cx + w / 3, (h * 2) / 3, std::max(4, w / 72), MAT_ICE);
     app.simPipeline->paintDisk(cx - w / 3, floorY + h / 6, std::max(5, w / 70), MAT_PLANT);
     app.simPipeline->syncSimForSampling();
+    app.sim.gridHasMatter = true;
+    app.sim.sleeping = false;
     app.toast.show("Starter sandbox", 1.2f);
 }
 

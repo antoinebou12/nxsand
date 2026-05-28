@@ -49,7 +49,13 @@ public:
     bool setSimGridSize(int w, int h, bool preserveContent);
     void applyRuntimeSettings();
 
+    bool computeSimSupported() const { return computeSimSupported_; }
+
 private:
+    bool computeSimSupported_ = false;
+    bool forceComputeBackend_ = false;
+    SimBackend resolveSimBackend() const;
+    bool initSimPipeline(int w, int h);
     void tickMenu(double dtSec);
     void tickPlay(double dtSec);
     void renderFrame();

@@ -1,15 +1,40 @@
 # Architecture Diagrams
 
-NXSand keeps editable diagram sources under `docs/diagrams/` beside committed SVG renders. Regenerate diagrams when simulation pass wiring, lava/water rules, or ownership boundaries change.
+NXSand keeps editable diagram sources under `docs/diagrams/` beside committed SVG renders. Use **uml-mcp** (`generate_uml` / `generate_uml_batch`) or Kroki to regenerate; see [`diagrams/README.md`](diagrams/README.md) for the full catalog and rename rules.
 
-Preferred sources:
+## Quick index
 
-| Diagram | Source |
-|---------|--------|
-| Play frame pipeline | `docs/diagrams/sim-pipeline.mmd` |
-| Material reactions | `docs/diagrams/material-reactions.mmd` → `material-reactions.svg` |
-| Lava/water quench | `docs/diagrams/lava-water-reaction.puml` |
+| Diagram | Source | Use when |
+|---------|--------|----------|
+| Play frame pipeline | `diagrams/sim-pipeline.mmd` | End-to-end CPU/GPU per frame |
+| Source modules | `diagrams/source-modules.mmd` | Repo layout and dependencies |
+| Scenes (Menu / Play) | `diagrams/game-scenes.mmd` | `App::frame`, menu transitions |
+| Save / load | `diagrams/save-load-flow.puml` | `save.cpp` slot JSON + GPU upload |
+| Core classes | `diagrams/core-runtime-classes.puml` | `App`, `SimPipeline`, `RenderPipeline` |
+| Sim substep | `diagrams/sim-margolus-step.mmd` | Four Margolus phases, active tiles |
+| Brush path | `diagrams/brush-input-flow.mmd` | Input → `paint.frag` → `step` |
+| Material reactions | `diagrams/material-reactions.mmd` | Shader interaction matrix overview |
+| Lava/water quench | `diagrams/reaction-lava-water-quench.puml` | Specific quench branch in sim |
 
-The current runtime path is GLES 3.0 fragment based: `paint.frag`, four `sim.frag` Margolus passes, `palette_lookup.frag`, optional glow, then UI quads.
+## Runtime path (summary)
 
-Do not commit generated copies under `romfs/`.
+GLES 3.0+ presentation is fragment-first:
+
+1. `paint.frag` — dirty-rect brush stamp (ping-pong `GL_R8UI`).
+2. `sim.frag` × 4 or `sim.comp` — Margolus phases (`PhysicsBlock` UBO).
+3. `palette_lookup.frag` — material ID → color, grid, AO/flicker/grain.
+4. Optional `glow_extract.frag` / `glow_blur.frag`.
+5. `ui_quad` + font atlas — menus, HUD, perf overlay.
+
+**Engine → Performance → Sim backend → Compute** selects `sim.comp` (GLES 3.1) instead of fullscreen `sim.frag` passes when supported.
+
+## Regeneration checklist
+
+Update sources first, then render SVGs and commit both when behavior changes:
+
+- Sim/render wiring → `sim-pipeline.mmd`, `sim-margolus-step.mmd`
+- `sim.frag` / `sim_common.glsl` reactions → `material-reactions.mmd`, `reaction-lava-water-quench.puml`
+- Save format or paths → `save-load-flow.puml`
+- New `source/` area or public type → `source-modules.mmd`, `core-runtime-classes.puml`
+
+Do not commit generated copies under `romfs/` (build copies from `shaders/` via `prepare_romfs`).

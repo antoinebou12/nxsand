@@ -45,6 +45,9 @@ function Test-BinaryContainsAscii {
 $icon = Join-Path $proj 'romfs\icon.jpg'
 $simFrag = Join-Path $proj 'romfs\shaders\sim.frag'
 $paintFrag = Join-Path $proj 'romfs\shaders\paint.frag'
+$paletteFrag = Join-Path $proj 'romfs\shaders\palette_lookup.frag'
+$simCommon = Join-Path $proj 'romfs\shaders\sim_common.glsl'
+$simIds = Join-Path $proj 'romfs\shaders\sim_ids.glsl'
 if (-not (Test-Path $icon)) {
     Write-Error "romfs\icon.jpg missing - run: powershell -File scripts\gen_icon.ps1"
 }
@@ -54,6 +57,15 @@ if (-not (Test-Path $simFrag)) {
 if (-not (Test-Path $paintFrag)) {
     Write-Error "romfs\shaders\paint.frag missing - run: make (prepare_romfs)"
 }
+if (-not (Test-Path $paletteFrag)) {
+    Write-Error "romfs\shaders\palette_lookup.frag missing - run: make (prepare_romfs)"
+}
+if (-not (Test-Path $simCommon)) {
+    Write-Error "romfs\shaders\sim_common.glsl missing - run: make (prepare_romfs)"
+}
+if (-not (Test-Path $simIds)) {
+    Write-Error "romfs\shaders\sim_ids.glsl missing - run: make (prepare_romfs)"
+}
 
 $iconInfo = Get-Item $icon
 if ($iconInfo.Length -lt 500) {
@@ -61,12 +73,16 @@ if ($iconInfo.Length -lt 500) {
 }
 
 # Embedded romfs (shader sources) and NACP title must be inside the NRO.
-if (-not (Test-BinaryContainsAscii $bytes 'Stable GLES 3.0 fragment CA')) {
+if (-not (Test-BinaryContainsAscii $bytes 'GLES 3.0 fragment Margolus pass')) {
     Write-Error @"
 NRO is missing the GPU sim shader in romfs (sim.frag).
 Rebuild so elf2nro gets: --romfsdir=<project>/romfs
 You should see shaders/sim.frag copied during make (prepare_romfs).
 "@
+}
+
+if (-not (Test-BinaryContainsAscii $bytes 'Shared Margolus CA rules')) {
+    Write-Error "NRO is missing romfs shader include sim_common.glsl. Rebuild prepare_romfs."
 }
 
 if (-not (Test-BinaryContainsAscii $bytes 'NXSand')) {

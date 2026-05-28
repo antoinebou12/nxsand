@@ -90,23 +90,18 @@ void MenuSim::tick(int animTick) {
 void MenuSim::draw(RenderPipeline& r, int screenW, int screenH, float /*uiScale*/) {
     if (tex_ == 0) return;
     const float aspect = float(kMenuSimW) / float(kMenuSimH);
-    // Keep decorative sim in the top band so it does not bleed through the menu panel.
-    const float maxH = float(screenH) * 0.32f;
-    const float maxW = float(screenW) * 0.68f;
-    float drawH = maxH;
-    float drawW = drawH * aspect;
-    if (drawW > maxW) {
-        drawW = maxW;
-        drawH = drawW / aspect;
+    float drawW = float(screenW);
+    float drawH = drawW / aspect;
+    if (drawH < float(screenH)) {
+        drawH = float(screenH);
+        drawW = drawH * aspect;
     }
     const float drawX = (float(screenW) - drawW) * 0.5f;
-    const float drawY = float(screenH) * 0.05f;
-    // Backdrop sim is decorative — bump alpha so users can actually see what
-    // the engine looks like in motion behind the menu chrome.
+    const float drawY = (float(screenH) - drawH) * 0.5f;
 #if defined(__SWITCH__)
-    const float alpha = 0.22f;
+    const float alpha = 0.20f;
 #else
-    const float alpha = 0.26f;
+    const float alpha = 0.24f;
 #endif
     r.drawTexturedRect(drawX, drawY, drawW, drawH, 0.f, 0.f, 1.f, 1.f, 1.f, 1.f, 1.f, alpha, screenW,
                        screenH, tex_);

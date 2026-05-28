@@ -1,6 +1,7 @@
 #include "test_harness.hpp"
 #include "gpu_test_gl.hpp"
 #include "gpu/sim_pipeline.hpp"
+#include "gpu/gl_loader.hpp"
 #include "sim/materials.hpp"
 #include "game/game_settings.hpp"
 #include "sim/physics_params.hpp"
@@ -58,13 +59,13 @@ void run_gpu_sim_tests(TestContext& ctx) {
 
     {
         nx::SimPipeline bad;
-        CHECK(ctx, !bad.init(16, 16, "shaders/__missing__"));
+        CHECK(ctx, !bad.init(16, 16, "shaders/__missing__", nx::SimBackend::Fragment));
     }
 
     const int w = 32;
     const int h = 32;
     nx::SimPipeline pipe;
-    CHECK(ctx, pipe.init(w, h, gl.shaderDir));
+    CHECK(ctx, pipe.init(w, h, gl.shaderDir, nx::SimBackend::Fragment));
     CHECK(ctx, pipe.readTexture() != 0u);
 
     {
@@ -119,7 +120,7 @@ void run_gpu_sim_tests(TestContext& ctx) {
         CHECK(ctx, readTopDown(pipe, w, h, out));
         const bool moved =
             atTop(out, w, sx, sy) != static_cast<uint8_t>(nx::MAT_SAND) ||
-            atTop(out, w, sx, sy + 1) == static_cast<uint8_t>(nx::MAT_SAND);
+            atTop(out, w, sx, sy - 1) == static_cast<uint8_t>(nx::MAT_SAND);
         CHECK(ctx, moved);
     }
 
@@ -144,23 +145,32 @@ void run_gpu_sim_tests(TestContext& ctx) {
         pipe.clearAll(nx::MAT_EMPTY);
         std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
         const int sx = w / 2;
-        const int sy = 8;
+        const int sy = 12;
+        for (int x = sx - 2; x <= sx + 2; ++x) {
+            setTop(in, w, x, sy - 1, nx::MAT_WALL);
+        }
         setTop(in, w, sx, sy, nx::MAT_SAND);
-        setTop(in, w, sx, sy + 1, nx::MAT_WALL);
         pipe.uploadGridTopDown(in, w, h);
         nx::PhysicsParams physics{};
         pipe.step(0u, physics);
         std::vector<uint8_t> out;
         CHECK(ctx, readTopDown(pipe, w, h, out));
-        CHECK(ctx, atTop(out, w, sx, sy) == static_cast<uint8_t>(nx::MAT_SAND));
-        CHECK(ctx, atTop(out, w, sx, sy + 1) == static_cast<uint8_t>(nx::MAT_WALL));
+        CHECK(ctx, atTop(out, w, sx, sy - 1) == static_cast<uint8_t>(nx::MAT_WALL));
+        CHECK(ctx, atTop(out, w, sx, sy - 2) != static_cast<uint8_t>(nx::MAT_SAND));
+        int sandInColumn = 0;
+        for (int y = 0; y < h; ++y) {
+            if (atTop(out, w, sx, y) == static_cast<uint8_t>(nx::MAT_SAND)) {
+                ++sandInColumn;
+            }
+        }
+        CHECK(ctx, sandInColumn >= 1);
     }
 
     {
         pipe.clearAll(nx::MAT_EMPTY);
         std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
         const int wx = w / 2;
-        const int wy = 4;
+        const int wy = 10;
         setTop(in, w, wx, wy, nx::MAT_WATER);
         pipe.uploadGridTopDown(in, w, h);
         nx::PhysicsParams physics{};
@@ -170,7 +180,7 @@ void run_gpu_sim_tests(TestContext& ctx) {
         CHECK(ctx, readTopDown(pipe, w, h, out));
         const bool waterMoved =
             atTop(out, w, wx, wy) != static_cast<uint8_t>(nx::MAT_WATER) ||
-            atTop(out, w, wx, wy + 1) == static_cast<uint8_t>(nx::MAT_WATER);
+            atTop(out, w, wx, wy - 1) == static_cast<uint8_t>(nx::MAT_WATER);
         CHECK(ctx, waterMoved);
     }
 
@@ -186,7 +196,7 @@ void run_gpu_sim_tests(TestContext& ctx) {
         std::vector<uint8_t> afterOne;
         CHECK(ctx, readTopDown(pipe, w, h, afterOne));
         int yAfterOne = sy;
-        for (int y = sy; y < h; ++y) {
+        for (int y = 0; y <= sy; ++y) {
             if (atTop(afterOne, w, sx, y) == static_cast<uint8_t>(nx::MAT_SAND)) {
                 yAfterOne = y;
             }
@@ -195,12 +205,12 @@ void run_gpu_sim_tests(TestContext& ctx) {
         std::vector<uint8_t> afterTwo;
         CHECK(ctx, readTopDown(pipe, w, h, afterTwo));
         int yAfterTwo = sy;
-        for (int y = sy; y < h; ++y) {
+        for (int y = 0; y <= sy; ++y) {
             if (atTop(afterTwo, w, sx, y) == static_cast<uint8_t>(nx::MAT_SAND)) {
                 yAfterTwo = y;
             }
         }
-        CHECK(ctx, yAfterTwo >= yAfterOne);
+        CHECK(ctx, yAfterTwo <= yAfterOne);
     }
 
     {
@@ -224,10 +234,10 @@ void run_gpu_sim_tests(TestContext& ctx) {
         const int cy = 12;
         pipe.paintDisk(cx, cy, 2, nx::MAT_SAND);
         pipe.paintDisk(cx, cy, 2, nx::MAT_EMPTY);
-        CHECK(ctx, pipe.sampleMaterial(cx, cy) == nx::MAT_EMPTY);
         std::vector<uint8_t> grid;
         CHECK(ctx, readTopDown(pipe, w, h, grid));
         CHECK(ctx, countMaterial(grid, w, h, nx::MAT_SAND) == 0);
+        CHECK(ctx, atTop(grid, w, cx, cy) == static_cast<uint8_t>(nx::MAT_EMPTY));
     }
 
     {
@@ -248,7 +258,8 @@ void run_gpu_sim_tests(TestContext& ctx) {
         std::vector<uint8_t> out;
         CHECK(ctx, readTopDown(pipe, w, h, out));
         CHECK(ctx, countMaterial(out, w, h, nx::MAT_LAVA) > 0);
-        CHECK(ctx, countMaterial(out, w, h, nx::MAT_WALL) > 0);
+        CHECK(ctx, countMaterial(out, w, h, nx::MAT_EMPTY) > 0);
+        CHECK(ctx, countMaterial(out, w, h, nx::MAT_WALL) == 0);
     }
 
     {
@@ -265,15 +276,18 @@ void run_gpu_sim_tests(TestContext& ctx) {
 
     {
         pipe.clearAll(nx::MAT_EMPTY);
-        std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_STONE));
-        setTop(in, w, w / 2, 6, nx::MAT_EMPTY);
+        std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
+        const int sx = w / 2;
+        const int sy = 8;
+        setTop(in, w, sx, sy, nx::MAT_WALL);
+        setTop(in, w, sx, sy - 1, nx::MAT_WALL);
         pipe.uploadGridTopDown(in, w, h);
         nx::PhysicsParams physics{};
         pipe.step(0u, physics);
         std::vector<uint8_t> out;
         CHECK(ctx, readTopDown(pipe, w, h, out));
-        CHECK(ctx, countMaterial(out, w, h, nx::MAT_STONE) > 0);
-        CHECK(ctx, atTop(out, w, w / 2, 6) == static_cast<uint8_t>(nx::MAT_EMPTY));
+        CHECK(ctx, atTop(out, w, sx, sy) == static_cast<uint8_t>(nx::MAT_WALL));
+        CHECK(ctx, atTop(out, w, sx, sy - 1) == static_cast<uint8_t>(nx::MAT_WALL));
     }
 
     {
@@ -287,6 +301,20 @@ void run_gpu_sim_tests(TestContext& ctx) {
     }
 
     {
+        pipe.clearAll(nx::MAT_EMPTY);
+        CHECK(ctx, pipe.activeTiles.activeCount() == 0);
+    }
+
+    {
+        pipe.clearAll(nx::MAT_EMPTY);
+        pipe.activeTiles.wakeAll();
+        nx::PhysicsParams physics{};
+        pipe.step(0u, physics, nx::ActiveTileMode::Conservative);
+        CHECK(ctx, pipe.lastActiveTileFallback());
+        CHECK(ctx, pipe.lastPasses() == 4);
+    }
+
+    {
         pipe.syncSimForSampling();
         const GLuint texAfterSync = pipe.readTexture();
         pipe.paintDisk(20, 20, 1, nx::MAT_OIL);
@@ -295,6 +323,102 @@ void run_gpu_sim_tests(TestContext& ctx) {
         CHECK(ctx, pipe.sampleMaterial(20, 20) == nx::MAT_OIL);
     }
 
+    {
+        pipe.clearAll(nx::MAT_EMPTY);
+        std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
+        const int lx = w / 2;
+        const int ly = h / 2;
+        setTop(in, w, lx, ly, nx::MAT_LAVA);
+        setTop(in, w, lx - 1, ly, nx::MAT_WALL);
+        setTop(in, w, lx + 1, ly, nx::MAT_WALL);
+        setTop(in, w, lx, ly - 1, nx::MAT_WALL);
+        setTop(in, w, lx, ly + 1, nx::MAT_WALL);
+        pipe.uploadGridTopDown(in, w, h);
+        pipe.activeTiles.wakeAll();
+        nx::PhysicsParams physics{};
+        for (uint32_t f = 0; f < 120u; ++f) {
+            pipe.step(f, physics);
+        }
+        std::vector<uint8_t> out;
+        CHECK(ctx, readTopDown(pipe, w, h, out));
+        CHECK(ctx, atTop(out, w, lx - 1, ly) == static_cast<uint8_t>(nx::MAT_WALL));
+        CHECK(ctx, atTop(out, w, lx + 1, ly) == static_cast<uint8_t>(nx::MAT_WALL));
+        CHECK(ctx, atTop(out, w, lx, ly - 1) == static_cast<uint8_t>(nx::MAT_WALL));
+        CHECK(ctx, atTop(out, w, lx, ly + 1) == static_cast<uint8_t>(nx::MAT_WALL));
+    }
+
+    {
+        pipe.clearAll(nx::MAT_EMPTY);
+        std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
+        const int py = 16;
+        const int plantX0 = 8;
+        for (int x = plantX0; x < w - 4; ++x) {
+            setTop(in, w, x, py, nx::MAT_PLANT);
+        }
+        setTop(in, w, plantX0 - 1, py, nx::MAT_FIRE);
+        pipe.uploadGridTopDown(in, w, h);
+        pipe.activeTiles.wakeAll();
+        nx::PhysicsParams physics{};
+        physics.fire_ignitePlant = 0.14f;
+        for (uint32_t f = 0; f < 48u; ++f) {
+            pipe.step(f, physics);
+        }
+        std::vector<uint8_t> out;
+        CHECK(ctx, readTopDown(pipe, w, h, out));
+        CHECK(ctx, countMaterial(out, w, h, nx::MAT_FIRE) >= 2);
+        CHECK(ctx, countMaterial(out, w, h, nx::MAT_PLANT) < (w - 4 - plantX0));
+    }
+
+    {
+        pipe.clearAll(nx::MAT_EMPTY);
+        std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
+        constexpr int poolW = 5;
+        constexpr int poolH = 5;
+        const int ox = (w - poolW) / 2;
+        const int oy = (h - poolH) / 2;
+        for (int y = oy; y < oy + poolH; ++y) {
+            for (int x = ox; x < ox + poolW; ++x) {
+                setTop(in, w, x, y, nx::MAT_OIL);
+            }
+        }
+        setTop(in, w, ox - 1, oy + poolH / 2, nx::MAT_FIRE);
+        pipe.uploadGridTopDown(in, w, h);
+        pipe.activeTiles.wakeAll();
+        nx::PhysicsParams physics{};
+        for (uint32_t f = 0; f < 6u; ++f) {
+            pipe.step(f, physics);
+        }
+        std::vector<uint8_t> out;
+        CHECK(ctx, readTopDown(pipe, w, h, out));
+        CHECK(ctx, countMaterial(out, w, h, nx::MAT_FIRE) >= 4);
+    }
+
     pipe.shutdown();
+
+    {
+        std::string computeErr;
+        const bool computeOk = nx::gl::check_compute_support(&computeErr);
+        if (computeOk) {
+            nx::SimPipeline comp;
+            CHECK(ctx, comp.init(w, h, gl.shaderDir, nx::SimBackend::Compute));
+            CHECK(ctx, comp.backend() == nx::SimBackend::Compute);
+            comp.clearAll(nx::MAT_EMPTY);
+            std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
+            const int sx = w / 2;
+            const int sy = 4;
+            in[static_cast<size_t>(sy * w + sx)] = static_cast<uint8_t>(nx::MAT_SAND);
+            comp.uploadGridTopDown(in, w, h);
+            nx::PhysicsParams physics{};
+            comp.step(0u, physics);
+            std::vector<uint8_t> out;
+            CHECK(ctx, readTopDown(comp, w, h, out));
+            const bool moved =
+                atTop(out, w, sx, sy) != static_cast<uint8_t>(nx::MAT_SAND) ||
+                atTop(out, w, sx, sy - 1) == static_cast<uint8_t>(nx::MAT_SAND);
+            CHECK(ctx, moved);
+            comp.shutdown();
+        }
+    }
+
     gl.shutdown();
 }

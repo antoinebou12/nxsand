@@ -1,0 +1,30 @@
+#version 310 es
+// GLES 3.1+ compute Margolus pass. Compute uses GL_R32UI because GLES imageStore
+// does not require r8ui image binds; material IDs still fit in the low 8 bits.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, r32ui) readonly uniform highp uimage2D uSimIn;
+layout(binding = 1, r32ui) writeonly uniform highp uimage2D uSimOut;
+
+uniform ivec2 uGridSize;
+uniform ivec2 uPhase;
+uniform ivec2 uDispatchOrigin;
+uniform ivec2 uDispatchLimit;
+uniform uint uFrame;
+
+#include "sim_ids.glsl"
+
+uint cell(ivec2 c) {
+    if (c.x < 0 || c.y < 0 || c.x >= uGridSize.x || c.y >= uGridSize.y) return M_WALL;
+    return imageLoad(uSimIn, c).r;
+}
+
+#include "sim_common.glsl"
+
+void main() {
+    ivec2 c = ivec2(gl_GlobalInvocationID.xy) + uDispatchOrigin;
+    if (c.x >= uDispatchLimit.x || c.y >= uDispatchLimit.y ||
+        c.x >= uGridSize.x || c.y >= uGridSize.y) return;
+    imageStore(uSimOut, c, uvec4(simulateBlockCell(c), 0u, 0u, 0u));
+}

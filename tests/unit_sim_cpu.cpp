@@ -50,4 +50,17 @@ void run_sim_cpu_tests(TestContext& ctx) {
         nx::cpu_margolus_sand_phase(g, w, h, 0, 0, 0);
         CHECK(ctx, g[static_cast<size_t>(y * w + x)] == static_cast<uint8_t>(nx::MAT_SAND));
     }
+
+    {
+        CHECK(ctx, nx::cpu_react_ice(true, false, false, false, 0.015f, 0.f, 1.f) ==
+                         nx::MAT_WATER);
+        CHECK(ctx, nx::cpu_react_ice(true, false, false, false, 0.015f, 1.f, 1.f) == nx::MAT_ICE);
+        CHECK(ctx, nx::cpu_react_smoke(true, false, 0.05f, 0.f, 1.f) == nx::MAT_WATER);
+        CHECK(ctx, nx::cpu_react_smoke(true, false, 0.05f, 1.f, 1.f) == nx::MAT_SMOKE);
+        CHECK(ctx, nx::cpu_react_smoke(false, true, 0.04f, 1.f, 0.12f) == nx::MAT_EMPTY);
+        CHECK(ctx, nx::cpu_react_smoke(false, false, 0.04f, 1.f, 0.12f) == nx::MAT_SMOKE);
+        CHECK(ctx, nx::cpu_liquid_level_boost_applies(0.006f, true, true, 0.f));
+        CHECK(ctx, !nx::cpu_liquid_level_boost_applies(0.006f, true, false, 0.f));
+        CHECK(ctx, !nx::cpu_liquid_level_boost_applies(0.006f, true, true, 1.f));
+    }
 }

@@ -54,7 +54,7 @@ ShaderProgram& ShaderProgram::operator=(ShaderProgram&& o) noexcept {
     return *this;
 }
 
-std::string ShaderProgram::readFile(const std::string& path) {
+static std::string readFileRaw(const std::string& path) {
     // fopen works reliably with romfs:/ on Switch (ifstream can fail).
     if (FILE* f = std::fopen(path.c_str(), "rb")) {
         std::fseek(f, 0, SEEK_END);
@@ -74,6 +74,48 @@ std::string ShaderProgram::readFile(const std::string& path) {
     std::ostringstream ss;
     ss << f.rdbuf();
     return ss.str();
+}
+
+static std::string readShaderResolved(const std::string& path, int depth = 0) {
+    if (depth > 8) return {};
+    std::string src = readFileRaw(path);
+    if (src.empty()) return src;
+
+    const size_t slash = path.find_last_of("/\\");
+    const std::string dir = slash != std::string::npos ? path.substr(0, slash + 1) : "";
+
+    std::string out;
+    out.reserve(src.size() + 256);
+    size_t lineStart = 0;
+    while (lineStart <= src.size()) {
+        size_t lineEnd = src.find('\n', lineStart);
+        if (lineEnd == std::string::npos) lineEnd = src.size();
+        const std::string line = src.substr(lineStart, lineEnd - lineStart);
+        const auto incPos = line.find("#include");
+        if (incPos != std::string::npos) {
+            const auto q1 = line.find('"', incPos);
+            const auto q2 = (q1 != std::string::npos) ? line.find('"', q1 + 1) : std::string::npos;
+            if (q1 != std::string::npos && q2 != std::string::npos && q2 > q1 + 1) {
+                const std::string inc = line.substr(q1 + 1, q2 - q1 - 1);
+                out += readShaderResolved(dir + inc, depth + 1);
+                out.push_back('\n');
+                if (lineEnd < src.size()) {
+                    lineStart = lineEnd + 1;
+                    continue;
+                }
+                break;
+            }
+        }
+        out.append(line);
+        out.push_back('\n');
+        if (lineEnd >= src.size()) break;
+        lineStart = lineEnd + 1;
+    }
+    return out;
+}
+
+std::string ShaderProgram::readFile(const std::string& path) {
+    return readShaderResolved(path);
 }
 
 GLuint ShaderProgram::compile(GLenum type, const char* src) {
@@ -127,20 +169,24 @@ bool ShaderProgram::link(GLuint vs, GLuint fs) {
 
 bool ShaderProgram::loadFromFiles(const std::string& vertPath, const std::string& fragPath) {
     g_shader_diag.clear();
-    std::string vsrc = readFile(vertPath);
-    std::string fsrc = readFile(fragPath);
+    std::string vsrc = readFileRaw(vertPath);
+    std::string fsrc = readShaderResolved(fragPath);
     if (vsrc.empty() || fsrc.empty()) {
         g_shader_diag = "shader read failed: " + vertPath + " / " + fragPath;
         std::cerr << g_shader_diag << "\n";
         return false;
     }
     GLuint vs = compile(GL_VERTEX_SHADER, vsrc.c_str());
+    if (!vs) {
+        std::cerr << "shader compile failed (vertex): " << vertPath << "\n";
+        return false;
+    }
     GLuint fs = compile(GL_FRAGMENT_SHADER, fsrc.c_str());
-    if (!vs || !fs) {
-        if (vs) glDeleteShader(vs);
-        if (fs) glDeleteShader(fs);
+    if (!fs) {
+        std::cerr << "shader compile failed (fragment): " << fragPath << "\n";
+        glDeleteShader(vs);
         if (g_shader_diag.empty()) {
-            g_shader_diag = "shader compile failed: " + vertPath + " / " + fragPath;
+            g_shader_diag = "shader compile failed: " + fragPath;
         }
         return false;
     }
@@ -155,7 +201,7 @@ bool ShaderProgram::loadFromFiles(const std::string& vertPath, const std::string
 
 bool ShaderProgram::loadComputeFromFile(const std::string& compPath) {
     g_shader_diag.clear();
-    std::string src = readFile(compPath);
+    std::string src = readShaderResolved(compPath);
     if (src.empty()) {
         g_shader_diag = "shader read failed: " + compPath;
         std::cerr << g_shader_diag << "\n";

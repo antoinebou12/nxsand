@@ -4,6 +4,7 @@
 #include <vector>
 #include "gl_loader.hpp"
 #include "shader_program.hpp"
+#include "../game/game_settings.hpp"
 #include "../sim/materials.hpp"
 #include "../ui/layout.hpp"
 
@@ -12,6 +13,7 @@ namespace nx {
 class RenderPipeline {
 public:
     ShaderProgram palShader;
+    ShaderProgram upscaleShader;
     ShaderProgram uiShader;
     GLuint palTex = 0;   // 256x1 RGBA8
     GLuint vao = 0;
@@ -26,10 +28,20 @@ public:
     GLint pal_uMode = -1;
     GLint pal_uFlicker = -1;
     GLint pal_uGrain = -1;
+    GLint pal_uBlob = -1;
     GLint pal_uAo = -1;
 
+    GLint up_uSrc = -1;
+    GLint up_uSrcSize = -1;
+    GLint up_uDstSize = -1;
+    GLint up_uFilter = -1;
+
     int paletteMode_ = 0; // 0 pretty, 1 fast, 2 debug
-    bool glowEnabled_ = false;
+    UpscaleFilter upscaleFilter_ = UpscaleFilter::Nearest;
+    bool blobEnabled_ = true;
+    VisualBloom bloom_ = VisualBloom::Off;
+    int glowBlurPasses_ = 4;
+    float glowCompositeAlpha_ = 0.55f;
     bool flickerEnabled_ = true;
     bool grainEnabled_ = false;
     float aoStrength_ = 0.04f;
@@ -52,11 +64,15 @@ public:
 
     void setPaletteMode(int mode);
     int paletteMode() const { return paletteMode_; }
-    void setGlowEnabled(bool on) { glowEnabled_ = on; }
-    bool glowEnabled() const { return glowEnabled_; }
+    void setUpscaleFilter(UpscaleFilter filter);
+    UpscaleFilter upscaleFilter() const { return upscaleFilter_; }
+    void setBlobEnabled(bool on) { blobEnabled_ = on; }
+    void setBloomLevel(VisualBloom level);
+    bool bloomEnabled() const { return bloom_ != VisualBloom::Off; }
     void setFlickerEnabled(bool on) { flickerEnabled_ = on; }
     void setGrainEnabled(bool on) { grainEnabled_ = on; }
     void setAoStrength(float v) { aoStrength_ = v; }
+    void releaseGlowTargets();
 
     // Solid / textured UI quads in pixel space (screen W/H).
     void drawSolidRect(float x, float y, float w, float h, float r, float g, float b, float a,
@@ -83,6 +99,10 @@ private:
                     float r, float g, float b, float a, int screenW, int screenH, GLuint texture,
                     int mode);
     void flushUiBatch();
+    void ensureGlowTargets(int simW, int simH);
+    void ensureLookTargets(int simW, int simH);
+    void releaseLookTargets();
+    void drawPalettePass(GLuint simR8UI, int simW, int simH, uint32_t frame, int mode);
 
     struct UiVertex {
         float x, y, u, v;
@@ -102,6 +122,8 @@ private:
     int glowW = 0, glowH = 0;
     GLuint lookFbo = 0;
     GLuint lookTex = 0;
+    int lookW = 0;
+    int lookH = 0;
 };
 
 } // namespace nx

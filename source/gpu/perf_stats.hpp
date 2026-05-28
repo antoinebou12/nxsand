@@ -28,7 +28,10 @@ struct PerfStats {
     int activeTileMode = 0;
     int activeTileCount = 0;
     bool activeTileFallback = false;
+    bool simSleeping = false;
+    bool gridHasMatter = false;
     const char* presetLabel = "Balanced";
+    const char* simBackendLabel = "Fragment";
     double lastUnaccountedMs = 0.0;
     double lastFrameMs = 0.0;
     double lastSimMs = 0.0;

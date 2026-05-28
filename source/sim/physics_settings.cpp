@@ -19,16 +19,17 @@ Material settingsMaterialAt(int i) {
 
 static const ParamSpec kFire[] = {
     {"fire_speed", "Rise speed", 0.1f, 2.f, 0.1f, 1.f},
-    {"fire_smokeRate", "Smoke out", 0.f, 0.20f, 0.005f, 0.080f},
-    {"fire_ignitePlant", "Ignite plant", 0.f, 0.20f, 0.005f, 0.10f},
-    {"fire_igniteOil", "Ignite oil", 0.f, 0.20f, 0.005f, 0.025f},
+    {"fire_smokeRate", "Smoke out", 0.f, 0.20f, 0.005f, 0.070f},
+    {"fire_ignitePlant", "Ignite plant", 0.f, 0.35f, 0.005f, 0.14f},
+    {"fire_igniteOil", "Ignite oil", 0.f, 0.25f, 0.005f, 0.045f},
     {"fire_spreadRate", "Drift", 0.f, 0.25f, 0.01f, 0.040f},
 };
 static const ParamSpec kWater[] = {
-    {"water_flowRate", "Spread", 0.05f, 0.80f, 0.025f, 0.38f},
+    {"water_flowRate", "Spread", 0.05f, 0.85f, 0.025f, 0.74f},
+    {"water_levelRate", "Level", 0.f, 0.05f, 0.001f, 0.028f},
 };
 static const ParamSpec kSmoke[] = {
-    {"smoke_fadeRate", "Fade", 0.f, 0.15f, 0.005f, 0.035f},
+    {"smoke_fadeRate", "Fade", 0.f, 0.15f, 0.005f, 0.028f},
     {"smoke_driftRate", "Drift", 0.f, 0.7f, 0.025f, 0.20f},
 };
 static const ParamSpec kAcid[] = {
@@ -37,17 +38,17 @@ static const ParamSpec kAcid[] = {
     {"acid_stoneCorrode", "Burn stone", 0.f, 0.08f, 0.005f, 0.045f},
 };
 static const ParamSpec kPlant[] = {
-    {"plant_growthRate", "Growth", 0.002f, 0.12f, 0.002f, 0.02f},
+    {"plant_growthRate", "Growth", 0.002f, 0.12f, 0.002f, 0.06f},
     {"plant_wallSupport", "Wall support", 0.f, 1.f, 1.f, 1.f},
 };
 static const ParamSpec kLava[] = {
-    {"lava_flowRate", "Fall", 0.f, 1.f, 0.05f, 0.22f},
-    {"lava_spreadRate", "Spread", 0.f, 0.45f, 0.02f, 0.10f},
+    {"lava_flowRate", "Fall", 0.f, 1.f, 0.05f, 0.16f},
+    {"lava_spreadRate", "Spread", 0.f, 0.45f, 0.02f, 0.09f},
     {"lava_igniteGas", "Ignite gas", 0.f, 0.2f, 0.01f, 0.08f},
 };
 static const ParamSpec kOil[] = {
-    {"oil_igniteRate", "Ignite", 0.f, 0.2f, 0.01f, 0.05f},
-    {"oil_floatRate", "Spread", 0.f, 0.7f, 0.025f, 0.19f},
+    {"oil_igniteRate", "Ignite", 0.f, 0.2f, 0.01f, 0.07f},
+    {"oil_floatRate", "Spread", 0.f, 0.7f, 0.025f, 0.16f},
 };
 static const ParamSpec kIce[] = {
     {"ice_meltRate", "Melt", 0.f, 0.08f, 0.002f, 0.015f},
@@ -56,7 +57,7 @@ static const ParamSpec kIce[] = {
 static const ParamSpec* specsFor(Material m, int& count) {
     switch (m) {
         case MAT_FIRE: count = 5; return kFire;
-        case MAT_WATER: count = 1; return kWater;
+        case MAT_WATER: count = 2; return kWater;
         case MAT_SMOKE: count = 2; return kSmoke;
         case MAT_ACID: count = 3; return kAcid;
         case MAT_PLANT: count = 2; return kPlant;
@@ -89,6 +90,7 @@ static float* ptr(PhysicsParams& p, const char* id) {
     if (!strcmp(id, "smoke_fadeRate")) return &p.smoke_fadeRate;
     if (!strcmp(id, "smoke_driftRate")) return &p.smoke_driftRate;
     if (!strcmp(id, "water_flowRate")) return &p.water_flowRate;
+    if (!strcmp(id, "water_levelRate")) return &p.water_levelRate;
     if (!strcmp(id, "acid_flowRate")) return &p.acid_flowRate;
     if (!strcmp(id, "acid_wallCorrode")) return &p.acid_wallCorrode;
     if (!strcmp(id, "acid_stoneCorrode")) return &p.acid_stoneCorrode;

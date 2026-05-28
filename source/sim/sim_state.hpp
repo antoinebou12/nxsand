@@ -37,6 +37,9 @@ struct SimState {
     uint32_t tick = 0;
     bool  paused = false;
     bool  sleeping = false;
+    // True when the grid may contain non-empty cells (paint, load, starter scene).
+    // Used so active-tile idle sleep does not freeze a populated sandbox.
+    bool  gridHasMatter = false;
     bool  paletteHidden = true;
 
     // Brush

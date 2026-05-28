@@ -1,0 +1,23 @@
+{
+  "acid_flowRate": 0.2800000011920929,
+  "acid_stoneCorrode": 0.04500000178813934,
+  "acid_wallCorrode": 0.05999999865889549,
+  "fire_igniteOil": 0.05499999597668648,
+  "fire_ignitePlant": 0.11000000685453415,
+  "fire_smokeRate": 0.20000000298023224,
+  "fire_speed": 1.100000023841858,
+  "fire_spreadRate": 0.03999999910593033,
+  "ice_freezeRate": 0.029999999329447746,
+  "ice_meltRate": 0.014999999664723873,
+  "lava_flowRate": 0.2199999988079071,
+  "lava_igniteGas": 0.07999999821186066,
+  "lava_spreadRate": 0.10000000149011612,
+  "oil_floatRate": 0.6899998784065247,
+  "oil_igniteRate": 0.1600000113248825,
+  "plant_growthRate": 0.052000004798173904,
+  "plant_wallSupport": 1.0,
+  "smoke_driftRate": 0.20000000298023224,
+  "smoke_fadeRate": 0.03500000014901161,
+  "water_flowRate": 0.800000011920929,
+  "water_levelRate": 0.0
+}

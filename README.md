@@ -24,14 +24,15 @@ Reactions follow the rules in `shaders/sim.frag` (for example, lava meeting wate
 
 ## Controls
 
-| Input | Action |
-|-------|--------|
-| **A** or **ZR** | Paint |
-| **B** or **ZL** | Erase |
-| **L** / **R** | Brush size |
-| **X** | Material ring |
-| **+** | Menu (slots, settings) |
-| Mouse (desktop) | Left paint · right or Shift+left erase |
+| Input | Switch | Desktop |
+|-------|--------|---------|
+| Paint | **A** or **ZR** | **Space** or left mouse |
+| Erase | **B** or **ZL** | **Shift** or right mouse |
+| Brush size | **L** / **R** | **[** / **]** |
+| Material ring | **X** | **H** or **Tab** |
+| Quick save | **Y** | **F5** |
+| Menu | **+** | **Esc** |
+| Move brush | Left stick / D-pad | **WASD** / arrows / mouse position |
 
 ## Install on Switch (players)
 
@@ -42,6 +43,24 @@ You need a homebrew-ready Switch ([setup guide](https://switch.hacks.guide/)).
 3. Launch from the Homebrew Menu.
 
 Saves live in `sdmc:/switch/nxsand/`. Legacy `sdmc:/switch/nxengine/` data is migrated on first launch when possible. Full install notes: [docs/INSTALL.md](docs/INSTALL.md).
+
+### Reference versions (May 2026)
+
+These are the versions NXSand is documented against. Update your SD setup and devkitPro packages when newer releases ship.
+
+| Component | Version | Role |
+|-----------|---------|------|
+| [Atmosphère](https://github.com/Atmosphere-NX/Atmosphere/releases) | **1.11.1** | Custom firmware (homebrew); update **fusee** with each release |
+| [hekate](https://github.com/CTCaer/hekate/releases) | **6.5.2** (Nyx **1.9.2**) | Bootloader / payload launcher (HOS up to 22.1.0) |
+| [libnx](https://github.com/switchbrew/libnx/releases) | **4.12.0** | Switch homebrew runtime (via devkitPro `switch-dev`) |
+| SDL2 | **2.28.5** (`switch-sdl2`) | Switch port from devkitPro; [upstream SDL2](https://github.com/libsdl-org/SDL/releases) is **2.32.0** |
+
+After installing devkitPro, check what you have with:
+
+```bash
+dkp-pacman -Q libnx switch-sdl2
+dkp-pacman -Syu    # pull newer libnx / switch-sdl2 when available
+```
 
 ## Build from source
 

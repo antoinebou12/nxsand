@@ -3,6 +3,7 @@
 #include "../gpu/font_atlas.hpp"
 #include "../gpu/render_pipeline.hpp"
 #include "../sim/materials.hpp"
+#include "ui_copy.hpp"
 #include "theme.hpp"
 #include <algorithm>
 #include <cmath>
@@ -23,6 +24,25 @@ void drawDisk(RenderPipeline& r, float cx, float cy, float radius, float cr, flo
 }
 
 } // namespace
+
+MaterialWheelLayout materialWheelLayout(int screenW, int screenH, float accessibilityScale) {
+    const float s = theme::uiScale(screenW, screenH, accessibilityScale);
+    MaterialWheelLayout L{};
+    L.cx = float(screenW) * 0.5f;
+    L.cy = float(screenH) * 0.42f;
+    L.rad = 132.f * s;
+    L.minPickDist = 52.f * s;
+    return L;
+}
+
+int materialWheelIndexFromPointer(float px, float py, const MaterialWheelLayout& layout,
+                                  int segmentCount) {
+    const float dx = px - layout.cx;
+    const float dy = py - layout.cy;
+    const float len = std::hypot(dx, dy);
+    if (len < layout.minPickDist || segmentCount <= 0) return -1;
+    return materialWheelIndexFromStick(dx / len, -dy / len, segmentCount, 0.01f);
+}
 
 int materialWheelIndexFromStick(float normX, float normY, int segmentCount, float minStickLen) {
     if (segmentCount <= 0) return -1;
@@ -45,9 +65,10 @@ void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app) {
     const int W = app.screenW;
     const int H = app.screenH;
     const float s = theme::uiScale(W, H, app.settings.accessibility.uiScale);
-    const float cx = float(W) * 0.5f;
-    const float cy = float(H) * 0.42f;
-    const float rad = 132.f * s;
+    const MaterialWheelLayout wl = materialWheelLayout(W, H, app.settings.accessibility.uiScale);
+    const float cx = wl.cx;
+    const float cy = wl.cy;
+    const float rad = wl.rad;
 
     const int n = static_cast<int>(PICKER_MATERIALS.size());
 
@@ -81,13 +102,8 @@ void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app) {
              W, H);
     font.drawTextCentered(r, cx, cy + 5.f * s, 0.76f * s, material_name(selected), 0.02f,
                           0.025f, 0.035f, 1.f, W, H);
-#if defined(__SWITCH__)
-    font.drawTextCentered(r, cx, cy + rad + 28.f * s, 1.0f * s, "A select   B cancel   stick aim",
+    font.drawTextCentered(r, cx, cy + rad + 28.f * s, 1.0f * s, ui_copy::materialRingHint(),
                           0.85f, 0.9f, 0.95f, 1.f, W, H);
-#else
-    font.drawTextCentered(r, cx, cy + rad + 28.f * s, 1.0f * s, "Enter select   Esc cancel   stick aim",
-                          0.85f, 0.9f, 0.95f, 1.f, W, H);
-#endif
 }
 
 } // namespace nx

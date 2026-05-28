@@ -1,0 +1,16 @@
+%% Brush path: pointer / Joy-Con to GPU stamp
+sequenceDiagram
+  participant SDL as platform/input
+  participant App as game/app.cpp
+  participant Region as PlayRegion
+  participant Sim as SimPipeline
+  participant Paint as paint.frag
+  participant Tiles as ActiveTileMap
+
+  SDL->>App: poll InputState\npointer / stick
+  App->>Region: screen to sim coords\nqueryDrawableSize
+  App->>Sim: paintDisk(cx,cy,r,mat)
+  Sim->>Paint: dirty rect FBO pass
+  Paint->>Sim: ping-pong tex swap
+  Sim->>Tiles: markDisk + expand bounds
+  Note over App: tickPlay fixed dt\nsubsteps x sim.step

@@ -51,7 +51,7 @@ Legacy saves under `sdmc:/switch/nxengine/` or `./nxengine_save/` are migrated f
 
 ## Shaders
 
-Runtime shaders live in `shaders/`. The Switch build copies fragment/vertex shaders into `romfs/shaders/`; compute shaders are not part of the default NRO runtime path.
+Runtime shaders live in `shaders/`. The Switch build copies fragment, vertex, shared GLSL, and compute shaders into `romfs/shaders/` via `make prepare_romfs`.
 
 ## Troubleshooting
 

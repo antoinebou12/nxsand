@@ -13,6 +13,9 @@ DESKTOP_CXX      ?= g++
 DESKTOP_CXXFLAGS := -std=c++17 -O3 -Wall -Wno-missing-field-initializers \
                     -Isource -Ithird_party -DNX_DESKTOP=1 \
                     $(shell pkg-config --cflags sdl2 glesv2 freetype2 2>/dev/null)
+ifneq ($(filter-out 0 false FALSE off OFF no NO,$(strip $(NXSAND_ENABLE_COMPUTE))),)
+DESKTOP_CXXFLAGS += -DNXSAND_ENABLE_COMPUTE_DEFAULT=1
+endif
 DESKTOP_LDFLAGS  :=
 DESKTOP_LIBS     := $(shell pkg-config --libs sdl2 glesv2 freetype2 2>/dev/null || echo "-lSDL2 -lGLESv2 -lfreetype")
 
@@ -36,6 +39,10 @@ UNIT_SRCS     := tests/unit_main.cpp \
                  tests/unit_sim_grid.cpp \
                  tests/unit_settings.cpp \
                  tests/unit_brush_stroke.cpp \
+                 tests/unit_active_tiles.cpp \
+                 tests/unit_tpt_import.cpp \
+                 tests/unit_perf_preset_physics.cpp \
+                 source/save/tpt_stamp_import.cpp \
                  source/game/game_settings.cpp \
                  source/save/settings_io.cpp \
                  source/sim/cpu_reference.cpp \
@@ -53,6 +60,7 @@ GPU_UNIT_SRCS     := tests/gpu_unit_main.cpp \
                      tests/unit_gpu_sim.cpp \
                      tests/gpu_test_gl.cpp \
                      source/gpu/sim_pipeline.cpp \
+                     source/gpu/sim_backend.cpp \
                      source/gpu/shader_program.cpp \
                      source/gpu/gl_loader.cpp
 
@@ -155,11 +163,11 @@ export NROFLAGS  += --romfsdir=$(ROMFS_DIR)
 prepare_romfs: $(ROMFS_SHADERS_STAMP) $(ROMFS_ICON)
 	@rm -rf $(ROMFS_DIR)/fonts
 
-$(ROMFS_SHADERS_STAMP): shaders/*.frag shaders/*.vert
+$(ROMFS_SHADERS_STAMP): shaders/*.frag shaders/*.vert shaders/*.glsl shaders/*.comp $(TOPDIR)/Makefile
 	@rm -rf $(ROMFS_DIR)/fonts
 	@mkdir -p $(dir $@) $(ROMFS_DIR)/shaders
-	@rm -f $(ROMFS_DIR)/shaders/*.comp
-	@cp -f shaders/*.frag shaders/*.vert $(ROMFS_DIR)/shaders/
+	@rm -f $(ROMFS_DIR)/shaders/*.frag $(ROMFS_DIR)/shaders/*.vert $(ROMFS_DIR)/shaders/*.glsl $(ROMFS_DIR)/shaders/*.comp
+	@cp -f shaders/*.frag shaders/*.vert shaders/*.glsl shaders/*.comp $(ROMFS_DIR)/shaders/
 	@touch $@
 
 $(ROMFS_ICON):

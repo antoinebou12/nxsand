@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Test-Path E:\\\\nxapplication; if \\(Test-Path E:\\\\nxapplication\\) { \\(Get-ChildItem E:\\\\nxapplication\\).Count; Get-ChildItem E:\\\\nxapplication\\\\src -ErrorAction SilentlyContinue | Measure-Object | Select-Object -ExpandProperty Count })",
+      "Bash(Get-ChildItem -Path \"E:\\\\nxapplication\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20)",
+      "Bash(Format-Table FullName)",
+      "mcp__filesystem__list_directory",
+      "PowerShell(if \\(Test-Path \"C:\\\\devkitPro\"\\) { Get-ChildItem -Path \"C:\\\\devkitPro\" -Force | Format-Table -Property Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"[DIR]\"}else{\"[FILE]\"}}} } else { Write-Host \"devkitPro not found at C:\\\\devkitPro\" })",
+      "PowerShell(Write-Host \"=== portlibs/switch ===\" ; Get-ChildItem -Path \"C:\\\\devkitPro\\\\portlibs\\\\switch\" -Force | Format-Table -Property Name, @{Name=\"Type\";Expression={if\\($_.PSIsContainer\\){\"[DIR]\"}else{\"[FILE]\"}}} | head -50)",
+      "PowerShell(& 'C:\\\\Users\\\\antoi\\\\NXEngine\\\\scripts\\\\build-native.ps1' 2>&1)",
+      "Bash(/c/devkitPro/msys2/usr/bin/bash.exe -c \"source /etc/profile && cd /c/Users/antoi/NXEngine && make 2>&1\")",
+      "Bash(/c/devkitPro/msys2/usr/bin/bash.exe --noprofile --norc -c \"source /etc/profile && make 2>&1\")"
+    ]
+  }
+}

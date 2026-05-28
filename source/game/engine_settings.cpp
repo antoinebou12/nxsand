@@ -1,5 +1,6 @@
 #include "engine_settings.hpp"
 #include "app.hpp"
+#include "../gpu/sim_backend.hpp"
 #include "benchmark_scene.hpp"
 #include <SDL2/SDL.h>
 #include "../save/settings_io.hpp"
@@ -23,8 +24,8 @@ const char* engineTabLabel(EngineTab tab) {
 
 int engineTabRowCount(EngineTab tab) {
     switch (tab) {
-        case EngineTab::Performance: return 6;
-        case EngineTab::Visuals: return 4;
+        case EngineTab::Performance: return 7;
+        case EngineTab::Visuals: return 6;
         case EngineTab::Controls: return 4;
         case EngineTab::Accessibility: return 3;
         case EngineTab::Display: return 3;
@@ -40,8 +41,8 @@ static void fmtSimSize(char* buf, size_t n, int w, int h) {
         std::snprintf(buf, n, "Auto");
 }
 
-const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settings, char* buf,
-                              size_t bufSize) {
+const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settings,
+                              bool computeSimSupported, char* buf, size_t bufSize) {
     const auto& p = settings.performance;
     const auto& v = settings.visuals;
     const auto& c = settings.controls;
@@ -56,15 +57,19 @@ const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settin
                     std::snprintf(buf, bufSize, "Preset: %s", perfPresetLabel(p.mode));
                     break;
                 case 1:
+                    std::snprintf(buf, bufSize, "Sim shader: %s",
+                                  simBackendLabel(p.simBackend));
+                    break;
+                case 2:
                     std::snprintf(buf, bufSize, "Target FPS: %d", p.targetFps);
                     break;
-                case 2: {
+                case 3: {
                     char sz[32];
                     fmtSimSize(sz, sizeof(sz), p.simWidth, p.simHeight);
                     std::snprintf(buf, bufSize, "Sim size: %s", sz);
                     break;
                 }
-                case 3:
+                case 4:
                     std::snprintf(buf, bufSize, "Substeps: %d",
                                   p.substeps > 0 ? p.substeps : effectiveSubsteps(p,
 #if defined(__SWITCH__)
@@ -74,11 +79,11 @@ const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settin
 #endif
                                   ));
                     break;
-                case 4:
+                case 5:
                     std::snprintf(buf, bufSize, "Dynamic resolution: %s",
                                   p.dynamicResolution ? "On" : "Off");
                     break;
-                case 5:
+                case 6:
                     std::snprintf(buf, bufSize, "Active tiles: %s",
                                   p.activeTiles == ActiveTileMode::Off          ? "Off"
                                   : p.activeTiles == ActiveTileMode::Conservative ? "Stable fallback"
@@ -96,11 +101,18 @@ const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settin
                                   v.ao == VisualAo::Off ? "Off" : v.ao == VisualAo::Low ? "Low" : "High");
                     break;
                 case 2:
-                    std::snprintf(buf, bufSize, "Glow/Bloom: %s",
-                                  v.glowEnabled ? "On" : "Off");
+                    std::snprintf(buf, bufSize, "Bloom: %s",
+                                  v.bloom == VisualBloom::Off ? "Off" : "Low");
                     break;
                 case 3:
                     std::snprintf(buf, bufSize, "Flicker: %s", v.flicker ? "On" : "Off");
+                    break;
+                case 4:
+                    std::snprintf(buf, bufSize, "Grain: %s", v.grain ? "On" : "Off");
+                    break;
+                case 5:
+                    std::snprintf(buf, bufSize, "Upscale filter: %s",
+                                  upscaleFilterName(v.upscaleFilter));
                     break;
             }
             break;
@@ -193,14 +205,27 @@ void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir) {
 #else
                         applyPerfPreset(s.performance, s.performance.mode, false);
 #endif
+                        applyPerfPresetVisuals(s.visuals, s.performance.mode);
+                        applyPerfPresetPhysics(app.physics, s.performance.mode);
                     }
                     break;
                 }
-                case 1:
+                case 1: {
+                    if (!app.computeSimSupported()) {
+                        app.toast.show("Compute sim needs OpenGL ES 3.1", 2.5f);
+                        s.performance.simBackend = SimBackend::Fragment;
+                        break;
+                    }
+                    int b = static_cast<int>(s.performance.simBackend) + dir;
+                    b = std::clamp(b, 0, static_cast<int>(SimBackend::Compute));
+                    s.performance.simBackend = static_cast<SimBackend>(b);
+                    break;
+                }
+                case 2:
                     s.performance.targetFps = (dir > 0) ? 60 : 30;
                     SDL_GL_SetSwapInterval(s.performance.targetFps == 60 ? 1 : 2);
                     break;
-                case 2: {
+                case 3: {
                     static const int kSizes[][2] = {{384, 216}, {480, 270}, {640, 360},
                                                     {720, 405}, {960, 540}};
                     int idx = 2;
@@ -217,15 +242,15 @@ void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir) {
                     s.performance.mode = PerfPreset::Manual;
                     break;
                 }
-                case 3:
+                case 4:
                     s.performance.substeps = std::clamp(
                         (s.performance.substeps > 0 ? s.performance.substeps : 2) + dir, 1, 2);
                     s.performance.mode = PerfPreset::Manual;
                     break;
-                case 4:
+                case 5:
                     s.performance.dynamicResolution = !s.performance.dynamicResolution;
                     break;
-                case 5: {
+                case 6: {
                     int m = static_cast<int>(s.performance.activeTiles) + dir;
                     m = std::clamp(m, 0, static_cast<int>(ActiveTileMode::Aggressive));
                     s.performance.activeTiles = static_cast<ActiveTileMode>(m);
@@ -244,12 +269,24 @@ void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir) {
                     s.visuals.ao = static_cast<VisualAo>(m);
                     break;
                 }
-                case 2:
-                    s.visuals.glowEnabled = !s.visuals.glowEnabled;
+                case 2: {
+                    int b = static_cast<int>(s.visuals.bloom) + dir;
+                    b = std::clamp(b, 0, static_cast<int>(VisualBloom::Low));
+                    s.visuals.bloom = static_cast<VisualBloom>(b);
                     break;
+                }
                 case 3:
                     s.visuals.flicker = !s.visuals.flicker;
                     break;
+                case 4:
+                    s.visuals.grain = !s.visuals.grain;
+                    break;
+                case 5: {
+                    int m = static_cast<int>(s.visuals.upscaleFilter) + dir;
+                    m = std::clamp(m, 0, static_cast<int>(UpscaleFilter::Count) - 1);
+                    s.visuals.upscaleFilter = static_cast<UpscaleFilter>(m);
+                    break;
+                }
             }
             break;
         case EngineTab::Controls:

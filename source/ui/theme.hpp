@@ -20,6 +20,7 @@ constexpr Color TEXT_MUTED   = rgba(0x95, 0xa0, 0xae);
 constexpr Color ERASE_RED    = rgba(0xe0, 0x52, 0x52);
 
 constexpr const char* APP_TITLE   = "NXSand";
+constexpr const char* APP_MARK    = "NXSand";
 constexpr const char* APP_VERSION = "0.1.0";
 
 constexpr int BASE_SCREEN_W = 1280;

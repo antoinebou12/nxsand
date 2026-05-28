@@ -11,6 +11,9 @@ uniform sampler2D  uPalette;
 uniform ivec2      uGridSize;
 uniform uint       uFrame;
 uniform int        uPaletteMode;
+uniform int        uFlicker;
+uniform int        uGrain;
+uniform float      uAoStrength;
 
 const uint M_EMPTY = 0u;
 const uint M_SAND  = 1u;
@@ -79,8 +82,16 @@ void main() {
     vec3 col = materialColor(m, n);
     float openTop = float(cellAt(c + ivec2(0, 1)) == M_EMPTY);
     float openLeft = float(cellAt(c + ivec2(-1, 0)) == M_EMPTY);
-    float shade = openTop * 0.10 + openLeft * 0.04 - float(cellAt(c + ivec2(0, -1)) != M_EMPTY) * 0.04;
+    float openRight = float(cellAt(c + ivec2(1, 0)) == M_EMPTY);
+    float openBottom = float(cellAt(c + ivec2(0, -1)) == M_EMPTY);
+    float shade = openTop * 0.10 + openLeft * 0.04 - (1.0 - openBottom) * 0.04;
+    shade += uAoStrength * (openTop + openLeft + openRight + openBottom);
     col += vec3(shade);
+    if (uGrain != 0) col += vec3((n - 0.5) * 0.06);
+    if (uFlicker != 0 && (m == M_FIRE || m == M_LAVA)) {
+        float flick = sin(float(uFrame) * 0.35 + float(c.x) * 0.2 + float(c.y) * 0.17) * 0.5 + 0.5;
+        col *= 0.88 + flick * 0.14;
+    }
 
     if (uPaletteMode == 1) {
         col = mix(col, texture(uPalette, vec2((float(m) + 0.5) / 256.0, 0.5)).rgb, 0.35);

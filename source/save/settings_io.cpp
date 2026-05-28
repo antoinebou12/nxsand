@@ -1,5 +1,7 @@
 #include "settings_io.hpp"
 #include "save_paths.hpp"
+#include <algorithm>
+#include <cstdlib>
 #include <fstream>
 
 #include <nlohmann/json.hpp>
@@ -67,6 +69,8 @@ bool loadGameSettings(GameSettings& out) {
             out.performance.dynamicResolution = readBool(p, "dynamicResolution", false);
             out.performance.activeTiles = static_cast<ActiveTileMode>(
                 readEnumInt(p, "activeTiles", static_cast<int>(out.performance.activeTiles)));
+            out.performance.simBackend = static_cast<SimBackend>(
+                readEnumInt(p, "simBackend", static_cast<int>(out.performance.simBackend)));
         }
 
         if (j.contains("visuals") && j["visuals"].is_object()) {
@@ -77,7 +81,14 @@ bool loadGameSettings(GameSettings& out) {
                 readEnumInt(v, "bloom", static_cast<int>(VisualBloom::Off)));
             out.visuals.flicker = readBool(v, "flicker", true);
             out.visuals.grain = readBool(v, "grain", false);
-            out.visuals.glowEnabled = readBool(v, "glowEnabled", false);
+            {
+                int uf = readEnumInt(v, "upscaleFilter", static_cast<int>(UpscaleFilter::Nearest));
+                uf = std::clamp(uf, 0, static_cast<int>(UpscaleFilter::Count) - 1);
+                out.visuals.upscaleFilter = static_cast<UpscaleFilter>(uf);
+            }
+            if (readBool(v, "glowEnabled", false) && out.visuals.bloom == VisualBloom::Off) {
+                out.visuals.bloom = VisualBloom::Low;
+            }
         }
 
         if (j.contains("controls") && j["controls"].is_object()) {
@@ -137,13 +148,14 @@ bool saveGameSettings(const GameSettings& s) {
     j["performance"]["substeps"] = s.performance.substeps;
     j["performance"]["dynamicResolution"] = s.performance.dynamicResolution;
     j["performance"]["activeTiles"] = static_cast<int>(s.performance.activeTiles);
+    j["performance"]["simBackend"] = static_cast<int>(s.performance.simBackend);
 
     j["visuals"]["paletteMode"] = s.visuals.paletteMode;
     j["visuals"]["ao"] = static_cast<int>(s.visuals.ao);
     j["visuals"]["bloom"] = static_cast<int>(s.visuals.bloom);
     j["visuals"]["flicker"] = s.visuals.flicker;
     j["visuals"]["grain"] = s.visuals.grain;
-    j["visuals"]["glowEnabled"] = s.visuals.glowEnabled;
+    j["visuals"]["upscaleFilter"] = static_cast<int>(s.visuals.upscaleFilter);
 
     j["controls"]["cursorSpeed"] = s.controls.cursorSpeed;
     j["controls"]["brushRadius"] = s.controls.brushRadius;

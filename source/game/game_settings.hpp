@@ -1,4 +1,6 @@
 #pragma once
+#include "../gpu/sim_backend.hpp"
+#include "../sim/physics_params.hpp"
 #include <cstdint>
 #include <utility>
 
@@ -19,6 +21,16 @@ enum class ProfilerHud : int {
 
 enum class VisualAo : int { Off = 0, Low = 1, High = 2 };
 enum class VisualBloom : int { Off = 0, Low = 1 };
+
+/// Presentation upscale from sim-resolution palette buffer to the play region.
+enum class UpscaleFilter : int {
+    Nearest = 0,
+    Tent = 1,
+    Mitchell = 2,
+    CatmullRom = 3,
+    Lanczos3 = 4,
+    Count = 5,
+};
 enum class RumbleLevel : int { Off = 0, Low = 1, Medium = 2, High = 3 };
 enum class ActiveTileMode : int { Off = 0, Conservative = 1, Aggressive = 2 };
 
@@ -37,6 +49,7 @@ struct PerformanceSettings {
     int substeps = 2;
     bool dynamicResolution = false;
     ActiveTileMode activeTiles = ActiveTileMode::Off;
+    SimBackend simBackend = SimBackend::Fragment;
 };
 
 struct VisualSettings {
@@ -49,7 +62,7 @@ struct VisualSettings {
     VisualBloom bloom = VisualBloom::Off;
     bool flicker = true;
     bool grain = false;
-    bool glowEnabled = false;
+    UpscaleFilter upscaleFilter = UpscaleFilter::Nearest;
 };
 
 struct ControlSettings {
@@ -80,7 +93,7 @@ struct DisplaySettings {
     bool fullscreenSim = true;
 };
 
-constexpr int CURRENT_SETTINGS_VERSION = 2;
+constexpr int CURRENT_SETTINGS_VERSION = 3;
 
 struct GameSettings {
     int version = CURRENT_SETTINGS_VERSION;
@@ -97,10 +110,14 @@ const char* perfPresetLabel(PerfPreset p);
 const char* profilerHudLabel(ProfilerHud h);
 const char* menuChromeLabel(MenuChrome m);
 const char* screenOrientationLabel(ScreenOrientation o);
+const char* upscaleFilterName(UpscaleFilter f);
 
 void applyPerfPreset(PerformanceSettings& perf, PerfPreset preset, bool onSwitch);
+void applyPerfPresetVisuals(VisualSettings& vis, PerfPreset preset);
+void applyPerfPresetPhysics(PhysicsParams& phys, PerfPreset preset);
 int effectiveSubsteps(const PerformanceSettings& perf, bool onSwitch);
 std::pair<int, int> presetSimSize(PerfPreset preset, int screenW, int screenH, bool onSwitch);
 std::pair<int, int> resolveSimGridSize(int screenW, int screenH, const PerformanceSettings& perf);
+std::pair<int, int> maxSimSizeForPreset(PerfPreset preset);
 
 } // namespace nx

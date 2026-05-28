@@ -1,0 +1,60 @@
+%% NXSand source tree (see docs/ARCHITECTURE.md)
+flowchart TB
+  subgraph Platform["source/platform/"]
+    Main["main.cpp\nSDL + romfs"]
+    Input["input/\nJoy-Con / pointer"]
+    Screen["screen_size.hpp\nqueryDrawableSize"]
+  end
+
+  subgraph Game["source/game/"]
+    App["app.cpp\nframe loop"]
+    Settings["game_settings.*\nperf + display"]
+  end
+
+  subgraph GPU["source/gpu/"]
+    SimPipe["sim_pipeline.*\nping-pong GL_R8UI"]
+    RenderPipe["render_pipeline.*\npalette + glow"]
+    Active["active_tiles.hpp\nCPU bitset + scissor"]
+    Font["font_atlas.*"]
+  end
+
+  subgraph Sim["source/sim/"]
+    Mats["materials.hpp\nMaterial IDs"]
+    Phys["physics_params.*\n+ physics_gpu UBO"]
+    Brush["brush helpers"]
+    CPURef["cpu_reference.cpp\ntests only"]
+  end
+
+  subgraph UI["source/ui/"]
+    MenuUI["menu.cpp / hud"]
+    Wheel["material_wheel.hpp"]
+    Perf["perf_overlay.cpp"]
+  end
+
+  subgraph Save["source/save/"]
+    Slots["save.cpp\nJSON + base64 grid"]
+    SettingsIO["settings_io.cpp\nsettings.json"]
+  end
+
+  subgraph Shaders["shaders/"]
+    SimFrag["sim.frag / sim.comp"]
+    Paint["paint.frag"]
+    Pal["palette_lookup.frag"]
+    UIQuad["ui_quad.*"]
+  end
+
+  Main --> App
+  Input --> App
+  Screen --> App
+  App --> SimPipe
+  App --> RenderPipe
+  App --> MenuUI
+  Settings --> SettingsIO
+  App --> Slots
+  SimPipe --> SimFrag
+  SimPipe --> Paint
+  RenderPipe --> Pal
+  MenuUI --> Font
+  SimPipe --> Phys
+  SimPipe --> Active
+  Brush --> App

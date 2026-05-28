@@ -1,5 +1,5 @@
-@startuml
-title Lava + water quench (NXSand sim.frag)
+@startuml reaction-lava-water-quench
+title Lava + water quench (sim.frag / sim.comp)
 start
 :Active lava cell L;
 if (Cell below L is water W?) then (yes)

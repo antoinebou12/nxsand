@@ -60,7 +60,7 @@ void run_layout_tests(TestContext& ctx) {
 
     nx::ActiveTileMap tiles;
     tiles.reset(128, 96);
-    CHECK(ctx, tiles.activeCount() > 0);
+    CHECK(ctx, tiles.activeCount() == 0);
     tiles.sleepAll();
     int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     CHECK(ctx, !tiles.activeBounds(x0, y0, x1, y1, 1));

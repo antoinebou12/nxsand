@@ -82,6 +82,14 @@ bool loadGame(App& app, int slot) {
     if (static_cast<int>(dec.size()) != w * h) return false;
 
     app.simPipeline->uploadGridTopDown(dec, w, h);
+    app.sim.gridHasMatter = false;
+    for (uint8_t cell : dec) {
+        if (cell != MAT_EMPTY) {
+            app.sim.gridHasMatter = true;
+            break;
+        }
+    }
+    app.sim.sleeping = false;
     app.sim.brush_x = std::clamp(j.value("brushX", app.sim.grid_w / 2), 0, app.sim.grid_w - 1);
     app.sim.brush_y = std::clamp(j.value("brushY", app.sim.grid_h / 2), 0, app.sim.grid_h - 1);
     app.sim.brush_mat = sanitizeBrushMaterial(j.value("material", static_cast<int>(MAT_SAND)));

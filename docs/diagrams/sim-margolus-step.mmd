@@ -1,0 +1,23 @@
+%% One sim substep (source/gpu/sim_pipeline.cpp)
+flowchart TB
+  Start([step frameTick]) --> Upload[uploadPhysics\nPhysicsBlock UBO]
+  Upload --> Backend{SimBackend?}
+  Backend --> Bounds[active tile row-runs\nor full grid fallback]
+  Bounds -->|Compute| C0[phase 0,0 clipped dispatch]
+  Bounds -->|Fragment| F0[phase 0,0 scissored pass]
+  C0 --> C1[phase 1,0]
+  C1 --> C2[phase 0,1]
+  C2 --> C3[phase 1,1]
+  F0 --> F1[phase 1,0]
+  F1 --> F2[phase 0,1]
+  F2 --> F3[phase 1,1]
+  C3 --> Swap[cur ping-pong index]
+  F3 --> Swap
+  Swap --> Done([lastPasses = 4])
+
+  subgraph Pass["Each phase pass"]
+    Read[tex read] --> Preserve[preserve inactive cells\nwhen partial]
+    Preserve --> Shader[sim.frag scissor/fullscreen\nor sim.comp clipped 16x16]
+    Shader --> Write[tex write]
+    Write --> Flip[cur = write]
+  end

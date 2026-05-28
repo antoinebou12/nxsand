@@ -18,8 +18,8 @@ enum class EngineTab {
 
 const char* engineTabLabel(EngineTab tab);
 int engineTabRowCount(EngineTab tab);
-const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settings, char* buf,
-                              size_t bufSize);
+const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settings,
+                              bool computeSimSupported, char* buf, size_t bufSize);
 void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir);
 
 void applySettingsToRuntime(App& app);

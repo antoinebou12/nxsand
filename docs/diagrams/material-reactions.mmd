@@ -25,7 +25,8 @@ flowchart TB
   Acid -->|"20% weaken"| Ice
   Acid -->|"25% neutralize"| Water
 
-  Fire -->|"fire_ignitePlant"| Plant
+  Fire -->|"plant x2.5 cardinal; x0.85 diagonal; 2+ sides"| Plant
+  Fire -->|"oil x3; 2+ neighbors x2.5"| Oil
   Fire -->|"extinguish"| Water
   Fire -->|"extinguish"| Ice
   Fire -->|"extinguish"| Acid
@@ -34,9 +35,13 @@ flowchart TB
   Lava -->|"quench"| Ice
   Lava -->|"fuse"| Sand
   Water -->|"lava contact"| Stone
-  Oil -->|"fire_igniteOil / oil_igniteRate"| Fire
+  Oil -->|"ignite max rates"| Fire
+  Smoke -->|"fire_ignitePlant x0.55"| Plant
 
   Wall -->|"corrode"| Empty
   Plant -->|"growth near water/wall"| Empty
   Ice -->|"ice_freezeRate"| Water
-  Ice -->|"ice_meltRate"| Water
+  Ice -->|"0.2% slow thaw"| Water
+  Smoke -->|"42% condense on ice"| Water
+  Smoke -->|"fade +0.10 near solids"| Empty
+  Water -->|"water_levelRate wide spread"| Empty

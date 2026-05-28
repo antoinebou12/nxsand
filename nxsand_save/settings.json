@@ -1,0 +1,44 @@
+{
+  "accessibility": {
+    "reduceFlashing": false,
+    "togglePaint": false,
+    "uiScale": 1.0
+  },
+  "controls": {
+    "brushRadius": 7,
+    "cursorSpeed": 1.0,
+    "deadzone": 0.18000000715255737,
+    "invertY": false,
+    "rumble": 2
+  },
+  "debug": {
+    "benchmarkScene": 0,
+    "profilerHud": 2,
+    "showActiveTiles": true,
+    "showMaterialIds": false
+  },
+  "display": {
+    "fullscreenSim": true,
+    "menuChrome": 0,
+    "orientation": 0
+  },
+  "performance": {
+    "activeTiles": 0,
+    "dynamicResolution": true,
+    "mode": 0,
+    "simBackend": 1,
+    "simHeight": 270,
+    "simWidth": 480,
+    "substeps": 1,
+    "targetFps": 60
+  },
+  "version": 3,
+  "visuals": {
+    "ao": 0,
+    "bloom": 0,
+    "flicker": false,
+    "grain": false,
+    "paletteMode": 0,
+    "upscaleFilter": 0
+  }
+}

@@ -25,9 +25,8 @@ inline std::pair<int, int> pickSimGridSize(int screenW, int screenH) {
         }
     }
 
-#if defined(__SWITCH__)
     const int maxDim = screenW > screenH ? screenW : screenH;
-    // Handheld-first: 480x270 (fast) .. 960x540 (docked / stress).
+    // Handheld-first: 480x270 (fast) .. 960x540 (large displays). Same tiers on desktop and Switch.
     if (maxDim >= 1600) {
         return {960, 540};
     }
@@ -38,9 +37,6 @@ inline std::pair<int, int> pickSimGridSize(int screenW, int screenH) {
         return {640, 360};
     }
     return {480, 270};
-#else
-    return {screenW, screenH};
-#endif
 }
 
 } // namespace nx

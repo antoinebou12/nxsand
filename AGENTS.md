@@ -17,7 +17,7 @@ Instructions for coding agents working in this repository. Codex and similar too
 - Do not commit **`romfs/shaders/`** generated copies; `prepare_romfs` copies from `shaders/` at build time.
 - Build outputs under **`build/`** and **`dist/`** only.
 - Strip porting comment headers (paths into `E:/nxapplication`); keep code self-explanatory.
-- Simulation runtime is **`shaders/sim.frag`** (fragment Margolus over `GL_R8UI`). Compute files may remain as disabled/reference material only and must not be copied into romfs.
+- Simulation runtime: **`shaders/sim.frag`** (fragment) or **`shaders/sim.comp`** (GLES 3.1 compute), selectable in Engine → Performance → Sim shader on Switch and desktop. Shared rules in **`shaders/sim_common.glsl`**. `prepare_romfs` copies `sim.comp` into `romfs/shaders/`.
 
 ## Architecture (current)
 
@@ -26,12 +26,12 @@ Instructions for coding agents working in this repository. Codex and similar too
 | Entry / SDL bootstrap | `source/platform/main.cpp` | Romfs checks include `sim.frag`, `paint.frag` |
 | Frame loop | `source/game/app.cpp` | Sim grid from `resolveSimGridSize` + `settings.json` performance; each frame calls `queryDrawableSize(..., settings.display.orientation)`; before world draw call `syncSimForSampling()` then `drawSimulation` |
 | Drawable / orientation | `source/platform/screen_size.hpp` | `SDL_GL_GetDrawableSize` + `ScreenOrientation` (Auto / Landscape / Portrait). Prefer `queryDrawableSize` over raw `SDL_GL_GetDrawableSize` wherever UI or input maps window pixels |
-| Fragment sim | `source/gpu/sim_pipeline.cpp`, `shaders/sim.frag` | Ping-pong `GL_R8UI`, Margolus 4 phases; acid/wall/stone, liquid layering, powder ledge slide; tunables in `physics.json` |
+| Fragment / compute sim | `source/gpu/sim_pipeline.cpp`, `shaders/sim.frag`, `shaders/sim.comp`, `shaders/sim_common.glsl` | Ping-pong `GL_R8UI`; fragment or compute (GLES 3.1 when supported); 4 Margolus phases; tunables in `physics.json` |
 | GPU brush | `shaders/paint.frag` | Dirty-rect fragment stamp with ping-pong copy/swap |
-| Render | `source/gpu/render_pipeline.cpp`, `shaders/palette_lookup.frag` | `uPaletteMode`, flicker/grain/AO from `settings.json` via `applyRuntimeSettings`; glow optional |
+| Render | `source/gpu/render_pipeline.cpp`, `shaders/palette_lookup.frag`, `shaders/upscale.frag` | `uPaletteMode`, blob halos (pretty mode), flicker/grain/AO from `settings.json`; optional filtered upscale (`visuals.upscaleFilter`, default nearest); optional bloom (`VisualBloom::Low`, 4 blur passes, sim-sized glow FBO) |
 | Input | `source/platform/input/` | Joy-Con-first; Switch face buttons via `switch_face.hpp` (A/B/X/Y, not positional SDL enums on switch-sdl2); pointer mapping uses `queryDrawableSize(..., settings.display.orientation)` |
 | UI | `source/ui/` | GPU quads, not SDL renderer |
-| Perf HUD | `source/ui/perf_overlay.cpp`, `source/gpu/perf_stats.hpp` | FPS, ms breakdown, grid, substeps, fragment passes, brush commands, dirty rect, active-tile fallback |
+| Perf HUD | `source/ui/perf_overlay.cpp`, `source/gpu/perf_stats.hpp` | FPS, ms breakdown, grid, substeps, fragment passes, brush commands, dirty rect, active-tile fallback, idle sleep |
 | Settings | `source/save/settings_io.cpp`, `source/game/game_settings.*` | `settings.json` (engine) + `physics.json` (elements); flush on Engine tab back, Engine menu exit, shutdown |
 | Active tiles | `source/gpu/active_tiles.hpp` | CPU bitset on brush; fragment scissor optimization with full-grid fallback for stability |
 | CPU reference | `source/sim/cpu_reference.cpp` | Tests / parity tooling only |
@@ -42,12 +42,12 @@ Longer narrative: **`docs/ARCHITECTURE.md`**, **`docs/NATIVE.md`**, **`docs/PHYS
 ## Performance priorities (when optimizing)
 
 1. **Measure** on Switch (profiler HUD); desktop GLES is sanity only.
-2. **Sim resolution** - default Balanced **640x360** handheld; Battery Saver **480x270**; env override `NXSAND_SIM_W` / `NXSAND_SIM_H`.
-3. **Substeps** - `effectiveSubsteps` clamps to **1-2** (Balanced preset defaults to 2); fewer substeps = fewer passes (trade vs fluid feel).
+2. **Sim resolution** - Switch boots **Battery Saver 480x270**; Balanced **640x360** when dynamic resolution upgrades; env override `NXSAND_SIM_W` / `NXSAND_SIM_H`.
+3. **Substeps** - `effectiveSubsteps` clamps to **1-2** (Battery Saver / Quality preset **1**, Balanced **2**); fewer substeps = fewer passes (trade vs fluid feel).
 4. **GPU passes** - keep FBO state restoration and texture sampling barriers boring and explicit.
-5. **Shader** - prefer simple `texelFetch` and branch-light 2x2 rules over wide caches or driver-risky constructs.
+5. **Shader** - prefer simple `texelFetch` and branch-light 2x2 rules over wide caches or driver-risky constructs; micro-opts only after `docs/SWITCH_PERF_MATRIX.md` shows sim-bound frames.
 6. **Brush** - keep dirty-rect GPU stamp path.
-7. **Active tiles** - default stable/off on Switch; any uncertainty must fall back to full-grid sim rather than freezing motion.
+7. **Active tiles** - default **Conservative** on Switch and desktop; full-grid fallback when >45% tiles active or too many runs; idle **sim.sleeping** after 30 frames with zero active tiles (populated static scenes OK). **Active tiles Off** sleeps only on an empty grid; compute and fragment skip dispatches while sleeping.
 
 Do not default **1280x720** sim on handheld OLED.
 
@@ -73,11 +73,22 @@ When behavior or paths change, update any of: `README.md`, `docs/INSTALL.md`, `d
 
 Only commit when the user explicitly asks. Do not change `git config` or use destructive git commands unless requested.
 
-## Learned preferences (concise)
+## Learned User Preferences
 
 - LAN FTP deploy path for NRO: `scripts/serve-nro-ftp.ps1` -> `dist/switch/NXSand.nro`.
-- Match nxsand UX: main menu, three slots, Joy-Con-first HUD, material picker, settings; touch on desktop where applicable.
+- Match nxsand UX: main menu with no product title or version subtitle; live falling-sand animation visible through translucent menu chrome (`menu_chrome`, `menu_sim`); three slots, Joy-Con-first HUD, material picker, settings; touch on desktop where applicable.
+- Desktop play: mouse brush and WASD movement; menu/HUD hints use desktop copy (`ui_copy`), not Switch Joy-Con strings.
+- Menu lists: keep row label text aligned and vertically centered with selection/highlight boxes on Switch and desktop; when fixing layout, verify both platforms.
 - Switch menus must use compact safe-area scroll lists; do not draw all rows when they exceed the visible panel.
 - Material selection: ring wheel only (`PICKER_MATERIALS`, `material_wheel.hpp`); no grid selector; picker-first (no palette digit hotkeys).
 - Switch controls: `switch_face.hpp` for confirm/back/ring; optional `NXSAND_SWITCH_SWAP_FACE_XY` env swaps ring face.
 - Diagram sources: `docs/diagrams/*.mmd` / `*.puml`; regenerate SVG per `docs/DIAGRAMS.md` when `sim.frag` reactions or sim/render wiring change.
+- README: keep a reference-versions table for Atmosphere, Hekate, libnx, and SDL2 (update when releases ship).
+- README install/build: link devkitPro installer (Windows) and Getting Started; document `make` as the primary build path (omit PowerShell helper scripts from README body).
+- Do not add README "Reference" blurbs pointing at nx.js or `E:\nxapplication` (parity notes belong in AGENTS.md / internal docs only).
+
+## Learned Workspace Facts
+
+- Git remote: https://github.com/antoinebou12/nxsand (GitHub repo name `nxsand`; product/artifact NXSand).
+- Git root is the NXEngine workspace folder (no nested `nxsand/` subfolder with its own `.git`).
+- Switch: `SDL_GL_GetDrawableSize` can report portrait 720×1280 while the panel is landscape; use `nx::queryDrawableSize` from `screen_size.hpp` for UI, input, and render sizing.

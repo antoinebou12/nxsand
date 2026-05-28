@@ -1,0 +1,28 @@
+@startuml save-load-flow
+title Save / load slot (source/save/save.cpp)
+actor Player
+participant "menu.cpp" as Menu
+participant "App" as App
+participant "SimPipeline" as Sim
+database "sdmc:/switch/nxsand/\nslot-N.json" as SD
+
+== Save ==
+Player -> Menu: confirm save slot
+Menu -> App: saveGame(slot)
+App -> Sim: readGridTo(raw)
+Sim --> App: GL_R8UI readback
+App -> App: flipGlRowsToTopDown
+App -> App: JSON grid base64 +\nbrush + timestamp
+App -> SD: atomicWriteFile
+
+== Load ==
+Player -> Menu: load slot
+Menu -> App: loadGame(slot)
+App -> SD: read slot-N.json
+SD --> App: width height grid b64
+App -> App: base64Decode + validate size
+App -> Sim: uploadGridTopDown(dec)
+App -> App: restore brush,\ngridHasMatter, wake sim
+Menu -> App: scene = Play
+
+@enduml

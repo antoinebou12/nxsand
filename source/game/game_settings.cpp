@@ -14,9 +14,47 @@ GameSettings defaultGameSettings() {
     s.performance.dynamicResolution = true;
     s.display.orientation = ScreenOrientation::Landscape;
     applyPerfPreset(s.performance, PerfPreset::BatterySaver, true);
-    s.performance.activeTiles = ActiveTileMode::Off;
+    s.performance.activeTiles = ActiveTileMode::Conservative;
+    applyPerfPresetVisuals(s.visuals, PerfPreset::BatterySaver);
+#else
+    applyPerfPreset(s.performance, PerfPreset::Balanced, false);
+    s.performance.activeTiles = ActiveTileMode::Conservative;
+    s.performance.simBackend = SimBackend::Fragment;
+    applyPerfPresetVisuals(s.visuals, PerfPreset::Balanced);
 #endif
     return s;
+}
+
+void applyPerfPresetVisuals(VisualSettings& vis, PerfPreset preset) {
+    switch (preset) {
+        case PerfPreset::BatterySaver:
+            vis.ao = VisualAo::Off;
+            vis.flicker = false;
+            vis.bloom = VisualBloom::Off;
+            break;
+        case PerfPreset::Balanced:
+            vis.ao = VisualAo::Low;
+            break;
+        case PerfPreset::Quality:
+            vis.ao = VisualAo::Low;
+            break;
+        case PerfPreset::Manual:
+            break;
+    }
+}
+
+void applyPerfPresetPhysics(PhysicsParams& phys, PerfPreset preset) {
+    switch (preset) {
+        case PerfPreset::BatterySaver:
+            phys.water_levelRate = 0.010f;
+            break;
+        case PerfPreset::Balanced:
+        case PerfPreset::Quality:
+            phys.water_levelRate = 0.028f;
+            break;
+        case PerfPreset::Manual:
+            break;
+    }
 }
 
 const char* perfPresetLabel(PerfPreset p) {
@@ -60,13 +98,25 @@ const char* screenOrientationLabel(ScreenOrientation o) {
 #endif
 }
 
+const char* upscaleFilterName(UpscaleFilter f) {
+    switch (f) {
+        case UpscaleFilter::Nearest: return "nearest";
+        case UpscaleFilter::Tent: return "tent";
+        case UpscaleFilter::Mitchell: return "mitchell";
+        case UpscaleFilter::CatmullRom: return "catmullrom";
+        case UpscaleFilter::Lanczos3: return "lanczos3";
+        case UpscaleFilter::Count: break;
+    }
+    return "nearest";
+}
+
 void applyPerfPreset(PerformanceSettings& perf, PerfPreset preset, bool onSwitch) {
     perf.mode = preset;
     switch (preset) {
         case PerfPreset::BatterySaver:
             perf.simWidth = 480;
             perf.simHeight = 270;
-            perf.substeps = 2;
+            perf.substeps = 1;
             break;
         case PerfPreset::Balanced:
             perf.simWidth = 640;
@@ -76,17 +126,21 @@ void applyPerfPreset(PerformanceSettings& perf, PerfPreset preset, bool onSwitch
         case PerfPreset::Quality:
             perf.simWidth = 720;
             perf.simHeight = 405;
-            perf.substeps = 2;
+            perf.substeps = 1;
             break;
         case PerfPreset::Manual:
             break;
     }
+    (void)onSwitch;
 }
 
 int effectiveSubsteps(const PerformanceSettings& perf, bool onSwitch) {
     (void)onSwitch;
-    if (perf.substeps > 0) return std::clamp(perf.substeps, 1, 2);
-    return 2;
+    int steps = perf.substeps > 0 ? std::clamp(perf.substeps, 1, 2) : 2;
+    const int w = perf.simWidth > 0 ? perf.simWidth : 640;
+    const int h = perf.simHeight > 0 ? perf.simHeight : 360;
+    if (w * h > 640 * 360) steps = std::min(steps, 1);
+    return steps;
 }
 
 std::pair<int, int> presetSimSize(PerfPreset preset, int screenW, int screenH, bool onSwitch) {
@@ -127,12 +181,27 @@ std::pair<int, int> resolveSimGridSize(int screenW, int screenH, const Performan
     }
 
     if (perf.simWidth > 0 && perf.simHeight > 0) {
-        int w = std::min(perf.simWidth, screenW);
-        int h = std::min(perf.simHeight, screenH);
+        const auto tierCap = pickSimGridSize(screenW, screenH);
+        int w = std::min({perf.simWidth, screenW, tierCap.first});
+        int h = std::min({perf.simHeight, screenH, tierCap.second});
         if (w >= 32 && h >= 32) return {w, h};
     }
 
+    if (perf.mode == PerfPreset::Manual) {
+        return presetSimSize(PerfPreset::Balanced, screenW, screenH, false);
+    }
+
     return pickSimGridSize(screenW, screenH);
+}
+
+std::pair<int, int> maxSimSizeForPreset(PerfPreset preset) {
+    switch (preset) {
+        case PerfPreset::BatterySaver: return {480, 270};
+        case PerfPreset::Balanced: return {640, 360};
+        case PerfPreset::Quality: return {720, 405};
+        case PerfPreset::Manual: return {960, 540};
+    }
+    return {640, 360};
 }
 
 } // namespace nx

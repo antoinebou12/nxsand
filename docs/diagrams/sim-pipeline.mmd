@@ -9,7 +9,7 @@ flowchart LR
 
   subgraph GPU["GPU"]
     Paint["paint.frag\ndirty-rect brush"]
-    Sim["sim.frag x4 phases\nfragment Margolus passes"]
+    Sim["sim.frag or sim.comp\n4 Margolus phases"]
     Pal["palette_lookup.frag"]
     Glow["glow_extract / glow_blur"]
     UI["ui_quad batched + FontAtlas"]

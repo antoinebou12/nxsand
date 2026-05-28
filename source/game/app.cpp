@@ -1,4 +1,6 @@
 #include "app.hpp"
+#include "../gpu/gl_loader.hpp"
+#include "../gpu/sim_backend.hpp"
 #include "engine_settings.hpp"
 #include "game_settings.hpp"
 #include "gpu/gl_loader.hpp"
@@ -22,6 +24,7 @@
 #include "sim/sim_state.hpp"
 #include "platform/input/haptics.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <chrono>
 #include <cstdarg>
@@ -80,6 +83,13 @@ static std::string getenvStr(const char* k) {
     return v ? std::string(v) : std::string{};
 }
 
+static bool getenvEnabled(const char* k) {
+    std::string v = getenvStr(k);
+    std::transform(v.begin(), v.end(), v.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return !v.empty() && v != "0" && v != "false" && v != "off" && v != "no";
+}
+
 std::string App::resolveShaderDir() const {
     std::string e = getenvStr("NXSAND_SHADER_DIR");
     if (!e.empty()) return e;
@@ -103,6 +113,11 @@ bool App::init() {
     }
 
     loadGameSettings(settings);
+    forceComputeBackend_ =
+#if defined(NXSAND_ENABLE_COMPUTE_DEFAULT) && NXSAND_ENABLE_COMPUTE_DEFAULT
+        true ||
+#endif
+        getenvEnabled("NXSAND_ENABLE_COMPUTE") || getenvEnabled("NXENGINE_ENABLE_COMPUTE");
 #if defined(__SWITCH__)
     settings.display.orientation = ScreenOrientation::Landscape;
 #endif
@@ -110,12 +125,8 @@ bool App::init() {
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-#if defined(__SWITCH__)
-    // The shipped Switch path uses GLES 3.0 fragment passes, avoiding compute/image sync.
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#else
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-#endif
+    // GLES 3.1 for optional compute sim (Switch + desktop); context creation falls back to 3.0.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 
@@ -145,14 +156,10 @@ bool App::init() {
     glCtx = SDL_GL_CreateContext(window);
     if (!glCtx) {
 #if defined(__SWITCH__)
-        appendLaunchLogf("SDL_GL_CreateContext ES 3.0 failed: %s", SDL_GetError());
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-        glCtx = SDL_GL_CreateContext(window);
-#else
-        // Fallback to GLES 3.0
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-        glCtx = SDL_GL_CreateContext(window);
+        appendLaunchLogf("SDL_GL_CreateContext ES 3.1 failed: %s", SDL_GetError());
 #endif
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+        glCtx = SDL_GL_CreateContext(window);
     }
     if (!glCtx) {
         initError = std::string("SDL_GL_CreateContext: ") + SDL_GetError();
@@ -193,8 +200,26 @@ bool App::init() {
               << " GLSL=" << (glSl ? glSl : "?") << "\n";
 #endif
 
+    {
+        std::string computeErr;
+        computeSimSupported_ = gl::check_compute_support(&computeErr);
+        if (!forceComputeBackend_ && !computeSimSupported_ &&
+            settings.performance.simBackend == SimBackend::Compute) {
+            settings.performance.simBackend = SimBackend::Fragment;
+            markGameSettingsDirty();
+        }
+#if defined(__SWITCH__)
+        appendLaunchLogf("Compute sim: %s", computeSimSupported_ ? "yes" : computeErr.c_str());
+#endif
+#if !defined(NDEBUG)
+        if (!computeSimSupported_ && !computeErr.empty()) {
+            std::cerr << "Compute sim unavailable: " << computeErr << "\n";
+        }
+#endif
+    }
+
     simPipeline = std::make_unique<SimPipeline>();
-    if (!simPipeline->init(sim.grid_w, sim.grid_h, shaderDir)) {
+    if (!initSimPipeline(sim.grid_w, sim.grid_h)) {
         initError = std::string("Sim pipeline failed. GL=") + (glVer ? glVer : "?") +
                     " GLSL=" + (glSl ? glSl : "?");
         const char* diag = lastShaderDiagnostics();
@@ -269,10 +294,38 @@ bool App::init() {
     return true;
 }
 
+SimBackend App::resolveSimBackend() const {
+    if (!computeSimSupported_) return SimBackend::Fragment;
+    if (forceComputeBackend_) return SimBackend::Compute;
+    return settings.performance.simBackend;
+}
+
+bool App::initSimPipeline(int w, int h) {
+    const SimBackend backend = resolveSimBackend();
+    if (simPipeline->init(w, h, shaderDir, backend)) return true;
+    if (backend != SimBackend::Compute) return false;
+    computeSimSupported_ = false;
+    if (!forceComputeBackend_ && settings.performance.simBackend == SimBackend::Compute) {
+        settings.performance.simBackend = SimBackend::Fragment;
+        markGameSettingsDirty();
+    }
+    setShaderDiagnostics("");
+    if (simPipeline->init(w, h, shaderDir, SimBackend::Fragment)) {
+        toast.show("Compute unavailable - using Fragment", 2.5f);
+        return true;
+    }
+    return false;
+}
+
 void App::applyRuntimeSettings() {
 #if defined(__SWITCH__)
     settings.display.orientation = ScreenOrientation::Landscape;
 #endif
+    if (!forceComputeBackend_ && !computeSimSupported_ &&
+        settings.performance.simBackend == SimBackend::Compute) {
+        settings.performance.simBackend = SimBackend::Fragment;
+        markGameSettingsDirty();
+    }
     applySdlOrientationHint(settings.display.orientation);
     const auto sz = resolveSimGridSize(screenW, screenH, settings.performance);
     if (simPipeline && (sz.first != sim.grid_w || sz.second != sim.grid_h)) {
@@ -284,7 +337,8 @@ void App::applyRuntimeSettings() {
     SDL_GL_SetSwapInterval(settings.performance.targetFps == 60 ? 1 : 2);
     if (render) {
         render->setPaletteMode(settings.visuals.paletteMode);
-        render->setGlowEnabled(settings.visuals.glowEnabled);
+        render->setBlobEnabled(settings.visuals.paletteMode == 0);
+        render->setBloomLevel(settings.visuals.bloom);
         const bool reduceFlash = settings.accessibility.reduceFlashing;
         render->setFlickerEnabled(settings.visuals.flicker && !reduceFlash);
         render->setGrainEnabled(settings.visuals.grain);
@@ -292,13 +346,33 @@ void App::applyRuntimeSettings() {
         if (settings.visuals.ao == VisualAo::Low) ao = 0.04f;
         else if (settings.visuals.ao == VisualAo::High) ao = 0.08f;
         render->setAoStrength(ao);
+        render->setUpscaleFilter(settings.visuals.upscaleFilter);
     }
     perf_.presetLabel = perfPresetLabel(settings.performance.mode);
+    if (simPipeline && simPipeline->backend() != resolveSimBackend()) {
+        const SimBackend prev = simPipeline->backend();
+        if (!setSimGridSize(sim.grid_w, sim.grid_h, true)) {
+            toast.show("Sim shader switch failed", 2.f);
+        } else if (simPipeline->backend() != prev) {
+            char msg[48];
+            std::snprintf(msg, sizeof(msg), "Sim shader: %s",
+                          simBackendLabel(simPipeline->backend()));
+            toast.show(msg, 1.8f);
+        }
+    }
+    if (simPipeline && settings.performance.activeTiles != ActiveTileMode::Off && sim.gridHasMatter) {
+        simPipeline->activeTiles.rewakeRememberedBounds(2);
+        sim.sleeping = false;
+    }
 }
 
 bool App::setSimGridSize(int w, int h, bool preserveContent) {
     if (w <= 0 || h <= 0) return false;
-    if (w == sim.grid_w && h == sim.grid_h) return true;
+    const SimBackend wantBackend = resolveSimBackend();
+    if (w == sim.grid_w && h == sim.grid_h && simPipeline &&
+        simPipeline->backend() == wantBackend) {
+        return true;
+    }
 
     std::vector<uint8_t> prev;
     const int oldW = sim.grid_w;
@@ -316,15 +390,25 @@ bool App::setSimGridSize(int w, int h, bool preserveContent) {
     sim.brush_x = std::clamp(sim.brush_x, 0, w - 1);
     sim.brush_y = std::clamp(sim.brush_y, 0, h - 1);
 
+    if (render) render->releaseGlowTargets();
+
     simPipeline->shutdown();
-    if (!simPipeline->init(w, h, shaderDir)) {
+    if (!initSimPipeline(w, h)) {
         initError = "Sim pipeline resize failed";
         return false;
     }
     if (!prev.empty()) {
         simPipeline->uploadGridTopDown(prev, oldW, oldH);
+        sim.gridHasMatter = false;
+        for (uint8_t cell : prev) {
+            if (cell != MAT_EMPTY) {
+                sim.gridHasMatter = true;
+                break;
+            }
+        }
     } else {
         simPipeline->clearAll(MAT_EMPTY);
+        sim.gridHasMatter = false;
     }
     return true;
 }
@@ -351,9 +435,15 @@ void App::tickMenu(double /*dtSec*/) {
     menuSim.tick(menu.tick);
     tickMenuBackgroundFx(menu.tick, screenW, screenH);
     pollInput(input, false, true, window, nullptr, 0, 0, settings.controls.cursorSpeed,
-              settings.controls.deadzone, settings.controls.invertY, settings.display.orientation);
+              settings.controls.deadzone, settings.controls.invertY, settings.display.orientation,
+              settings.accessibility.uiScale);
     if (input.quitRequested) return;
 
+    if (input.menuPointerActive) {
+        menu.handlePointer(*this, input.menuPointerX, input.menuPointerY,
+                           input.menuPointerConfirm);
+        input.menuPointerConfirm = false;
+    }
     if (input.menuConfirm) {
         menu.handleConfirm(*this);
         input.menuConfirm = false;
@@ -388,7 +478,8 @@ void App::tickPlay(double dtSec) {
 
     pollInput(input, menu.materialWheelOpen, false, window, &pr, sim.grid_w, sim.grid_h,
               settings.controls.cursorSpeed, settings.controls.deadzone,
-              settings.controls.invertY, settings.display.orientation);
+              settings.controls.invertY, settings.display.orientation,
+              settings.accessibility.uiScale);
     if (input.quitRequested) return;
     perf_.paintHeld = input.painting;
     perf_.eraseHeld = input.erasing;
@@ -409,9 +500,28 @@ void App::tickPlay(double dtSec) {
 
     if (menu.materialWheelOpen) {
         if (n > 0) {
+#if !defined(__SWITCH__)
+            if (input.materialWheelHoverIndex >= 0) {
+                menu.materialWheelIndex =
+                    std::clamp(input.materialWheelHoverIndex, 0, maxI);
+            } else if (input.menuLeft || input.menuUp) {
+                menu.materialWheelIndex = (menu.materialWheelIndex + n - 1) % n;
+                input.menuLeft = false;
+                input.menuUp = false;
+            } else if (input.menuRight || input.menuDown) {
+                menu.materialWheelIndex = (menu.materialWheelIndex + 1) % n;
+                input.menuRight = false;
+                input.menuDown = false;
+            } else {
+                const int idx = materialWheelIndexFromStick(input.ringStickX, input.ringStickY, n,
+                                                            0.01f);
+                if (idx >= 0) menu.materialWheelIndex = std::clamp(idx, 0, maxI);
+            }
+#else
             const int idx =
                 materialWheelIndexFromStick(input.ringStickX, input.ringStickY, n, 0.01f);
             if (idx >= 0) menu.materialWheelIndex = std::clamp(idx, 0, maxI);
+#endif
         }
         if (input.materialRingConfirm || input.menuConfirm) {
             if (n > 0) {
@@ -432,6 +542,7 @@ void App::tickPlay(double dtSec) {
         input.menuUp = input.menuDown = input.menuLeft = input.menuRight = false;
     } else {
         if (input.toggleMaterialRing) {
+            sim.sleeping = false;
             menu.materialWheelOpen = true;
             menu.materialWheelIndex = std::clamp(materialSelectorIndex(sim.brush_mat), 0, maxI);
             input.toggleMaterialRing = false;
@@ -448,10 +559,9 @@ void App::tickPlay(double dtSec) {
         if (input.pointerSetsBrush) {
             sim.brush_x = input.pointerGx;
             sim.brush_y = input.pointerGy;
-        } else {
-            sim.brush_x += input.brushDx;
-            sim.brush_y += input.brushDy;
         }
+        sim.brush_x += input.brushDx;
+        sim.brush_y += input.brushDy;
         sim.brush_x = std::max(0, std::min(sim.grid_w - 1, sim.brush_x));
         sim.brush_y = std::max(0, std::min(sim.grid_h - 1, sim.brush_y));
 
@@ -468,6 +578,8 @@ void App::tickPlay(double dtSec) {
 
         if (input.clearSandbox) {
             simPipeline->clearAll(MAT_EMPTY);
+            sim.gridHasMatter = false;
+            sim.sleeping = false;
             toast.show("Cleared", 1.0f);
             input.clearSandbox = false;
         }
@@ -484,6 +596,8 @@ void App::tickPlay(double dtSec) {
                                    ? (input.painting && !input.erasing)
                                    : (input.painting || input.erasing);
         if (wantPaint) {
+            sim.gridHasMatter = true;
+            sim.sleeping = false;
             perf_.beginPaint();
             int cmdCount = 0;
             int pdw = 0, pdh = 0;
@@ -499,18 +613,35 @@ void App::tickPlay(double dtSec) {
         sim.prev_brush_y = sim.brush_y;
     }
 
-    if (!sim.paused) {
+    constexpr int kSleepIdleFrames = 30;
+    static int idleFrames = 0;
+    const bool wantPaintNow = settings.accessibility.togglePaint
+                                  ? (input.painting && !input.erasing)
+                                  : (input.painting || input.erasing);
+    if (wantPaintNow || menu.materialWheelOpen) {
+        sim.sleeping = false;
+        idleFrames = 0;
+    }
+
+    if (!sim.paused && !sim.sleeping) {
         static double simAccum = 0.0;
         const double kFixedDt = 1.0 / 60.0;
+        constexpr double kSimBudgetMs = 20.0;
 #if defined(__SWITCH__)
-        const int kSubstepsPerTick = effectiveSubsteps(settings.performance, true);
+        int kSubstepsPerTick = effectiveSubsteps(settings.performance, true);
 #else
-        const int kSubstepsPerTick = effectiveSubsteps(settings.performance, false);
+        int kSubstepsPerTick = effectiveSubsteps(settings.performance, false);
+        if (perf_.lastSimMs > kSimBudgetMs && kSubstepsPerTick > 1) {
+            kSubstepsPerTick = 1;
+        }
 #endif
         // Cap catch-up to 2 ticks: deeper catch-up only exists to hide single-frame
         // hitches. Beyond that it stacks GPU work into the next swap and turns a hiccup
         // into a sustained low-FPS spiral. We'd rather drop sim time than fall further behind.
-        constexpr int kMaxSteps = 2;
+        int kMaxSteps = 2;
+        if (perf_.lastSimMs > kSimBudgetMs) {
+            kMaxSteps = 1;
+        }
         simAccum += dtSec;
         int steps = 0;
         perf_.substeps = kSubstepsPerTick;
@@ -535,12 +666,31 @@ void App::tickPlay(double dtSec) {
             simPipeline->activeTiles.tickOptimizer(settings.performance.activeTiles);
         }
     }
+
+    bool canEnterIdleSleep = false;
+    if (settings.performance.activeTiles != ActiveTileMode::Off) {
+        canEnterIdleSleep = (simPipeline->activeTiles.activeCount() == 0);
+    } else {
+        canEnterIdleSleep = !sim.gridHasMatter;
+    }
+    if (!sim.paused && canEnterIdleSleep) {
+        if (++idleFrames >= kSleepIdleFrames) {
+            sim.sleeping = true;
+        }
+    } else if (!sim.paused) {
+        idleFrames = 0;
+    }
+    perf_.simSleeping = sim.sleeping;
+    perf_.gridHasMatter = sim.gridHasMatter;
 }
 
 void App::renderFrame() {
     perf_.simW = sim.grid_w;
     perf_.simH = sim.grid_h;
     perf_.presetLabel = perfPresetLabel(settings.performance.mode);
+    if (simPipeline) {
+        perf_.simBackendLabel = simBackendLabel(simPipeline->backend());
+    }
     render->beginUiFrame();
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -556,7 +706,7 @@ void App::renderFrame() {
         if (simPipeline) simPipeline->syncSimForSampling();
         render->drawSimulation(simPipeline->readTexture(), sim.grid_w, sim.grid_h, pr, screenH,
                                sim.tick, perf_.simMs);
-        if (render->glowEnabled()) {
+        if (render->bloomEnabled()) {
             render->drawGlow(simPipeline->readTexture(), sim.grid_w, sim.grid_h, pr, screenW,
                              screenH, sim.tick);
         }
@@ -611,6 +761,8 @@ void App::frame(double dtSec) {
                                 false
 #endif
                 );
+                applyPerfPresetVisuals(settings.visuals, PerfPreset::BatterySaver);
+                applyPerfPresetPhysics(physics, PerfPreset::BatterySaver);
                 applyRuntimeSettings();
                 markGameSettingsDirty();
             }
@@ -623,6 +775,8 @@ void App::frame(double dtSec) {
                                 false
 #endif
                 );
+                applyPerfPresetVisuals(settings.visuals, PerfPreset::Balanced);
+                applyPerfPresetPhysics(physics, PerfPreset::Balanced);
                 applyRuntimeSettings();
                 markGameSettingsDirty();
                 stableFast = 0;

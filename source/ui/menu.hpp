@@ -18,6 +18,22 @@ enum class MenuScreen {
     EngineSettingsTab,
 };
 
+struct MenuLayout {
+    float s;
+    float panelX;
+    float panelY;
+    float panelW;
+    float panelH;
+    float rowH;
+    float listY0;
+    float titleY;
+    float markY;
+    float logoY;
+    float footerY;
+    int visibleRows;
+    int firstRow;
+};
+
 struct MenuState {
     MenuScreen screen = MenuScreen::Main;
     int index = 0;
@@ -34,6 +50,7 @@ struct MenuState {
     void moveVertical(int delta);
     void handleConfirm(App& app);
     void adjustHorizontal(App& app, int dir);
+    void handlePointer(App& app, int px, int py, bool confirm);
 };
 
 void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app);

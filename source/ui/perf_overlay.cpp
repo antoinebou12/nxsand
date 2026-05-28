@@ -47,10 +47,16 @@ void drawPerfOverlay(RenderPipeline& r, FontAtlas& font, const PerfStats& perf,
     std::snprintf(line2, sizeof(line2), "sim %.1f  paint %.1f  world %.1f  ui %.1f  present %.1f",
                   simMs, paintMs, worldMs, uiMs, presentMs);
 
-    std::snprintf(line3, sizeof(line3), "grid %dx%d  substeps %d  passes %d  %s  tiles %s:%d%s",
-                  perf.simW, perf.simH, perf.substeps, passes,
+    const char* idleHint = "";
+    if (!perf.simSleeping && activeMode == 0 && perf.gridHasMatter) {
+        idleHint = "  idle:use Stable";
+    }
+    std::snprintf(line3, sizeof(line3),
+                  "grid %dx%d  substeps %d  %s passes %d  %s  tiles %s:%d%s%s%s",
+                  perf.simW, perf.simH, perf.substeps,
+                  perf.simBackendLabel ? perf.simBackendLabel : "?", passes,
                   perf.presetLabel ? perf.presetLabel : "?", activeLabel, activeCount,
-                  activeFallback ? " fallback" : "");
+                  activeFallback ? " fallback" : "", perf.simSleeping ? " sleep" : "", idleHint);
 
     std::snprintf(line4, sizeof(line4),
                   "paint %s erase %s  mat %d  r %d  cmds %d  dirty %dx%d",

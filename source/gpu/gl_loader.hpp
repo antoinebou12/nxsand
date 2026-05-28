@@ -31,7 +31,7 @@ inline bool parse_es_version(int& major, int& minor) {
     return true;
 }
 
-// Experimental compute capability probe. Gameplay uses GLES 3.0 fragment passes.
+// GLES 3.1 compute capability probe (Switch + desktop).
 inline bool check_compute_support(std::string* outError, int* outMaxInvocations = nullptr) {
     int major = 0;
     int minor = 0;
@@ -70,6 +70,15 @@ inline bool check_compute_support(std::string* outError, int* outMaxInvocations 
         if (outError) {
             *outError = "GPU compute work group too small (MAX_COMPUTE_WORK_GROUP_INVOCATIONS=" +
                         std::to_string(maxInv) + ", need >= 256 for 16x16 groups)";
+        }
+        return false;
+    }
+    GLint maxImageUnits = 0;
+    glGetIntegerv(GL_MAX_IMAGE_UNITS, &maxImageUnits);
+    if (maxImageUnits < 2) {
+        if (outError) {
+            *outError = "GPU compute image units too small (MAX_IMAGE_UNITS=" +
+                        std::to_string(maxImageUnits) + ", need >= 2)";
         }
         return false;
     }

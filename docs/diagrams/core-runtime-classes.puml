@@ -1,0 +1,67 @@
+@startuml core-runtime-classes
+title Core runtime types (simplified)
+package "nx::game" {
+  class App {
+    +window: SDL_Window*
+    +scene: Scene
+    +sim: SimState
+    +physics: PhysicsParams
+    +settings: GameSettings
+    +input: InputState
+    +menu: MenuState
+    +simPipeline: SimPipeline*
+    +render: RenderPipeline*
+    +frame(dtSec)
+    +tickPlay(dtSec)
+    +renderFrame()
+  }
+  enum Scene {
+    Menu
+    Play
+  }
+}
+
+package "nx::gpu" {
+  class SimPipeline {
+    +tex[2]: GLuint
+    +cur: int
+    +activeTiles: ActiveTileMap
+    +paintDisk()
+    +step(frameTick, physics, activeMode)
+    +readGridTo()
+    +uploadGridTopDown()
+    +syncSimForSampling()
+  }
+  class RenderPipeline {
+    +drawSimulation()
+    +drawGlow()
+    +beginUiFrame()
+  }
+  class ActiveTileMap {
+    +markDisk()
+    +activeBounds()
+    +tickOptimizer()
+  }
+}
+
+package "nx::sim" {
+  class SimState {
+    +grid_w grid_h
+    +brush_x brush_y
+    +brush_mat brush_radius
+    +tick paused sleeping
+  }
+  class PhysicsParams {
+    +fallChance flow rates...
+  }
+}
+
+App --> SimPipeline
+App --> RenderPipeline
+App --> SimState
+App --> PhysicsParams
+App --> Scene
+SimPipeline --> ActiveTileMap
+SimPipeline ..> PhysicsParams : UBO upload
+
+@enduml

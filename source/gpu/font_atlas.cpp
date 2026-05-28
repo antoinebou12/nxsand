@@ -6,7 +6,9 @@
 #include <switch.h>
 #endif
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -24,19 +26,39 @@ struct FtLibrary {
     }
 };
 
+static bool readableFontFile(const std::string& path) {
+    if (path.empty()) return false;
+    std::ifstream f(path, std::ios::binary);
+    return f.good();
+}
+
 static std::string resolveFontPath() {
 #if defined(__SWITCH__)
     return {};
 #else
+    const char* overridePath = std::getenv("NXSAND_FONT_PATH");
+    if (overridePath && overridePath[0]) {
+        if (readableFontFile(overridePath)) return overridePath;
+        std::cerr << "Font override not readable: " << overridePath << "\n";
+    }
     const char* candidates[] = {
         "romfs/fonts/NotoSans-Regular.ttf",
         "fonts/NotoSans-Regular.ttf",
+        "/usr/share/fonts/truetype/inter/Inter-Regular.ttf",
+        "/usr/share/fonts/opentype/inter/Inter-Regular.otf",
+        "/usr/share/fonts/truetype/noto/NotoSansDisplay-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "C:/Windows/Fonts/SegoeUIVariable.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+        "C:/Windows/Fonts/segoeuisl.ttf",
+        "C:/Windows/Fonts/arial.ttf",
     };
     for (const char* p : candidates) {
-        std::ifstream f(p, std::ios::binary);
-        if (f.good()) return p;
+        if (readableFontFile(p)) return p;
     }
-    return candidates[0];
+    return {};
 #endif
 }
 
@@ -160,12 +182,12 @@ const FontAtlas::GlyphInfo& FontAtlas::ensureGlyph(uint32_t codepoint) const {
         const int bw = static_cast<int>(bitmap.width);
         const int bh = static_cast<int>(bitmap.rows);
 
-        if (penX_ + bw + 2 > atlasW) {
+        if (penX_ + bw + 3 > atlasW) {
             penX_ = 2;
-            penY_ += rowH_ + 2;
+            penY_ += rowH_ + 3;
             rowH_ = 0;
         }
-        if (penY_ + bh + 2 > atlasH) {
+        if (penY_ + bh + 3 > atlasH) {
             if (!growAtlas()) {
                 GlyphInfo miss{};
                 miss.advance = pixelSize / 2;
@@ -195,7 +217,7 @@ const FontAtlas::GlyphInfo& FontAtlas::ensureGlyph(uint32_t codepoint) const {
             }
         }
 
-        penX_ += bw + 2;
+        penX_ += bw + 3;
         rowH_ = std::max(rowH_, bh);
         glyphs_[codepoint] = g;
         uploadAtlas();
@@ -234,6 +256,11 @@ bool FontAtlas::init() {
                              static_cast<FT_Long>(font.size), 0, &g_ft.face);
     path = "Switch shared font";
 #else
+    if (path.empty()) {
+        std::cerr << "No usable desktop font found. Set NXSAND_FONT_PATH to a .ttf/.otf file.\n";
+        releaseFontResources();
+        return false;
+    }
     err = FT_New_Face(g_ft.lib, path.c_str(), 0, &g_ft.face);
 #endif
     if (err) {
@@ -263,8 +290,8 @@ bool FontAtlas::init() {
 
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, atlasW, atlasH, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
@@ -313,10 +340,12 @@ void FontAtlas::drawText(RenderPipeline& rp, float x, float y, float scale, cons
         }
         const GlyphInfo& g = ensureGlyph(cp);
         if (g.width > 0 && g.height > 0) {
-            float dx = penX + float(g.bearingX) * scale;
-            float dy = y + float(baseline - g.bearingY) * scale;
-            rp.drawAlphaMaskRect(dx, dy, float(g.width) * scale, float(g.height) * scale,
-                                 g.u0, g.v0, g.u1, g.v1, cr, cg, cb, ca, screenW, screenH, tex);
+            const float dx = std::round(penX + float(g.bearingX) * scale);
+            const float dy = std::round(y + float(baseline - g.bearingY) * scale);
+            const float gw = std::max(1.f, std::round(float(g.width) * scale));
+            const float gh = std::max(1.f, std::round(float(g.height) * scale));
+            rp.drawAlphaMaskRect(dx, dy, gw, gh, g.u0, g.v0, g.u1, g.v1, cr, cg, cb, ca, screenW,
+                                 screenH, tex);
         }
         penX += float(g.advance) * scale;
     }

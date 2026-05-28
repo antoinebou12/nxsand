@@ -32,7 +32,7 @@ struct alignas(16) PhysicsParamsGPU {
     float oil_floatRate;
     float ice_meltRate;
     float ice_freezeRate;
-    float _pad2;
+    float water_levelRate;
     float _pad3;
     float _pad4;
     float _pad5;
@@ -62,6 +62,7 @@ inline PhysicsParamsGPU to_gpu(const PhysicsParams& p, int /*simW*/ = SIM_W) {
     g.oil_floatRate = p.oil_floatRate;
     g.ice_meltRate = p.ice_meltRate;
     g.ice_freezeRate = p.ice_freezeRate;
+    g.water_levelRate = p.water_levelRate;
     return g;
 }
 

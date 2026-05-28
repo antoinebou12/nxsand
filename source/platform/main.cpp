@@ -82,7 +82,8 @@ bool romfsFilePresent(const char* rel) {
 }
 
 bool romfsShaderBundlePresent() {
-    return romfsFilePresent("shaders/sim.frag") && romfsFilePresent("shaders/paint.frag");
+    return romfsFilePresent("shaders/sim.frag") && romfsFilePresent("shaders/sim.comp") &&
+           romfsFilePresent("shaders/paint.frag");
 }
 
 } // namespace
@@ -109,7 +110,7 @@ static int run_app() {
         romfsExit();
         switchShowFatal("NXSand: shaders missing from romfs",
                         "Run: make (copies shaders/ into the NRO).\n"
-                        "Expected shaders/sim.frag and paint.frag inside the NRO.");
+                        "Expected shaders/sim.frag, sim.comp, and paint.frag inside the NRO.");
         return 1;
     }
     logStage("stage: app.init()");

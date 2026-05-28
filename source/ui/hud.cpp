@@ -3,6 +3,8 @@
 #include "../gpu/render_pipeline.hpp"
 #include "layout.hpp"
 #include "theme.hpp"
+#include "menu_chrome.hpp"
+#include "ui_copy.hpp"
 #include "../sim/materials.hpp"
 #include <algorithm>
 #include <cstddef>
@@ -115,15 +117,15 @@ void drawHudSolid(RenderPipeline& r, App& app, const PlayRegion& pr) {
     r.drawSolidRect(0, 0, float(W), topH, 0.04f, 0.055f, 0.085f, 0.62f, W, H);
     app.font.drawText(r, 14.f * s, 9.f * s, 0.92f * s, title,
                       0.88f, 0.94f, 1.0f, 0.92f, W, H);
-#if defined(__SWITCH__)
-    app.font.drawText(r, float(W) - 590.f * s, 9.f * s, 0.66f * s,
-                      "X RING  Y SAVE  + MENU  A/ZR PAINT  B/ZL ERASE  L/R SIZE",
-                      0.55f, 0.62f, 0.70f, 0.82f, W, H);
-#else
-    app.font.drawText(r, float(W) - 480.f * s, 9.f * s, 0.74f * s,
-                      "Y RING   F5 SAVE   + MENU   ZR PAINT   ZL ERASE   [/] SIZE",
-                      0.55f, 0.62f, 0.70f, 0.82f, W, H);
-#endif
+    {
+        const char* hint = ui_copy::playHudHint();
+        const float hintScale = 0.66f * s;
+        const float hintW = app.font.textWidth(hint, hintScale);
+        const float hintX = std::max(14.f * s, float(W) - hintW - 14.f * s);
+        const float hintY = 8.f * s;
+        const float pillCx = hintX + hintW * 0.5f;
+        drawHintPill(r, app.font, pillCx, hintY, s, hint, W, H);
+    }
 
     if (!app.sim.paletteHidden) {
         PaletteLayout l = getPaletteLayout(W, H, s);

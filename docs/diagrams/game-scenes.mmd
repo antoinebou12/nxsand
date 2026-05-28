@@ -1,0 +1,22 @@
+%% NXSand scene flow (source/game/app.cpp, source/ui/menu.cpp)
+stateDiagram-v2
+  direction LR
+  [*] --> Menu: init()
+  Menu --> Play: New / Load slot / Resume
+  Play --> Menu: Engine menu exit\n(settings flush)
+  Play --> Play: tickPlay + renderFrame
+  Menu --> Menu: tickMenu + renderFrame
+
+  state Play {
+    [*] --> SimTick
+    SimTick --> BrushPaint: input painting
+    BrushPaint --> SimTick: paint.frag stamp
+    SimTick --> RenderWorld: syncSimForSampling
+    RenderWorld --> [*]: palette + HUD + swap
+  }
+
+  state Menu {
+    [*] --> Slots
+    Slots --> Engine: Engine tab
+    Engine --> Slots: back (flush settings)
+  }
