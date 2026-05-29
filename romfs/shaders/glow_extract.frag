@@ -9,6 +9,7 @@ layout(location = 0) out vec4 fragColor;
 uniform usampler2D uSim;
 uniform sampler2D  uPalette;
 uniform ivec2      uGridSize;
+uniform uint       uFrame;
 
 const uint M_FIRE  = 3u;
 const uint M_SMOKE = 4u;
@@ -25,7 +26,7 @@ void main() {
     ivec2 c = ivec2(v_uv * vec2(uGridSize));
     c = clamp(c, ivec2(0), uGridSize - ivec2(1));
     uint m = texelFetch(uSim, c, 0).r;
-    float jitter = hash12(vec2(c) + vec2(13.7, 71.2));
+    float jitter = hash12(vec2(c) + vec2(float(uFrame) * 0.07, float(uFrame) * 0.11));
 
     vec4 col = texture(uPalette, vec2((float(m) + 0.5) / 256.0, 0.5));
     vec3 emit = vec3(0.0);

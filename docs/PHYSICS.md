@@ -28,14 +28,14 @@ OpenGL coordinates increase upward inside the sim texture. UI input, cursor draw
 |----------|------------|-------------------|---------|--------|
 | Sand | 1.0 | powder slide ~0.55–0.70 via `slideChance` | 4 | no |
 | Stone | 1.0 | powder slide | 5 | no |
-| Water | 1.0 | `water_flowRate` (default 0.85), `water_levelRate` wide spread + pocket fill under ledges (default 0.10) | 3 | no |
+| Water | 1.0 | `water_flowRate` (default 1.0), `water_levelRate` wide spread + pocket fill under ledges (default 0.18; triggers scale ×3 wide / ×6 pocket in `boostedFlow`) | 3 | no |
 | Acid | 0.88 | `acid_flowRate` (default 0.28) | 3 | no |
 | Lava | `lava_flowRate+0.45` clamped (default fall ~0.61) | `lava_spreadRate` (default 0.09) | 3 | no |
 | Oil | 0.55 | `oil_floatRate` (default 0.16) | 2 | no |
 | Fire / Smoke | `fire_speed` | `fire_spreadRate` / `smoke_driftRate`; rise/drift only into **empty** cells (cannot displace wall, stone, plant, or ice) | 0 | no |
 | Wall / Plant / Ice | — | ice slow-thaw near water | — | yes |
 
-Liquids spread horizontally into empty or same-or-lighter liquid cells (density layering keeps oil above water). Water also gets a **pocket** boost in `boostedFlow()` when one empty cell lies ahead with solid ground below it. Presets set `water_levelRate` to **0.10** via `applyPerfPresetPhysics` in `source/game/game_settings.cpp`. Powders use `slideChance` in diagonal swaps so sand and stone fall off ledges without horizontal “flow.”
+Liquids spread horizontally into empty or same-or-lighter liquid cells (density layering keeps oil above water). Water also gets a **pocket** boost in `boostedFlow()` when one empty cell lies ahead with solid ground below it. Wide spread and pocket attempts roll against `min(1, water_levelRate × 3)` and `min(1, water_levelRate × 6)` respectively. Presets set `water_levelRate` to **0.18** via `applyPerfPresetPhysics` in `source/game/game_settings.cpp`. Powders use `slideChance` in diagonal swaps so sand and stone fall off ledges without horizontal “flow.”
 
 ## Interaction matrix
 

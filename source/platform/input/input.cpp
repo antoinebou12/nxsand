@@ -225,6 +225,13 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
         if (nxDownBtn) in.menuDownHeld = true;
         if (nxLeft) in.menuLeftHeld = true;
         if (nxRight) in.menuRightHeld = true;
+        {
+            const int menuStickDead = std::max(4000, int(32767.f * deadzone));
+            if (nxLeftStick.x < -menuStickDead) in.menuLeftHeld = true;
+            if (nxLeftStick.x > menuStickDead) in.menuRightHeld = true;
+            if (nxLeftStick.y > menuStickDead) in.menuUpHeld = true;
+            if (nxLeftStick.y < -menuStickDead) in.menuDownHeld = true;
+        }
 #endif
         if (in.pad) {
             const bool fa = switch_face::confirm(in.pad);
@@ -234,9 +241,12 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
             bool lf = SDL_GameControllerGetButton(in.pad, SDL_CONTROLLER_BUTTON_DPAD_LEFT);
             bool rt = SDL_GameControllerGetButton(in.pad, SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
             const Sint16 ax = SDL_GameControllerGetAxis(in.pad, SDL_CONTROLLER_AXIS_LEFTX);
-            const int dead = 12000;
+            const Sint16 ay = SDL_GameControllerGetAxis(in.pad, SDL_CONTROLLER_AXIS_LEFTY);
+            const int dead = std::max(12000, int(32767.f * deadzone));
             const bool stickL = ax < -dead;
             const bool stickR = ax > dead;
+            const bool stickU = ay < -dead;
+            const bool stickD = ay > dead;
             if (edge(fa, prevFaceA)) in.menuConfirm = true;
             if (edge(fb, prevFaceB)) in.menuBack = true;
             if (up) in.menuUpHeld = true;
@@ -245,6 +255,8 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
             if (rt) in.menuRightHeld = true;
             if (stickL) in.menuLeftHeld = true;
             if (stickR) in.menuRightHeld = true;
+            if (stickU) in.menuUpHeld = true;
+            if (stickD) in.menuDownHeld = true;
             prevFaceA = fa;
             prevFaceB = fb;
         }

@@ -43,14 +43,15 @@ inline Material cpu_react_smoke(bool nearIce, bool nearWall, bool nearStoneSand,
 inline bool cpu_liquid_level_boost_applies(float levelRate, bool emptyOneAhead,
                                            bool emptyTwoAhead, float roll01) {
     if (levelRate <= 0.f || !emptyOneAhead || !emptyTwoAhead) return false;
-    return cpu_roll_lt(roll01, levelRate);
+    const float chance = levelRate * 3.f > 1.f ? 1.f : levelRate * 3.f;
+    return cpu_roll_lt(roll01, chance);
 }
 
 // Pocket fill under a ledge (boostedFlow water-only path).
 inline bool cpu_liquid_pocket_boost_applies(float levelRate, bool emptyOneAhead,
                                             bool solidBelowAhead, float roll01) {
     if (levelRate <= 0.f || !emptyOneAhead || !solidBelowAhead) return false;
-    const float chance = levelRate * 2.f > 1.f ? 1.f : levelRate * 2.f;
+    const float chance = levelRate * 6.f > 1.f ? 1.f : levelRate * 6.f;
     return cpu_roll_lt(roll01, chance);
 }
 

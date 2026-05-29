@@ -104,7 +104,7 @@ bool isPowder(uint m) {
 float slideChance(uint m) {
     if (isPowder(m)) return clamp(fallChance(m) * 0.62, 0.55, 0.70);
     if (m == M_SMOKE) return max(0.14, flowChance(m) * 0.90);
-    if (m == M_WATER) return max(0.70, flowChance(m));
+    if (m == M_WATER) return max(0.92, flowChance(m));
     return max(0.30, flowChance(m));
 }
 
@@ -360,11 +360,13 @@ float boostedFlow(uint m, ivec2 pos, ivec2 dir) {
     float base = flowChance(m);
     float boost = levelBoost(m);
     if (boost <= 0.0) return base;
-    if (cellEmpty(pos + dir) && cellEmpty(pos + dir * 2) && rand01(pos, 99u) < boost)
+    if (cellEmpty(pos + dir) && cellEmpty(pos + dir * 2) &&
+        rand01(pos, 99u) < min(1.0, boost * 3.0))
         return min(1.0, base + 0.95);
     if (m == M_WATER && cellEmpty(pos + dir)) {
         ivec2 ahead = pos + dir;
-        if (isSolidSurface(cell(ahead + ivec2(0, -1))) && rand01(pos, 100u) < boost * 3.0)
+        if (isSolidSurface(cell(ahead + ivec2(0, -1))) &&
+            rand01(pos, 100u) < min(1.0, boost * 6.0))
             return min(1.0, base + 0.70);
     }
     return base;

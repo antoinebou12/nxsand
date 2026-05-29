@@ -60,6 +60,10 @@ public:
     void frame(double dtSec);
     bool setSimGridSize(int w, int h, bool preserveContent);
     void applyRuntimeSettings();
+    void applyRuntimeSettingsLight();
+    void applyRuntimeSettingsHeavy();
+    void flushPendingHeavySettings();
+    void markSettingsHeavyApplyPending() { settingsHeavyApplyPending_ = true; }
 
     bool computeSimSupported() const { return computeSimSupported_; }
 
@@ -67,6 +71,10 @@ public:
     void requestSlotSave(int slot, bool fromQuickSave = false);
     void requestFlushGameSettings();
     void requestFlushPhysicsSettings();
+
+#if defined(__SWITCH__)
+    void presentBootProgress(float progress, const char* status);
+#endif
 
 private:
     bool computeSimSupported_ = false;
@@ -86,6 +94,7 @@ private:
 
     PendingSaveKind pendingSave_ = PendingSaveKind::None;
     int pendingSlot_ = 1;
+    bool settingsHeavyApplyPending_ = false;
 
     PerfStats perf_{};
     MenuRepeatState menuRepeat_{};

@@ -87,6 +87,7 @@ void MenuState::goBack(App& app) {
         return;
     }
     if (screen == MenuScreen::EngineSettingsTab) {
+        app.flushPendingHeavySettings();
         screen = MenuScreen::EngineSettings;
         index = static_cast<int>(engineTab);
         return;
@@ -109,7 +110,10 @@ void MenuState::goBack(App& app) {
 void MenuState::handleConfirm(App& app) {
     if (menuIsBackItem(*this, index)) {
         if (screen == MenuScreen::SettingsEdit) app.requestFlushPhysicsSettings();
-        if (screen == MenuScreen::EngineSettingsTab) app.requestFlushGameSettings();
+        if (screen == MenuScreen::EngineSettingsTab) {
+            app.flushPendingHeavySettings();
+            app.requestFlushGameSettings();
+        }
         goBack(app);
         return;
     }

@@ -40,11 +40,11 @@ Acceptance:
 
 ### TPT-informed physics (2026)
 
-See also **Performance analogy (TPT → NXSand)** in [`TPT_IMPORT.md`](TPT_IMPORT.md). Presets set runtime `water_levelRate` to **0.10** via `applyPerfPresetPhysics` (does not auto-save `physics.json`).
+See also **Performance analogy (TPT → NXSand)** in [`TPT_IMPORT.md`](TPT_IMPORT.md). Presets set runtime `water_levelRate` to **0.18** via `applyPerfPresetPhysics` (does not auto-save `physics.json`).
 
 Margolus rules in `shaders/sim_common.glsl` gained:
 
-- **`water_levelRate`** — wide horizontal spread when two empty cells lie ahead, plus pocket fill under ledges (TPT `flood_water` inspiration; no CPU flood-fill).
+- **`water_levelRate`** — wide horizontal spread when two empty cells lie ahead (`rand < min(1, level × 3)`), plus pocket fill under ledges (`rand < min(1, level × 6)`; TPT `flood_water` inspiration; no CPU flood-fill).
 - **Ice–water adjacency** — very slow ice thaw next to water; smoke+ice condensation tuned.
 
 These add branch-light `cell()` reads only when `water_levelRate > 0` and on reaction checks. Active tiles default **Off**; enable Conservative in Engine settings when needed. Full-grid fallback when row-run area exceeds the safety threshold; **sleep** after 30 idle frames when active tile count is zero (or empty grid with Active tiles Off).

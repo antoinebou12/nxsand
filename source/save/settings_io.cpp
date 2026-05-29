@@ -135,7 +135,6 @@ bool loadGameSettings(GameSettings& out) {
 }
 
 bool saveGameSettings(const GameSettings& s) {
-    migrateLegacySaveData();
     ensureDirectoryExists(saveDirectory());
 
     nlohmann::json j;

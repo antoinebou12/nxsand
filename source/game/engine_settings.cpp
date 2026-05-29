@@ -188,7 +188,18 @@ const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settin
     return buf;
 }
 
-void applySettingsToRuntime(App& app) { app.applyRuntimeSettings(); }
+void applySettingsToRuntime(App& app) { app.applyRuntimeSettingsLight(); }
+
+static bool engineTabRowNeedsHeavyApply(EngineTab tab, int row) {
+    switch (tab) {
+        case EngineTab::Performance:
+            return row == 0 || row == 1 || row == 3 || row == 4 || row == 5 || row == 6;
+        case EngineTab::Display:
+            return row == 2;
+        default:
+            return false;
+    }
+}
 
 bool engineTabRowIsToggle(EngineTab tab, int row) {
     switch (tab) {
@@ -240,7 +251,6 @@ void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir) {
                 }
                 case 2:
                     s.performance.targetFps = (dir > 0) ? 60 : 30;
-                    SDL_GL_SetSwapInterval(s.performance.targetFps == 60 ? 1 : 2);
                     break;
                 case 3: {
                     static const int kSizes[][2] = {{384, 216}, {480, 270}, {640, 360},
@@ -385,6 +395,8 @@ void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir) {
         default: break;
     }
     markGameSettingsDirty();
+    if (engineTabRowNeedsHeavyApply(tab, row))
+        app.markSettingsHeavyApplyPending();
     applySettingsToRuntime(app);
 }
 

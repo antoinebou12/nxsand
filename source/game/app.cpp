@@ -14,6 +14,7 @@
 #include "ui/layout.hpp"
 #include "ui/menu_fx.hpp"
 #include "ui/perf_overlay.hpp"
+#include "ui/boot_screen.hpp"
 #include "platform/screen_size.hpp"
 #include "ui/brush_cursor.hpp"
 #include "ui/material_wheel.hpp"
@@ -168,6 +169,14 @@ bool App::init() {
     }
     SDL_GL_SetSwapInterval(1);
 
+#if defined(__SWITCH__)
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, screenW, screenH);
+    glClearColor(0.03f, 0.04f, 0.06f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    SDL_GL_SwapWindow(window);
+#endif
+
     queryDrawableSize(window, screenW, screenH, settings.display.orientation);
     {
         const auto simSz = resolveSimGridSize(screenW, screenH, settings.performance);
@@ -218,6 +227,32 @@ bool App::init() {
 #endif
     }
 
+#if defined(__SWITCH__)
+    render = std::make_unique<RenderPipeline>();
+    if (!render->init(shaderDir)) {
+        initError = "Render pipeline failed";
+        const char* diag = lastShaderDiagnostics();
+        if (diag && diag[0]) {
+            initError += ": ";
+            initError += diag;
+        }
+        appendLaunchLogf("RenderPipeline init failed: %s", initError.c_str());
+        return false;
+    }
+    {
+        const char* palMode = SDL_getenv("NXSAND_PALETTE_MODE");
+        if (!palMode) palMode = SDL_getenv("NXENGINE_PALETTE_MODE");
+        if (palMode) {
+            const int m = std::atoi(palMode);
+            if (m >= 0 && m <= 2) render->setPaletteMode(m);
+        }
+    }
+    if (!font.init()) {
+        initError = "Font atlas init failed";
+        appendLaunchLog(initError.c_str());
+        return false;
+    }
+    presentBootProgress(0.12f, "Loading fonts...");
     simPipeline = std::make_unique<SimPipeline>();
     if (!initSimPipeline(sim.grid_w, sim.grid_h)) {
         initError = std::string("Sim pipeline failed. GL=") + (glVer ? glVer : "?") +
@@ -227,13 +262,10 @@ bool App::init() {
             initError += "\n";
             initError += diag;
         }
-#if defined(__SWITCH__)
         appendLaunchLogf("SimPipeline init failed: %s", initError.c_str());
-#endif
         return false;
     }
-
-#if defined(__SWITCH__)
+    presentBootProgress(0.55f, "Starting simulation...");
     if (SDL_getenv("NXSAND_DEBUG_GRID") || SDL_getenv("NXENGINE_DEBUG_GRID")) {
         const int mid = sim.grid_h / 2;
         for (int x = 0; x < sim.grid_w; x += 8) {
@@ -241,7 +273,18 @@ bool App::init() {
         }
         simPipeline->syncSimForSampling();
     }
-#endif
+#else
+    simPipeline = std::make_unique<SimPipeline>();
+    if (!initSimPipeline(sim.grid_w, sim.grid_h)) {
+        initError = std::string("Sim pipeline failed. GL=") + (glVer ? glVer : "?") +
+                    " GLSL=" + (glSl ? glSl : "?");
+        const char* diag = lastShaderDiagnostics();
+        if (diag && diag[0]) {
+            initError += "\n";
+            initError += diag;
+        }
+        return false;
+    }
 
     render = std::make_unique<RenderPipeline>();
     if (!render->init(shaderDir)) {
@@ -251,9 +294,6 @@ bool App::init() {
             initError += ": ";
             initError += diag;
         }
-#if defined(__SWITCH__)
-        appendLaunchLogf("RenderPipeline init failed: %s", initError.c_str());
-#endif
         return false;
     }
     const char* palMode = SDL_getenv("NXSAND_PALETTE_MODE");
@@ -266,12 +306,13 @@ bool App::init() {
     }
     if (!font.init()) {
         initError = "Font atlas init failed";
-#if defined(__SWITCH__)
-        appendLaunchLog(initError.c_str());
-#endif
         return false;
     }
+#endif
     loadPhysicsParams(physics);
+#if defined(__SWITCH__)
+    presentBootProgress(0.72f, "Loading menu...");
+#endif
     if (!menuSim.init()) {
         initError = "Menu backdrop init failed";
 #if defined(__SWITCH__)
@@ -287,12 +328,33 @@ bool App::init() {
     if (!ensureSwitchStorageReady()) {
         toast.show("SD saves unavailable (check microSD)", 4.0f);
     }
+    presentBootProgress(0.92f, "Almost ready...");
 #endif
 
     openFirstController(input);
     menu.resetMain();
+#if defined(__SWITCH__)
+    presentBootProgress(1.f, "Ready");
+#endif
     return true;
 }
+
+#if defined(__SWITCH__)
+void App::presentBootProgress(float progress, const char* status) {
+    if (!window || !glCtx || !render) return;
+    render->beginUiFrame();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, screenW, screenH);
+    glDisable(GL_SCISSOR_TEST);
+    glClearColor(0.03f, 0.04f, 0.06f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    if (font.tex != 0) {
+        drawBootScreen(*render, font, screenW, screenH, progress, status);
+    }
+    render->endUiFrame();
+    SDL_GL_SwapWindow(window);
+}
+#endif
 
 SimBackend App::resolveSimBackend() const {
     if (!computeSimSupported_) return SimBackend::Fragment;
@@ -317,7 +379,7 @@ bool App::initSimPipeline(int w, int h) {
     return false;
 }
 
-void App::applyRuntimeSettings() {
+void App::applyRuntimeSettingsLight() {
 #if defined(__SWITCH__)
     settings.display.orientation = ScreenOrientation::Landscape;
 #endif
@@ -327,12 +389,6 @@ void App::applyRuntimeSettings() {
         markGameSettingsDirty();
     }
     applySdlOrientationHint(settings.display.orientation);
-    const auto sz = resolveSimGridSize(screenW, screenH, settings.performance);
-    if (simPipeline && (sz.first != sim.grid_w || sz.second != sim.grid_h)) {
-        if (!setSimGridSize(sz.first, sz.second, true)) {
-            toast.show("Grid resize failed", 2.f);
-        }
-    }
     sim.brush_radius = std::clamp(settings.controls.brushRadius, 1, 64);
     SDL_GL_SetSwapInterval(settings.performance.targetFps == 60 ? 1 : 2);
     if (render) {
@@ -349,6 +405,15 @@ void App::applyRuntimeSettings() {
         render->setUpscaleFilter(settings.visuals.upscaleFilter);
     }
     perf_.presetLabel = perfPresetLabel(settings.performance.mode);
+}
+
+void App::applyRuntimeSettingsHeavy() {
+    const auto sz = resolveSimGridSize(screenW, screenH, settings.performance);
+    if (simPipeline && (sz.first != sim.grid_w || sz.second != sim.grid_h)) {
+        if (!setSimGridSize(sz.first, sz.second, true)) {
+            toast.show("Grid resize failed", 2.f);
+        }
+    }
     if (simPipeline && simPipeline->backend() != resolveSimBackend()) {
         const SimBackend prev = simPipeline->backend();
         if (!setSimGridSize(sim.grid_w, sim.grid_h, true)) {
@@ -364,6 +429,17 @@ void App::applyRuntimeSettings() {
         simPipeline->activeTiles.rewakeRememberedBounds(2);
         sim.sleeping = false;
     }
+}
+
+void App::applyRuntimeSettings() {
+    applyRuntimeSettingsLight();
+    applyRuntimeSettingsHeavy();
+}
+
+void App::flushPendingHeavySettings() {
+    if (!settingsHeavyApplyPending_) return;
+    applyRuntimeSettingsHeavy();
+    settingsHeavyApplyPending_ = false;
 }
 
 bool App::setSimGridSize(int w, int h, bool preserveContent) {
@@ -431,6 +507,7 @@ void App::shutdown() {
 }
 
 void App::onEnterPlayFromMenu() {
+    flushPendingHeavySettings();
     playSaveSuppressFrames_ = kPlaySaveSuppressFrames;
 }
 
@@ -447,16 +524,15 @@ void App::executePendingSave() {
         case PendingSaveKind::GameSettings: {
             const bool wasDirty = gameSettingsDirty();
             const bool ok = flushGameSettingsIfDirty(settings);
-            if (wasDirty)
-                toast.show(ok ? "Settings saved" : "Save settings failed", ok ? 1.0f : 1.5f);
+            if (wasDirty && !ok)
+                toast.show("Save settings failed", 1.5f);
             break;
         }
         case PendingSaveKind::PhysicsSettings: {
             const bool wasDirty = physicsParamsDirty();
             const bool ok = flushPhysicsParamsIfDirty(physics);
-            if (wasDirty)
-                toast.show(ok ? "Element settings saved" : "Save settings failed",
-                           ok ? 1.0f : 1.5f);
+            if (wasDirty && !ok)
+                toast.show("Save settings failed", 1.5f);
             break;
         }
         default: break;
@@ -496,26 +572,20 @@ void App::requestSlotSave(int slot, bool fromQuickSave) {
 
 void App::requestFlushGameSettings() {
     if (!gameSettingsDirty()) return;
-#if defined(__SWITCH__)
-    const bool ok = flushGameSettingsIfDirty(settings);
-    toast.show(ok ? "Settings saved" : "Save settings failed", ok ? 1.0f : 1.5f);
-    return;
-#endif
     if (pendingSave_ != PendingSaveKind::None) return;
     pendingSave_ = PendingSaveKind::GameSettings;
+#if !defined(__SWITCH__)
     saveOverlay.begin("Saving settings...");
+#endif
 }
 
 void App::requestFlushPhysicsSettings() {
     if (!physicsParamsDirty()) return;
-#if defined(__SWITCH__)
-    const bool ok = flushPhysicsParamsIfDirty(physics);
-    toast.show(ok ? "Element settings saved" : "Save settings failed", ok ? 1.0f : 1.5f);
-    return;
-#endif
     if (pendingSave_ != PendingSaveKind::None) return;
     pendingSave_ = PendingSaveKind::PhysicsSettings;
+#if !defined(__SWITCH__)
     saveOverlay.begin("Saving settings...");
+#endif
 }
 
 void App::tickMenu(double dtSec) {
@@ -539,7 +609,10 @@ void App::tickMenu(double dtSec) {
     }
     if (input.menuBack) {
         if (menu.screen == MenuScreen::SettingsEdit) requestFlushPhysicsSettings();
-        if (menu.screen == MenuScreen::EngineSettingsTab) requestFlushGameSettings();
+        if (menu.screen == MenuScreen::EngineSettingsTab) {
+            flushPendingHeavySettings();
+            requestFlushGameSettings();
+        }
         menu.goBack(*this);
         input.menuBack = false;
     }

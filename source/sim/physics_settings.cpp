@@ -25,8 +25,8 @@ static const ParamSpec kFire[] = {
     {"fire_spreadRate", "Drift", 0.f, 0.25f, 0.01f, 0.040f},
 };
 static const ParamSpec kWater[] = {
-    {"water_flowRate", "Spread", 0.05f, 0.85f, 0.025f, 0.85f},
-    {"water_levelRate", "Level", 0.f, 0.15f, 0.005f, 0.10f},
+    {"water_flowRate", "Spread", 0.05f, 1.f, 0.025f, 1.f},
+    {"water_levelRate", "Level", 0.f, 0.25f, 0.005f, 0.18f},
 };
 static const ParamSpec kSmoke[] = {
     {"smoke_fadeRate", "Fade", 0.f, 0.15f, 0.005f, 0.010f},

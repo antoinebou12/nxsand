@@ -32,7 +32,7 @@ Instructions for coding agents working in this repository. Codex and similar too
 | Input | `source/platform/input/` | Joy-Con-first; Switch face buttons via `switch_face.hpp` (A/B/X/Y, not positional SDL enums on switch-sdl2); pointer mapping uses `queryDrawableSize(..., settings.display.orientation)`; menus: hold D-pad / arrows for repeat navigation and value adjust on Element Settings + Engine Settings slider rows (`menu_repeat`, toggle rows single-step) |
 | UI | `source/ui/` | GPU quads, not SDL renderer |
 | Perf HUD | `source/ui/perf_overlay.cpp`, `source/gpu/perf_stats.hpp` | FPS, ms breakdown, grid, substeps, fragment passes, brush commands, dirty rect, active-tile fallback, idle sleep |
-| Settings | `source/save/settings_io.cpp`, `source/game/game_settings.*` | `settings.json` (engine) + `physics.json` (elements); flush on Engine tab back, Engine menu exit, shutdown |
+| Settings | `source/save/settings_io.cpp`, `source/game/game_settings.*` | `settings.json` (engine) + `physics.json` (elements); sim resize/backend apply on Engine tab exit (`flushPendingHeavySettings`); deferred flush on tab back / Engine menu exit / shutdown (Switch same as desktop, next frame) |
 | Active tiles | `source/gpu/active_tiles.hpp` | CPU bitset on brush; fragment scissor optimization with full-grid fallback for stability |
 | CPU reference | `source/sim/cpu_reference.cpp` | Tests / parity tooling only |
 | Diagrams | `docs/diagrams/*.mmd`, `docs/DIAGRAMS.md` | Include `material-reactions.mmd`; regenerate SVG when `sim.frag` rules change |
@@ -79,14 +79,14 @@ Only commit when the user explicitly asks. Do not change `git config` or use des
 - Match nxsand UX: main menu with no product title or version subtitle; live falling-sand backdrop at the bottom edge only (`menu_sim` through `menu_chrome`); no top header/title panel box behind the list; three slots, Joy-Con-first HUD, material picker, settings; touch on desktop where applicable.
 - Engine and Element Settings: hold D-pad or arrow keys on slider rows for repeat adjust (`menu_repeat`); toggle rows stay single-step.
 - Desktop play: mouse brush and WASD movement; menu/HUD hints use desktop copy (`ui_copy`), not Switch Joy-Con strings.
-- Menu lists: keep row label text aligned and vertically centered with selection/highlight boxes on Switch and desktop; when fixing layout, verify both platforms.
+- Menu lists and in-play HUD: keep row labels and material hints aligned and vertically centered inside the sim viewport (`PlayRegion`); when fixing layout, verify Switch and desktop.
 - Switch menus must use compact safe-area scroll lists; do not draw all rows when they exceed the visible panel.
 - Material selection: ring wheel only (`PICKER_MATERIALS`, `material_wheel.hpp`); no grid selector; picker-first (no palette digit hotkeys).
-- Switch controls: `switch_face.hpp` for confirm/back/ring; optional `NXSAND_SWITCH_SWAP_FACE_XY` env swaps ring face.
+- Switch controls: `switch_face.hpp` for confirm/back/ring; optional `NXSAND_SWITCH_SWAP_FACE_XY` env swaps ring face; menus fully navigable with joystick/D-pad (not touch-only).
 - Diagram sources: `docs/diagrams/*.mmd` / `*.puml`; regenerate SVG per `docs/DIAGRAMS.md` when `sim.frag` reactions or sim/render wiring change.
-- README: keep a reference-versions table for Atmosphere, Hekate, libnx, and SDL2 (update when releases ship).
-- README install/build: link devkitPro installer (Windows) and Getting Started; document `make` as the primary build path (omit PowerShell helper scripts from README body).
-- Do not add README "Reference" blurbs pointing at nx.js or `E:\nxapplication` (parity notes belong in AGENTS.md / internal docs only).
+- README: reference-versions table (Atmosphere, Hekate, libnx, SDL2); install/build links to devkitPro Getting Started; `make` as primary build path (no PowerShell helpers in README body); no Reference blurbs to nx.js or `E:\nxapplication`.
+- Settings saves: changing engine or element settings must not reset the active slot to a new empty map; show a desktop save-in-progress overlay while writing.
+- Physics feel: wall stays solid (fire/smoke never displace it); water fills trays and pools quickly; plant climbs walls and grows deeper underwater but not from map edges; relatively slow fire spread onto plant; longer smoke lifetime.
 
 ## Learned Workspace Facts
 
@@ -95,3 +95,6 @@ Only commit when the user explicitly asks. Do not change `git config` or use des
 - Switch: `SDL_GL_GetDrawableSize` can report portrait 720×1280 while the panel is landscape; use `nx::queryDrawableSize` from `screen_size.hpp` for UI, input, and render sizing.
 - TPT stamp import: `source/save/tpt_stamp_import.*` with material map in `source/save/tpt_material_map.hpp`; limits and JSON format in `docs/TPT_IMPORT.md` (not full TPT particle physics).
 - Desktop GLES compute default: set `NXSAND_ENABLE_COMPUTE=1` when running `make desktop` to build with `NXSAND_ENABLE_COMPUTE_DEFAULT` (Engine → Performance → Sim shader still selects fragment vs compute at runtime).
+- Fresh settings default `activeTiles` Off and `dynamicResolution` Off (`game_settings.hpp`); keep off unless the user opts in.
+- Water presets target fast tray/pool fill (`water_flowRate` 1.0, `water_levelRate` 0.18, boostedFlow wide ×3 / pocket ×6); see `docs/PHYSICS.md`.
+- Wall cells are static: fire and smoke only spread into empty cells and must not displace or erode wall.

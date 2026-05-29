@@ -17,8 +17,8 @@ const char* menuNavHint(MenuScreen screen, bool hasEnteredPlay) {
     switch (screen) {
         case MenuScreen::Main:
 #if defined(__SWITCH__)
-            return hasEnteredPlay ? "D-pad choose · A confirm · B resume"
-                                  : "D-pad choose · A confirm";
+            return hasEnteredPlay ? "D-pad / stick choose · A confirm · B resume"
+                                  : "D-pad / stick choose · A confirm";
 #else
             return hasEnteredPlay ? "WASD/Up-Down choose · Enter confirm · Esc return to sandbox"
                                   : "WASD/Up-Down choose · Enter confirm";
@@ -26,13 +26,13 @@ const char* menuNavHint(MenuScreen screen, bool hasEnteredPlay) {
         case MenuScreen::SettingsEdit:
         case MenuScreen::EngineSettingsTab:
 #if defined(__SWITCH__)
-            return "D-pad adjust · A confirm · B back";
+            return "D-pad / stick adjust · A confirm · B back";
 #else
             return "WASD/Up-Down row · Left/Right adjust · Enter confirm · Esc back";
 #endif
         default:
 #if defined(__SWITCH__)
-            return "D-pad choose · A confirm · B back";
+            return "D-pad / stick choose · A confirm · B back";
 #else
             return "WASD/Up-Down choose · Enter confirm · Esc back";
 #endif

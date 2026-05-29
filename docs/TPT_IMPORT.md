@@ -72,9 +72,9 @@ Shader rules in [`shaders/sim_common.glsl`](../shaders/sim_common.glsl) borrow *
 
 | Engine → Performance | Typical sim | Substeps | `water_levelRate` (runtime) |
 |----------------------|------------|----------|-------------------------------|
-| Battery Saver | 480×270 | 1 | **0.10** |
-| Balanced | 640×360 | 2 | **0.10** |
-| Quality | 720×405 | 1 | **0.10** |
+| Battery Saver | 480×270 | 1 | **0.18** |
+| Balanced | 640×360 | 2 | **0.18** |
+| Quality | 720×405 | 1 | **0.18** |
 
 Also prefer **Active tiles: Off** unless profiling needs Stable fallback, **Bloom Off**, and **Upscale filter: nearest** when profiling on Switch. Fill measured FPS / sim ms in [`SWITCH_PERF_MATRIX.md`](SWITCH_PERF_MATRIX.md).
 

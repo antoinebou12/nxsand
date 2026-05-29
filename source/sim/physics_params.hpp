@@ -21,8 +21,8 @@ struct alignas(16) PhysicsParams {
     float smoke_driftRate    = 0.12f;
 
     // Water (high spread/level = very fast, pool-like flow)
-    float water_flowRate     = 0.85f;
-    float water_levelRate    = 0.10f;
+    float water_flowRate     = 1.0f;
+    float water_levelRate    = 0.18f;
 
     // Acid
     float acid_flowRate      = 0.28f;
