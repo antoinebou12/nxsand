@@ -12,8 +12,8 @@ Set-Location $root
 function Find-MsysBash {
     $candidates = @(
         $env:MSYSTEM_BASH,
-        "C:\devkitPro\msys2\usr\bin\bash.exe",
-        "C:\msys64\usr\bin\bash.exe"
+        "C:\msys64\usr\bin\bash.exe",
+        "C:\devkitPro\msys2\usr\bin\bash.exe"
     ) | Where-Object { $_ -and (Test-Path $_) }
     if ($candidates.Count -gt 0) { return $candidates[0] }
     return $null
@@ -22,10 +22,16 @@ function Find-MsysBash {
 if (-not $MsysBash) { $MsysBash = Find-MsysBash }
 
 if ($MsysBash) {
+    $msysScript = Join-Path $PSScriptRoot 'build-desktop-msys.sh'
     Write-Host "Building desktop via MSYS2 bash: $MsysBash"
-    & $MsysBash -lc "cd '$($root -replace '\\','/')' && make desktop"
+    if (Test-Path $msysScript) {
+        & $MsysBash $msysScript
+    } else {
+        & $MsysBash -lc "cd '$($root -replace '\\','/')' && make desktop"
+    }
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Write-Host "OK: $root\NXSand.exe (or NXSand)"
+    $exe = Join-Path $root 'build\NXSand.exe'
+    if (Test-Path $exe) { Write-Host "OK: $exe" } else { Write-Host "OK: $root\build\NXSand" }
     exit 0
 }
 

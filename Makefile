@@ -11,8 +11,9 @@
 #---------------------------------------------------------------------------------
 DESKTOP_CXX      ?= g++
 DESKTOP_CXXFLAGS := -std=c++17 -O3 -Wall -Wno-missing-field-initializers \
-                    -Isource -Ithird_party -DNX_DESKTOP=1 \
+                    -Isource -Ithird_party -Ithird_party/glad/include -DNX_DESKTOP=1 \
                     $(shell pkg-config --cflags sdl2 glesv2 freetype2 2>/dev/null)
+DESKTOP_GLAD_C  := third_party/glad/src/gles2.c
 ifneq ($(filter-out 0 false FALSE off OFF no NO,$(strip $(NXSAND_ENABLE_COMPUTE))),)
 DESKTOP_CXXFLAGS += -DNXSAND_ENABLE_COMPUTE_DEFAULT=1
 endif
@@ -69,7 +70,7 @@ GPU_UNIT_SRCS     := tests/gpu_unit_main.cpp \
 .PHONY: desktop test test-gpu golden clean help dist
 desktop:
 	@mkdir -p build
-	$(DESKTOP_CXX) $(DESKTOP_CXXFLAGS) $(DESKTOP_SRCS) -o build/NXSand $(DESKTOP_LDFLAGS) $(DESKTOP_LIBS)
+	$(DESKTOP_CXX) $(DESKTOP_CXXFLAGS) $(DESKTOP_SRCS) $(DESKTOP_GLAD_C) -o build/NXSand $(DESKTOP_LDFLAGS) $(DESKTOP_LIBS)
 
 test:
 	@mkdir -p build

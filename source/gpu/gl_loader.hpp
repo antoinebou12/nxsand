@@ -1,16 +1,19 @@
 #pragma once
-// OpenGL ES 3.0+ via Mesa on Switch; GLESv2 on desktop.
+// OpenGL ES 3.x: Mesa (Switch / Linux) or GLAD + SDL proc loader (desktop, esp. Windows/ANGLE).
 #include <cstdio>
 #include <string>
 #include <SDL2/SDL.h>
+
+#if defined(NX_DESKTOP)
+#include <glad/gles2.h>
+#else
 #include <GLES3/gl3.h>
 #include <GLES3/gl31.h>
+#endif
 
 namespace nx::gl {
 
-inline bool load_gl_functions() {
-    return true;
-}
+bool load_gl_functions();
 
 inline bool parse_es_version(int& major, int& minor) {
     major = 0;

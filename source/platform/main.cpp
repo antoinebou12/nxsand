@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstdarg>
 #include <cstdio>
+#include <iostream>
 #include <exception>
 #include <string>
 
@@ -118,6 +119,13 @@ static int run_app() {
 
     nx::App app;
     if (!app.init()) {
+#if !defined(__SWITCH__)
+        if (!app.initError.empty()) {
+            std::cerr << "NXSand init failed: " << app.initError << "\n";
+        } else {
+            std::cerr << "NXSand init failed\n";
+        }
+#endif
 #if defined(__SWITCH__)
         std::string detail = app.initError;
         if (detail.empty()) {

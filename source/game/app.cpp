@@ -107,6 +107,10 @@ std::string App::resolveShaderDir() const {
 bool App::init() {
     initError.clear();
 
+#if defined(NX_DESKTOP) && defined(_WIN32)
+    SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
+#endif
+
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_TIMER) != 0) {
         initError = std::string("SDL_Init: ") + SDL_GetError();
         std::cerr << initError << "\n";
@@ -167,6 +171,11 @@ bool App::init() {
         std::cerr << initError << "\n";
         return false;
     }
+    if (SDL_GL_MakeCurrent(window, glCtx) != 0) {
+        initError = std::string("SDL_GL_MakeCurrent: ") + SDL_GetError();
+        std::cerr << initError << "\n";
+        return false;
+    }
     SDL_GL_SetSwapInterval(1);
 
 #if defined(__SWITCH__)
@@ -192,7 +201,8 @@ bool App::init() {
     lastScreenH_ = screenH;
 
     if (!gl::load_gl_functions()) {
-        initError = "OpenGL ES init failed";
+        initError = "OpenGL ES function loader failed (GLAD)";
+        std::cerr << initError << "\n";
         return false;
     }
 

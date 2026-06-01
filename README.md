@@ -95,15 +95,41 @@ CI runs the same `make` on every push to `main`; see the workflow badge above fo
 
 ### Desktop (optional)
 
-For UI and logic work without a Switch:
+For UI and logic work without a Switch. Needs SDL2, OpenGL ES 3.0 (Mesa on Linux/macOS; [ANGLE](https://github.com/google/angle) on Windows), and FreeType.
+
+**Linux / macOS / WSL**
 
 ```bash
+# Debian/Ubuntu (once): sudo apt install build-essential pkg-config libsdl2-dev libgles2-mesa-dev libegl1-mesa-dev libfreetype6-dev
 make desktop
-./build/NXSand    # or build\NXSand.exe on Windows
+./build/NXSand
 make test         # CPU reference tests, no GPU
 ```
 
-Requires a C++20 toolchain plus SDL2, GLESv2, and FreeType (e.g. MSYS2 MinGW on Windows). Saves go to `./nxsand_save/`; legacy `./nxengine_save/` is migrated when possible.
+WSL with GUI: `bash scripts/build-desktop-wsl.sh` then `powershell -File scripts/run-desktop-wsl.ps1`.
+
+**Windows (MSYS2 MinGW64)**
+
+1. Install [MSYS2](https://www.msys2.org/) if needed, then in the **MINGW64** terminal:
+
+```bash
+pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-make mingw-w64-x86_64-SDL2 mingw-w64-x86_64-freetype mingw-w64-x86_64-angleproject
+```
+
+2. Build and run from the repo root:
+
+```powershell
+powershell -File scripts/build-desktop.ps1
+powershell -File scripts/run-desktop.ps1
+```
+
+The build copies `libEGL.dll` and `libGLESv2.dll` into `build/`; `run-desktop.ps1` also adds MSYS2 to `PATH` if needed. Always launch with the **repo root** as the working directory so `shaders/` resolves.
+
+Or from MSYS2: `bash scripts/build-desktop-msys.sh` then `cd` to the repo root and `./build/NXSand.exe`.
+
+Plain `make desktop` in PowerShell or devkitPro MSYS2 usually fails (missing MinGW SDL2/GLES/GLAD). Use the scripts above instead.
+
+Saves go to `./nxsand_save/`; legacy `./nxengine_save/` is migrated when possible.
 
 ## Project layout
 
