@@ -48,6 +48,7 @@ jobs:
         run: python3 scripts/package-release.py switch --tag "${{ env.RELEASE_TAG }}"
 
       - uses: actions/upload-artifact@v4
+        if: env.ACT != 'true'
         with:
           name: release-switch
           path: dist/release/NXSand-switch-v*.zip
@@ -77,6 +78,7 @@ jobs:
         run: python3 scripts/package-release.py linux --tag "${{ env.RELEASE_TAG }}"
 
       - uses: actions/upload-artifact@v4
+        if: env.ACT != 'true'
         with:
           name: release-linux
           path: dist/release/NXSand-linux-v*.zip
@@ -119,6 +121,7 @@ jobs:
           python3 scripts/package-release.py windows --tag "${{ env.RELEASE_TAG }}"
 
       - uses: actions/upload-artifact@v4
+        if: env.ACT != 'true'
         with:
           name: release-windows
           path: dist/release/NXSand-windows-v*.zip
