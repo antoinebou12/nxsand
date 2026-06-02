@@ -48,7 +48,7 @@ Saves use JSON + base64 slot files (`sdmc:/switch/nxsand/` on Switch, `./nxsand_
 
 You need a homebrew-ready Switch ([setup guide](https://switch.hacks.guide/)).
 
-1. Get **`NXSand.nro`** — build it yourself (below), download the latest **NXSand-switch** zip from [GitHub Actions](https://github.com/antoinebou12/nxsand/actions/workflows/native-nro.yml) (`switch/NXSand.nro` inside), or use a [release](https://github.com/antoinebou12/nxsand/releases) tag.
+1. Get **`NXSand.nro`** — build it yourself (below), download the latest **NXSand-switch** zip from [GitHub Actions](https://github.com/antoinebou12/nxsand/actions/workflows/native-nro.yml) (`switch/NXSand.nro` inside), or use a [release](https://github.com/antoinebou12/nxsand/releases) tag (Switch + Linux + Windows portable zips).
 2. Copy to the SD card: `sdmc:/switch/NXSand.nro` (unzip the artifact at the card root, or copy `switch/NXSand.nro` into `switch/`).
 3. Launch from the Homebrew Menu.
 

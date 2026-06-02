@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag (e.g. v0.1.0)
+        description: Release tag (e.g. v0.0.1)
         required: true
         type: string
       prerelease:
@@ -12,6 +12,9 @@ on:
         required: false
         type: boolean
         default: false
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag }}
 
 jobs:
   unit-tests:
@@ -26,12 +29,10 @@ jobs:
       - name: Build and run unit tests
         run: make test
 
-  release:
-    name: Build and publish
+  build-switch:
+    name: Package Switch NRO
     needs: unit-tests
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     container:
       image: devkitpro/devkita64:latest
     steps:
@@ -40,13 +41,103 @@ jobs:
       - name: Verify required portlibs
         run: dkp-pacman -Q switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz
 
-      - name: Build NRO and stage dist
-        run: |
-          make
-          make dist
+      - name: Build NRO
+        run: make
 
-      - name: Package switch zip
-        run: python3 -c "import shutil; shutil.make_archive('NXSand-switch', 'zip', 'dist', 'switch')"
+      - name: Package Switch zip
+        run: python3 scripts/package-release.py switch --tag "${{ env.RELEASE_TAG }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-switch
+          path: dist/release/NXSand-switch-v*.zip
+          if-no-files-found: error
+
+  build-linux:
+    name: Package Linux portable
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SDL2 + GLESv2 + FreeType (Mesa)
+        run: sudo apt-get update && sudo apt-get install -y build-essential libsdl2-dev libgles2-mesa-dev libegl1-mesa-dev libfreetype6-dev curl
+
+      - name: Fetch UI font
+        run: |
+          mkdir -p romfs/fonts
+          curl -fsSL -o romfs/fonts/NotoSans-Regular.ttf \
+            https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf
+          test -s romfs/fonts/NotoSans-Regular.ttf
+
+      - name: Build desktop
+        run: make desktop
+
+      - name: Package Linux zip
+        run: python3 scripts/package-release.py linux --tag "${{ env.RELEASE_TAG }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
+          path: dist/release/NXSand-linux-v*.zip
+          if-no-files-found: error
+
+  build-windows:
+    name: Package Windows portable
+    needs: unit-tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-freetype
+            mingw-w64-x86_64-angleproject
+
+      - name: Fetch UI font
+        shell: pwsh
+        run: ./scripts/fetch-font.ps1
+
+      - name: Build desktop
+        run: bash scripts/build-desktop-msys.sh
+
+      - name: Package Windows zip
+        run: python3 scripts/package-release.py windows --tag "${{ env.RELEASE_TAG }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/release/NXSand-windows-v*.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    needs: [build-switch, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/release
+          pattern: release-*
+          merge-multiple: true
+
+      - name: List release artifacts
+        run: ls -la dist/release/
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
@@ -54,5 +145,5 @@ jobs:
           tag_name: ${{ github.event.inputs.tag }}
           name: NXSand ${{ github.event.inputs.tag }}
           prerelease: ${{ github.event.inputs.prerelease }}
-          files: NXSand-switch.zip
+          files: dist/release/*.zip
           generate_release_notes: true

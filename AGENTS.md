@@ -63,7 +63,7 @@ Do not default **1280x720** sim on handheld OLED.
 ## CI
 
 - **Build:** `.github/workflows/native-nro.yml` — `make test`, then Switch `make` + `make dist`, artifact `NXSand-switch.zip` (`switch/NXSand.nro`); Linux and Windows desktop sanity builds (`build/NXSand` / `build/NXSand.exe`).
-- **Release:** `.github/workflows/release.yml` — `workflow_dispatch` with tag; same zip attached to GitHub Release.
+- **Release:** `.github/workflows/release.yml` — `workflow_dispatch` with tag; builds Switch NRO, Linux portable, and Windows portable zips via `scripts/package-release.py`, then publishes all three to GitHub Releases.
 - Align artifact paths with README / `docs/INSTALL.md` when they change.
 
 ## Documentation touch list

@@ -38,7 +38,13 @@ Override the FTP port with `$env:NXSAND_FTP_PORT = 2121`. The legacy `$env:NXENG
 
 GitHub Actions uploads **NXSand-switch** (`NXSand-switch.zip`) with `switch/NXSand.nro` inside. Unzip at the SD card root so the file lands at `switch/NXSand.nro`, or copy that path manually to `sdmc:/switch/NXSand.nro`.
 
-Tagged releases use **Actions → Release NXSand** (`workflow_dispatch`) and attach the same zip layout.
+Tagged releases use **Actions → Release NXSand** (`workflow_dispatch`) and attach three portable zips:
+
+| Zip | Contents |
+|-----|----------|
+| `NXSand-switch-v*.zip` | `switch/NXSand.nro` (unzip at SD root) |
+| `NXSand-linux-v*.zip` | Flat folder: `NXSand`, `shaders/`, `romfs/fonts/`, `run.sh` |
+| `NXSand-windows-v*.zip` | Flat folder: `NXSand.exe`, ANGLE DLLs, `shaders/`, `romfs/fonts/` |
 
 ## Saves
 
