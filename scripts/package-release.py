@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -101,26 +102,110 @@ def write_run_sh(staging: Path) -> None:
     script.chmod(0o755)
 
 
+def _mingw_search_dirs(extra: Path) -> list[Path]:
+    dirs: list[Path] = []
+    prefix = os.environ.get("MINGW_PREFIX", "")
+    if prefix:
+        dirs.append(Path(prefix) / "bin")
+    for candidate in (
+        Path("/mingw64/bin"),
+        Path("C:/msys64/mingw64/bin"),
+        extra,
+    ):
+        if candidate.is_dir() and candidate not in dirs:
+            dirs.append(candidate)
+    return dirs
+
+
+def _is_windows_system_dll(name: str) -> bool:
+    lower = name.lower()
+    if not lower.endswith(".dll"):
+        return True
+    system_prefixes = (
+        "api-ms-",
+        "ext-ms-",
+        "ucrtbase",
+        "vcruntime",
+        "msvcp",
+        "kernel",
+        "ntdll",
+        "user32",
+        "gdi32",
+        "shell32",
+        "advapi32",
+        "ole32",
+        "combase",
+        "rpcrt4",
+        "ws2_32",
+        "winmm",
+        "imm32",
+        "setupapi",
+        "shlwapi",
+        "crypt32",
+        "sechost",
+        "bcrypt",
+        "cfgmgr32",
+        "d3d",
+        "dxgi",
+        "dxguid",
+        "opengl32",
+        "wintypes",
+        "windows.",
+    )
+    return any(lower.startswith(p) for p in system_prefixes)
+
+
+def _resolve_dll_from_ldd(line: str, search_dirs: list[Path]) -> Path | None:
+    dll_name = line.split("=>", 1)[0].strip()
+    if not dll_name.lower().endswith(".dll") or _is_windows_system_dll(dll_name):
+        return None
+    match = re.search(r"=>\s+(/[^\s(]+)", line)
+    if match:
+        resolved = Path(match.group(1))
+        if resolved.is_file():
+            norm = str(resolved).replace("\\", "/").lower()
+            if "/windows/" in norm or norm.startswith("/c/windows"):
+                return None
+            return resolved
+    for directory in search_dirs:
+        candidate = directory / dll_name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def gather_windows_dlls(exe: Path, dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
-    for dll in (exe.parent).glob("*.dll"):
+    for dll in exe.parent.glob("*.dll"):
         shutil.copy2(dll, dest / dll.name)
-    try:
-        proc = subprocess.run(
-            ["ldd", str(exe)],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return
-    for line in proc.stdout.splitlines():
-        match = re.search(r"=>\s+(/[^\s]+)", line)
-        if not match:
+
+    search_dirs = _mingw_search_dirs(exe.parent)
+    queue = [exe]
+    seen: set[str] = set()
+
+    while queue:
+        target = queue.pop()
+        try:
+            proc = subprocess.run(
+                ["ldd", str(target)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            break
+        if proc.returncode != 0 and not proc.stdout:
             continue
-        dll_path = Path(match.group(1))
-        if dll_path.is_file():
-            shutil.copy2(dll_path, dest / dll_path.name)
+        for line in proc.stdout.splitlines():
+            dll_path = _resolve_dll_from_ldd(line, search_dirs)
+            if dll_path is None:
+                continue
+            dll_name = dll_path.name
+            if dll_name in seen:
+                continue
+            shutil.copy2(dll_path, dest / dll_name)
+            seen.add(dll_name)
+            queue.append(dest / dll_name)
 
 
 def zip_dir(folder: Path, zip_path: Path, arc_prefix: Path | None = None) -> None:
@@ -213,17 +298,14 @@ def package_windows(root: Path, version: str, out_dir: Path) -> Path:
         zip_path,
         [
             f"{prefix}NXSand.exe",
+            f"{prefix}SDL2.dll",
             f"{prefix}README.txt",
             f"{prefix}shaders/sim.frag",
             f"{prefix}romfs/fonts/NotoSans-Regular.ttf",
+            f"{prefix}libEGL.dll",
+            f"{prefix}libGLESv2.dll",
         ],
     )
-    egl = f"{prefix}libEGL.dll"
-    gles = f"{prefix}libGLESv2.dll"
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        names = set(zf.namelist())
-        if egl not in names and gles not in names:
-            raise RuntimeError(f"{zip_path.name} missing ANGLE DLLs")
     print(f"OK: {zip_path}")
     return zip_path
 
