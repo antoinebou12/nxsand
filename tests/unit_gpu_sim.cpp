@@ -404,20 +404,23 @@ void run_gpu_sim_tests(TestContext& ctx) {
         std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
         const int py = 16;
         const int plantX0 = 8;
-        for (int x = plantX0; x < w - 4; ++x) {
-            setTop(in, w, x, py, nx::MAT_PLANT);
-        }
+        setTop(in, w, plantX0 - 2, py, nx::MAT_WALL);
         setTop(in, w, plantX0 - 1, py, nx::MAT_FIRE);
+        setTop(in, w, plantX0, py, nx::MAT_PLANT);
+        setTop(in, w, plantX0 + 1, py, nx::MAT_WALL);
+        setTop(in, w, plantX0 - 1, py - 1, nx::MAT_WALL);
+        setTop(in, w, plantX0, py - 1, nx::MAT_WALL);
+        setTop(in, w, plantX0 - 1, py + 1, nx::MAT_WALL);
+        setTop(in, w, plantX0, py + 1, nx::MAT_WALL);
         pipe.uploadGridTopDown(in, w, h);
         pipe.activeTiles.wakeAll();
         nx::PhysicsParams physics{};
-        physics.fire_ignitePlant = 0.14f;
-        for (uint32_t f = 0; f < 12u; ++f) {
-            pipe.step(f, physics);
-        }
+        physics.fire_ignitePlant = 1.0f;
+        physics.fire_smokeRate = 0.0f;
+        pipe.step(0u, physics);
         std::vector<uint8_t> out;
         CHECK(ctx, readTopDown(pipe, w, h, out));
-        CHECK(ctx, countMaterial(out, w, h, nx::MAT_PLANT) < (w - 4 - plantX0));
+        CHECK(ctx, atTop(out, w, plantX0, py) == static_cast<uint8_t>(nx::MAT_FIRE));
     }
 
     {

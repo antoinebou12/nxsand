@@ -36,8 +36,9 @@ bool GpuTestGl::init(int winW, int winH) {
     }
 
 #if defined(__linux__)
+    // Prefer the caller's driver (e.g. xvfb-run on CI). Offscreen is often absent in distro SDL2 builds.
     if (!std::getenv("SDL_VIDEODRIVER")) {
-        SDL_SetHint(SDL_HINT_VIDEODRIVER, "offscreen");
+        SDL_SetHint("SDL_VIDEODRIVER", "x11");
     }
 #endif
 

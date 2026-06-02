@@ -83,7 +83,11 @@ golden: test
 test-gpu:
 	@mkdir -p build
 	$(DESKTOP_CXX) $(GPU_UNIT_CXXFLAGS) $(GPU_UNIT_SRCS) $(GPU_UNIT_GLAD_C) -o build/gpu_unit_tests $(GPU_UNIT_LIBS)
-	./build/gpu_unit_tests
+	@if [ "$$(uname -s 2>/dev/null)" = "Linux" ] && command -v xvfb-run >/dev/null 2>&1; then \
+		LIBGL_ALWAYS_SOFTWARE=$${LIBGL_ALWAYS_SOFTWARE:-1} xvfb-run -a -s "-screen 0 128x128x24" ./build/gpu_unit_tests; \
+	else \
+		./build/gpu_unit_tests; \
+	fi
 
 #---------------------------------------------------------------------------------
 # Switch target. Requires devkitPro env: $DEVKITPRO must be set.
