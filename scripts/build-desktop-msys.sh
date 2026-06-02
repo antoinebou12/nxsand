@@ -13,12 +13,21 @@ if ! pkg-config --exists sdl2 freetype2 angleproject; then
   exit 1
 fi
 
+if command -v make >/dev/null 2>&1; then
+  MAKE=make
+elif command -v mingw32-make >/dev/null 2>&1; then
+  MAKE=mingw32-make
+else
+  echo "make not found (install mingw-w64-x86_64-make or msys make)"
+  exit 1
+fi
+
 FLAGS=$(pkg-config --cflags sdl2 freetype2 angleproject)
 LIBS=$(pkg-config --libs sdl2 freetype2 angleproject)
 # Console subsystem so init failures print to stderr when launched from a terminal.
 LIBS=${LIBS//-mwindows/}
 mkdir -p build
-make desktop \
+${MAKE} desktop \
   DESKTOP_CXXFLAGS="-std=c++17 -O3 -Wall -Wno-missing-field-initializers -Isource -Ithird_party -Ithird_party/glad/include -DNX_DESKTOP=1 ${FLAGS}" \
   DESKTOP_LIBS="${LIBS}"
 for dll in libEGL.dll libGLESv2.dll; do
