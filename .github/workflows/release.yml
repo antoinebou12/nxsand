@@ -38,9 +38,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install required portlibs
-        run: |
-          dkp-pacman -Sy --noconfirm switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz
-          pacman -Sy --noconfirm zip
+        run: dkp-pacman -Sy --noconfirm switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz
 
       - name: Build NRO and stage dist
         run: |
@@ -48,9 +46,7 @@ jobs:
           make dist
 
       - name: Package switch zip
-        run: |
-          cd dist
-          zip -r ../NXSand-switch.zip switch
+        run: python3 -c "import shutil; shutil.make_archive('NXSand-switch', 'zip', 'dist', 'switch')"
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
