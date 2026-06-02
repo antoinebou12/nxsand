@@ -56,8 +56,9 @@ UNIT_SRCS     := tests/unit_main.cpp \
                  source/platform/input/menu_repeat.cpp
 
 GPU_UNIT_CXXFLAGS := -std=c++17 -O2 -Wall -Wno-missing-field-initializers \
-                     -DNX_DESKTOP=1 -Isource -Ithird_party -Itests \
+                     -DNX_DESKTOP=1 -Isource -Ithird_party -Ithird_party/glad/include -Itests \
                      $(shell pkg-config --cflags sdl2 glesv2 2>/dev/null)
+GPU_UNIT_GLAD_C   := third_party/glad/src/gles2.c
 GPU_UNIT_LIBS     := $(shell pkg-config --libs sdl2 glesv2 2>/dev/null || echo "-lSDL2 -lGLESv2")
 GPU_UNIT_SRCS     := tests/gpu_unit_main.cpp \
                      tests/unit_gpu_sim.cpp \
@@ -81,7 +82,7 @@ golden: test
 
 test-gpu:
 	@mkdir -p build
-	$(DESKTOP_CXX) $(GPU_UNIT_CXXFLAGS) $(GPU_UNIT_SRCS) -o build/gpu_unit_tests $(GPU_UNIT_LIBS)
+	$(DESKTOP_CXX) $(GPU_UNIT_CXXFLAGS) $(GPU_UNIT_SRCS) $(GPU_UNIT_GLAD_C) -o build/gpu_unit_tests $(GPU_UNIT_LIBS)
 	./build/gpu_unit_tests
 
 #---------------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 #include "gpu_test_gl.hpp"
+#include "gpu/gl_loader.hpp"
 #include <SDL2/SDL.h>
 #include <cstdlib>
 #include <cstdio>
@@ -74,6 +75,12 @@ bool GpuTestGl::init(int winW, int winH) {
 
     if (SDL_GL_MakeCurrent(window, ctx) != 0) {
         std::fprintf(stderr, "gpu tests: SDL_GL_MakeCurrent failed: %s\n", SDL_GetError());
+        shutdown();
+        return false;
+    }
+
+    if (!nx::gl::load_gl_functions()) {
+        std::fprintf(stderr, "gpu tests: gladLoadGLES2 failed\n");
         shutdown();
         return false;
     }
