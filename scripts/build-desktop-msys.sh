@@ -29,6 +29,7 @@ LIBS=${LIBS//-mwindows/}
 mkdir -p build
 ${MAKE} desktop \
   DESKTOP_CXXFLAGS="-std=c++17 -O3 -Wall -Wno-missing-field-initializers -Isource -Ithird_party -Ithird_party/glad/include -DNX_DESKTOP=1 ${FLAGS}" \
+  DESKTOP_LDFLAGS="-static-libgcc -static-libstdc++" \
   DESKTOP_LIBS="${LIBS}"
 for dll in libEGL.dll libGLESv2.dll; do
   if [[ -f "/mingw64/bin/${dll}" ]]; then

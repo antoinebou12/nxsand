@@ -44,7 +44,7 @@ Tagged releases use **Actions → Release NXSand** (`workflow_dispatch`) and att
 |-----|----------|
 | `NXSand-switch-v*.zip` | `switch/NXSand.nro` (unzip at SD root) |
 | `NXSand-linux-v*.zip` | Flat folder: `NXSand`, `shaders/`, `romfs/fonts/`, `run.sh` |
-| `NXSand-windows-v*.zip` | Flat folder: `NXSand.exe`, ANGLE DLLs, `shaders/`, `romfs/fonts/` |
+| `NXSand-windows-v*.zip` | Flat folder: `NXSand.exe`, `NXSand-run.bat`, runtime DLLs, `shaders/`, `romfs/fonts/` |
 
 ## Saves
 

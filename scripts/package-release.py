@@ -43,12 +43,19 @@ Shaders and font are bundled; launch with this folder as the working directory.
 
 README_WINDOWS = """NXSand {version} — Windows x64 (portable folder)
 
-Run NXSand.exe from this folder (double-click or terminal).
-ANGLE GLES DLLs are included; keep all .dll files beside the .exe.
+Run NXSand-run.bat (recommended) or NXSand.exe from this folder.
+Keep all .dll files beside the .exe; do not copy NXSand.exe alone.
 
 Saves: .\\nxsand_save\\
-Shaders and font are bundled; do not move NXSand.exe without the shaders folder.
+Shaders and font are bundled; the working directory must stay this folder.
 """
+
+REQUIRED_WINDOWS_DLLS = (
+    "SDL2.dll",
+    "libfreetype-6.dll",
+    "libEGL.dll",
+    "libGLESv2.dll",
+)
 
 README_SWITCH = """NXSand {version} — Nintendo Switch
 
@@ -100,6 +107,15 @@ def write_run_sh(staging: Path) -> None:
         encoding="utf-8",
     )
     script.chmod(0o755)
+
+
+def write_run_bat(staging: Path) -> None:
+    (staging / "NXSand-run.bat").write_text(
+        "@echo off\r\n"
+        'cd /d "%~dp0"\r\n'
+        'start "" "NXSand.exe"\r\n',
+        encoding="utf-8",
+    )
 
 
 def _mingw_search_dirs(extra: Path) -> list[Path]:
@@ -291,21 +307,22 @@ def package_windows(root: Path, version: str, out_dir: Path) -> Path:
     copy_shaders(root / "shaders", staging / "shaders")
     copy_font(root, staging)
     write_readme(staging, README_WINDOWS.format(version=version))
+    write_run_bat(staging)
+    for dll in REQUIRED_WINDOWS_DLLS:
+        if not (staging / dll).is_file():
+            raise RuntimeError(f"Windows bundle missing {dll}")
     zip_path = out_dir / f"{folder_name}.zip"
     zip_dir(staging, zip_path)
     prefix = f"{folder_name}/"
-    verify_zip(
-        zip_path,
-        [
-            f"{prefix}NXSand.exe",
-            f"{prefix}SDL2.dll",
-            f"{prefix}README.txt",
-            f"{prefix}shaders/sim.frag",
-            f"{prefix}romfs/fonts/NotoSans-Regular.ttf",
-            f"{prefix}libEGL.dll",
-            f"{prefix}libGLESv2.dll",
-        ],
-    )
+    required = [
+        f"{prefix}NXSand.exe",
+        f"{prefix}NXSand-run.bat",
+        f"{prefix}README.txt",
+        f"{prefix}shaders/sim.frag",
+        f"{prefix}romfs/fonts/NotoSans-Regular.ttf",
+    ]
+    required.extend(f"{prefix}{dll}" for dll in REQUIRED_WINDOWS_DLLS)
+    verify_zip(zip_path, required)
     print(f"OK: {zip_path}")
     return zip_path
 
