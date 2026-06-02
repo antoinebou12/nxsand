@@ -84,4 +84,4 @@ On Switch, orientation is landscape-only until a real rotated framebuffer transf
 
 ## CI
 
-GitHub Actions builds `build/NXSand.nro`, runs `make test`, and sanity-builds the Linux desktop binary under `build/NXSand`.
+GitHub Actions builds `build/NXSand.nro`, runs `make test`, sanity-builds the Linux desktop binary under `build/NXSand`, and sanity-builds the Windows desktop binary under `build/NXSand.exe` (MSYS2 MinGW64 + ANGLE via `scripts/build-desktop-msys.sh`).

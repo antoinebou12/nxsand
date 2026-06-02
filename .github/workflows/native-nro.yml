@@ -84,3 +84,35 @@ jobs:
 
       - name: Verify binary
         run: test -f build/NXSand
+
+  desktop-windows:
+    name: Desktop sanity build (Windows)
+    needs: unit-tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-freetype
+            mingw-w64-x86_64-angleproject
+
+      - name: Fetch UI font
+        shell: pwsh
+        run: ./scripts/fetch-font.ps1
+
+      - name: Build desktop
+        run: bash scripts/build-desktop-msys.sh
+
+      - name: Verify binary
+        run: test -f build/NXSand.exe

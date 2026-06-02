@@ -101,7 +101,7 @@ make
 
 Output: **`build/NXSand.nro`** (also **`dist/switch/NXSand.nro`** after `make dist`). Copy to `sdmc:/switch/NXSand.nro`.
 
-CI runs the same `make` on every push to `main`; see the workflow badge above for status.
+CI runs Switch `make`, Linux desktop, and Windows desktop (`build/NXSand.exe` via MSYS2 + ANGLE) on every push to `main`; see the workflow badge above for status.
 
 ### Desktop (optional)
 
