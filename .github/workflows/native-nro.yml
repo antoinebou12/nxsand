@@ -33,8 +33,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install required portlibs
-        run: dkp-pacman -Sy --noconfirm switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz
+      - name: Verify required portlibs
+        run: dkp-pacman -Q switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz
 
       - name: Build NRO and stage dist
         run: |
