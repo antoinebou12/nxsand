@@ -5,7 +5,6 @@
 #include "sim/materials.hpp"
 #include "game/game_settings.hpp"
 #include "sim/physics_params.hpp"
-#include "sim/sim_state.hpp"
 #include <cstdlib>
 #include <vector>
 
@@ -24,16 +23,7 @@ int countMaterial(const std::vector<uint8_t>& g, int w, int h, nx::Material m) {
 }
 
 bool readTopDown(nx::SimPipeline& pipe, int w, int h, std::vector<uint8_t>& top) {
-    std::vector<uint8_t> gl;
-    if (!pipe.readGridTo(gl)) {
-        return false;
-    }
-    if (static_cast<int>(gl.size()) != w * h) {
-        return false;
-    }
-    top = gl;
-    nx::flipGlRowsToTopDown(top, w, h);
-    return true;
+    return pipe.readGridTo(top) && static_cast<int>(top.size()) == w * h;
 }
 
 uint8_t atTop(const std::vector<uint8_t>& g, int w, int x, int y) {
