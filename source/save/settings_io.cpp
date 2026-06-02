@@ -47,6 +47,25 @@ static void migrateSettings(GameSettings& s) {
     }
 }
 
+static void loadVisualsFromJson(const nlohmann::json& v, VisualSettings& vis) {
+    int pm = readInt(v, "paletteMode", vis.paletteMode);
+    vis.paletteMode = std::clamp(pm, 0, 2);
+    int ao = readEnumInt(v, "ao", static_cast<int>(vis.ao));
+    ao = std::clamp(ao, 0, static_cast<int>(VisualAo::High));
+    vis.ao = static_cast<VisualAo>(ao);
+    int bloom = readEnumInt(v, "bloom", static_cast<int>(vis.bloom));
+    bloom = std::clamp(bloom, 0, static_cast<int>(VisualBloom::Low));
+    vis.bloom = static_cast<VisualBloom>(bloom);
+    vis.flicker = readBool(v, "flicker", false);
+    vis.grain = readBool(v, "grain", false);
+    int uf = readEnumInt(v, "upscaleFilter", static_cast<int>(vis.upscaleFilter));
+    uf = std::clamp(uf, 0, static_cast<int>(UpscaleFilter::Count) - 1);
+    vis.upscaleFilter = static_cast<UpscaleFilter>(uf);
+    if (readBool(v, "glowEnabled", false) && vis.bloom == VisualBloom::Off) {
+        vis.bloom = VisualBloom::Low;
+    }
+}
+
 bool loadGameSettings(GameSettings& out) {
     migrateLegacySaveData();
     out = defaultGameSettings();
@@ -74,21 +93,9 @@ bool loadGameSettings(GameSettings& out) {
         }
 
         if (j.contains("visuals") && j["visuals"].is_object()) {
-            const auto& v = j["visuals"];
-            out.visuals.paletteMode = readInt(v, "paletteMode", 0);
-            out.visuals.ao = static_cast<VisualAo>(readEnumInt(v, "ao", static_cast<int>(VisualAo::Low)));
-            out.visuals.bloom = static_cast<VisualBloom>(
-                readEnumInt(v, "bloom", static_cast<int>(VisualBloom::Off)));
-            out.visuals.flicker = readBool(v, "flicker", true);
-            out.visuals.grain = readBool(v, "grain", false);
-            {
-                int uf = readEnumInt(v, "upscaleFilter", static_cast<int>(UpscaleFilter::Nearest));
-                uf = std::clamp(uf, 0, static_cast<int>(UpscaleFilter::Count) - 1);
-                out.visuals.upscaleFilter = static_cast<UpscaleFilter>(uf);
-            }
-            if (readBool(v, "glowEnabled", false) && out.visuals.bloom == VisualBloom::Off) {
-                out.visuals.bloom = VisualBloom::Low;
-            }
+            loadVisualsFromJson(j["visuals"], out.visuals);
+        } else if (j.contains("render") && j["render"].is_object()) {
+            loadVisualsFromJson(j["render"], out.visuals);
         }
 
         if (j.contains("controls") && j["controls"].is_object()) {
@@ -135,7 +142,7 @@ bool loadGameSettings(GameSettings& out) {
 }
 
 bool saveGameSettings(const GameSettings& s) {
-    ensureDirectoryExists(saveDirectory());
+    if (!ensureSaveDirectoryReady()) return false;
 
     nlohmann::json j;
     j["version"] = CURRENT_SETTINGS_VERSION;
@@ -175,7 +182,7 @@ bool saveGameSettings(const GameSettings& s) {
     j["debug"]["showMaterialIds"] = s.debug.showMaterialIds;
     j["debug"]["benchmarkScene"] = s.debug.benchmarkScene;
 
-    if (!atomicWriteFile(settingsPath(), j.dump(2))) return false;
+    if (!atomicWriteFile(settingsPath(), j.dump())) return false;
     g_dirty = false;
     return true;
 }

@@ -265,13 +265,25 @@ void run_gpu_sim_tests(TestContext& ctx) {
     {
         pipe.clearAll(nx::MAT_EMPTY);
         std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
-        setTop(in, w, 5, 5, static_cast<nx::Material>(12));  // legacy ATTRACTOR id
+        setTop(in, w, 5, 5, static_cast<nx::Material>(17));  // unknown id
         pipe.uploadGridTopDown(in, w, h);
         nx::PhysicsParams physics{};
         pipe.step(0u, physics);
         std::vector<uint8_t> out;
         CHECK(ctx, readTopDown(pipe, w, h, out));
         CHECK(ctx, atTop(out, w, 5, 5) == static_cast<uint8_t>(nx::MAT_EMPTY));
+    }
+
+    {
+        pipe.clearAll(nx::MAT_EMPTY);
+        std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
+        setTop(in, w, 5, 5, nx::MAT_STEAM);
+        pipe.uploadGridTopDown(in, w, h);
+        nx::PhysicsParams physics{};
+        pipe.step(0u, physics);
+        std::vector<uint8_t> out;
+        CHECK(ctx, readTopDown(pipe, w, h, out));
+        CHECK(ctx, countMaterial(out, w, h, nx::MAT_STEAM) > 0);
     }
 
     {

@@ -28,7 +28,7 @@ Use `make desktop` and the same benchmark scenes (`Engine → Debug → benchmar
 | Settled lava/stone, Stable | 480×270 | 1 | 0 when sleeping | ~0 | — | yes after idle |
 | Large bottom sand, Fast | 640×360 | 1–2 | partial or fallback | was ~48 before tile wake fix | — | no |
 
-**Bloom Low** (Engine → Visuals): optional glow extract + 4 blur passes at sim resolution; leave **Off** for Battery Saver profiling. Note one row when testing fire/lava scenes with bloom on.
+**Bloom Low** (Engine → Visuals): palette → bright pass (sim/8) + 2 blur passes (sim/16) + composite; leave **Off** for Battery Saver profiling. Note one row when testing fire/lava scenes with bloom on.
 
 **Upscale filter** (Engine → Visuals): default **nearest** (single palette pass). Non-nearest filters add a sim-sized RGBA FBO plus `upscale.frag` into the play region — profile **tent** vs **lanczos3** at 480×270 and 640×360 when tuning presentation cost.
 

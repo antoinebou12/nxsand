@@ -35,9 +35,13 @@ API: `nx::importTptStampJson` in [`source/save/tpt_stamp_import.cpp`](../source/
 | 6 | FIRE | Fire |
 | 5 | SMKE | Smoke |
 | 146 | ACID | Acid |
-| 28 | BMTL | Wall |
+| 28 | BMTL | Metal |
+| 62 | GUNP | Gunpowder |
 | 17 | ICEI | Ice |
 | 34 | PLNT | Plant |
+| 52 | GLAS | Glass |
+| 63 | STEM | Steam |
+| 191 | WOOD | Wood |
 | other | — | Empty (skipped) |
 
 Mapping table: [`source/save/tpt_material_map.hpp`](../source/save/tpt_material_map.hpp).

@@ -33,9 +33,18 @@ struct alignas(16) PhysicsParamsGPU {
     float ice_meltRate;
     float ice_freezeRate;
     float water_levelRate;
-    float _pad3;
-    float _pad4;
-    float _pad5;
+    float sand_wetSlideScale;
+    float sand_lithifyRate;
+    float gunpowder_wetIgniteScale;
+    float gunpowder_packBoost;
+    float metal_rustRate;
+    float metal_sparkRate;
+    float oil_coldScale;
+    float wood_charRate;
+    float salt_dissolveRate;
+    float ember_spawnRate;
+    float ember_fadeRate;
+    float ember_igniteWood;
 };
 
 static_assert(sizeof(PhysicsParamsGPU) % 16 == 0, "PhysicsParamsGPU must be 16-byte aligned");
@@ -63,6 +72,18 @@ inline PhysicsParamsGPU to_gpu(const PhysicsParams& p, int /*simW*/ = SIM_W) {
     g.ice_meltRate = p.ice_meltRate;
     g.ice_freezeRate = p.ice_freezeRate;
     g.water_levelRate = p.water_levelRate;
+    g.sand_wetSlideScale = p.sand_wetSlideScale;
+    g.sand_lithifyRate = p.sand_lithifyRate;
+    g.gunpowder_wetIgniteScale = p.gunpowder_wetIgniteScale;
+    g.gunpowder_packBoost = p.gunpowder_packBoost;
+    g.metal_rustRate = p.metal_rustRate;
+    g.metal_sparkRate = p.metal_sparkRate;
+    g.oil_coldScale = p.oil_coldScale;
+    g.wood_charRate = p.wood_charRate;
+    g.salt_dissolveRate = p.salt_dissolveRate;
+    g.ember_spawnRate = p.ember_spawnRate;
+    g.ember_fadeRate = p.ember_fadeRate;
+    g.ember_igniteWood = p.ember_igniteWood;
     return g;
 }
 

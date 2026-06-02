@@ -7,12 +7,18 @@
 #include <filesystem>
 
 void run_physics_tests(TestContext& ctx) {
-    CHECK(ctx, nx::settingsMaterialCount() == 8);
+    CHECK(ctx, nx::settingsMaterialCount() == 13);
     CHECK(ctx, nx::settingsMaterialAt(0) == nx::MAT_FIRE);
-    CHECK(ctx, nx::paramCountFor(nx::MAT_FIRE) == 5);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_FIRE) == 7);
     CHECK(ctx, nx::paramCountFor(nx::MAT_PLANT) == 2);
     CHECK(ctx, nx::paramSpecAt(nx::MAT_FIRE, 0) != nullptr);
-    CHECK(ctx, nx::paramSpecAt(nx::MAT_SAND, 0) == nullptr);
+    CHECK(ctx, nx::paramSpecAt(nx::MAT_SAND, 0) != nullptr);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_SAND) == 2);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_GUNPOWDER) == 2);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_SALT) == 1);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_METAL) == 2);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_WOOD) == 2);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_OIL) == 3);
 
     nx::PhysicsParams p{};
     CHECK(ctx, std::fabs(nx::getParam(p, nx::MAT_FIRE, "fire_speed") - 1.f) < 1e-5f);
@@ -25,6 +31,18 @@ void run_physics_tests(TestContext& ctx) {
     CHECK(ctx, std::fabs(p.oil_floatRate - 0.16f) < 1e-5f);
     CHECK(ctx, std::fabs(p.smoke_driftRate - 0.12f) < 1e-5f);
     CHECK(ctx, std::fabs(p.smoke_fadeRate - 0.010f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.sand_wetSlideScale - 0.40f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.sand_lithifyRate - 0.005f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.gunpowder_wetIgniteScale - 0.20f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.gunpowder_packBoost - 0.12f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.metal_rustRate - 0.003f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.metal_sparkRate - 0.10f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.oil_coldScale - 0.40f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.wood_charRate - 0.04f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.ember_spawnRate - 0.004f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.ember_fadeRate - 0.28f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.ember_igniteWood - 0.005f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.salt_dissolveRate - 0.035f) < 1e-5f);
 
     nx::adjustParam(p, nx::MAT_FIRE, "fire_speed", 100);
     const auto* spec = nx::paramSpecAt(nx::MAT_FIRE, 0);
@@ -41,12 +59,28 @@ void run_physics_tests(TestContext& ctx) {
     nx::PhysicsParams custom{};
     custom.fire_speed = 1.25f;
     custom.ice_meltRate = 0.01f;
+    custom.sand_lithifyRate = 0.012f;
+    custom.gunpowder_wetIgniteScale = 0.35f;
+    custom.metal_rustRate = 0.008f;
+    custom.wood_charRate = 0.06f;
+    custom.ember_spawnRate = 0.008f;
+    custom.ember_fadeRate = 0.35f;
+    custom.ember_igniteWood = 0.012f;
+    custom.salt_dissolveRate = 0.05f;
     CHECK(ctx, nx::savePhysicsParams(custom));
 
     nx::PhysicsParams loaded{};
     CHECK(ctx, nx::loadPhysicsParams(loaded));
     CHECK(ctx, std::fabs(loaded.fire_speed - 1.25f) < 1e-5f);
     CHECK(ctx, std::fabs(loaded.ice_meltRate - 0.01f) < 1e-5f);
+    CHECK(ctx, std::fabs(loaded.sand_lithifyRate - 0.012f) < 1e-5f);
+    CHECK(ctx, std::fabs(loaded.gunpowder_wetIgniteScale - 0.35f) < 1e-5f);
+    CHECK(ctx, std::fabs(loaded.metal_rustRate - 0.008f) < 1e-5f);
+    CHECK(ctx, std::fabs(loaded.wood_charRate - 0.06f) < 1e-5f);
+    CHECK(ctx, std::fabs(loaded.ember_spawnRate - 0.008f) < 1e-5f);
+    CHECK(ctx, std::fabs(loaded.ember_fadeRate - 0.35f) < 1e-5f);
+    CHECK(ctx, std::fabs(loaded.ember_igniteWood - 0.012f) < 1e-5f);
+    CHECK(ctx, std::fabs(loaded.salt_dissolveRate - 0.05f) < 1e-5f);
 
     std::filesystem::remove(path, ec);
 }

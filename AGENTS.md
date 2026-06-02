@@ -28,14 +28,15 @@ Instructions for coding agents working in this repository. Codex and similar too
 | Drawable / orientation | `source/platform/screen_size.hpp` | `SDL_GL_GetDrawableSize` + `ScreenOrientation` (Auto / Landscape / Portrait). Prefer `queryDrawableSize` over raw `SDL_GL_GetDrawableSize` wherever UI or input maps window pixels |
 | Fragment / compute sim | `source/gpu/sim_pipeline.cpp`, `shaders/sim.frag`, `shaders/sim.comp`, `shaders/sim_common.glsl` | Ping-pong `GL_R8UI`; fragment or compute (GLES 3.1 when supported); 4 Margolus phases; tunables in `physics.json` |
 | GPU brush | `shaders/paint.frag` | Dirty-rect fragment stamp with ping-pong copy/swap |
-| Render | `source/gpu/render_pipeline.cpp`, `shaders/palette_lookup.frag`, `shaders/upscale.frag` | `uPaletteMode` 0 Pretty / 1 Fast / 2 Classic (green empty bg, palette tex); 3 material IDs when debug HUD on; blob halos (pretty mode); flicker/grain/AO from `settings.json` (AO Off = no neighbor shading; Flicker Off = no fire/lava pulse or acid/plant shimmer); optional filtered upscale (`visuals.upscaleFilter`, default nearest); optional bloom (`VisualBloom::Low`, 4 blur passes, sim-sized glow FBO) |
+| Render | `source/gpu/render_pipeline.cpp`, `shaders/palette_lookup.frag`, `shaders/upscale.frag`, `shaders/bloom_*.frag` | `uPaletteMode` 0 Pretty / 1 Fast / 2 Classic (green empty bg, palette tex); 3 material IDs when debug HUD on; blob halos (pretty mode); flicker/grain/AO from `settings.json` `visuals` (legacy `render` alias on load; flicker default off if key missing; AO Off = no neighbor shading; Flicker Off = no fire/lava/ember pulse or acid/plant shimmer); optional filtered upscale (`visuals.upscaleFilter`, default nearest); optional bloom (`VisualBloom::Low`: palette → `lookTex`, `bloom_bright` at sim/8, `bloom_blur` ×4 at sim/16, EP01-style `bloom_composite` into `postTex`, then upscale to play region) |
 | Input | `source/platform/input/` | Joy-Con-first; Switch face buttons via `switch_face.hpp` (A/B/X/Y, not positional SDL enums on switch-sdl2); pointer mapping uses `queryDrawableSize(..., settings.display.orientation)`; menus: hold D-pad / arrows for repeat navigation and value adjust on Element Settings + Engine Settings slider rows (`menu_repeat`, toggle rows single-step) |
 | UI | `source/ui/` | GPU quads, not SDL renderer |
 | Perf HUD | `source/ui/perf_overlay.cpp`, `source/gpu/perf_stats.hpp` | FPS, ms breakdown, grid, substeps, fragment passes, brush commands, dirty rect, active-tile fallback, idle sleep |
-| Settings | `source/save/settings_io.cpp`, `source/game/game_settings.*` | `settings.json` (engine) + `physics.json` (elements); sim resize/backend apply on Engine tab exit (`flushPendingHeavySettings`); deferred flush on tab back / Engine menu exit / shutdown (Switch same as desktop, next frame) |
+| Settings | `source/save/settings_io.cpp`, `source/game/game_settings.*` | `settings.json` (engine) + `physics.json` (elements); sim resize/backend deferred one frame after tab exit (`schedulePendingHeavySettingsFlush`); disk flush queued on tab back / menu exit / shutdown (Switch same as desktop, one file per frame) |
 | Active tiles | `source/gpu/active_tiles.hpp` | CPU bitset on brush; fragment scissor optimization with full-grid fallback for stability |
 | CPU reference | `source/sim/cpu_reference.cpp` | Tests / parity tooling only |
-| Diagrams | `docs/diagrams/*.mmd`, `docs/DIAGRAMS.md` | Include `material-reactions.mmd`; regenerate SVG when `sim.frag` rules change |
+| Materials | `source/sim/materials.hpp`, `shaders/sim_ids.glsl`, `shaders/sim_common.glsl` | 17 brush IDs (1–17) + spawn-only Ember (18); includes steam/glass/wood (12–14), metal/gunpowder (15–16), salt (17). Do not renumber existing IDs in saves. Regenerate `material-reactions.svg` when reactions change. |
+| Diagrams | `docs/diagrams/*.mmd`, `docs/DIAGRAMS.md` | Include `material-reactions.mmd`; regenerate SVG when `sim_common.glsl` rules change |
 
 Longer narrative: **`docs/ARCHITECTURE.md`**, **`docs/NATIVE.md`**, **`docs/PHYSICS.md`**.
 
@@ -85,8 +86,8 @@ Only commit when the user explicitly asks. Do not change `git config` or use des
 - Switch controls: `switch_face.hpp` for confirm/back/ring; optional `NXSAND_SWITCH_SWAP_FACE_XY` env swaps ring face; menus fully navigable with joystick/D-pad (not touch-only).
 - Diagram sources: `docs/diagrams/*.mmd` / `*.puml`; regenerate SVG per `docs/DIAGRAMS.md` when `sim.frag` reactions or sim/render wiring change.
 - README: reference-versions table (Atmosphere, Hekate, libnx, SDL2); install/build links to devkitPro Getting Started; `make` as primary build path (no PowerShell helpers in README body); no Reference blurbs to nx.js or `E:\nxapplication`.
-- Settings saves: changing engine or element settings must not reset the active slot to a new empty map; show a desktop save-in-progress overlay while writing.
-- Physics feel: wall stays solid (fire/smoke never displace it); water fills trays and pools quickly; plant climbs walls and grows deeper underwater but not from map edges; relatively slow fire spread onto plant; longer smoke lifetime.
+- Settings saves: changing engine or element settings must not reset the active slot; brush radius changes flush to `settings.json` immediately (slot load uses global `controls.brushRadius`); Back from Engine Performance must not block on GPU sim reinit (defer one frame); show desktop save-in-progress overlay during disk write.
+- Physics feel: wall stays solid (fire/smoke never displace it); water fills trays and pools quickly; plant climbs walls and grows deeper underwater but not from map edges, with relatively slow spread (~0.07 default); relatively slow fire spread onto plant; longer smoke lifetime; lava vitrifies sand into glass; salt floats on water (density 2) and dissolves via `salt_dissolveRate`; packed gunpowder chains and detonates.
 
 ## Learned Workspace Facts
 
@@ -98,3 +99,5 @@ Only commit when the user explicitly asks. Do not change `git config` or use des
 - Fresh settings default `activeTiles` Off and `dynamicResolution` Off (`game_settings.hpp`); keep off unless the user opts in.
 - Water presets target fast tray/pool fill (`water_flowRate` 1.0, `water_levelRate` 0.18, boostedFlow wide ×3 / pocket ×6); see `docs/PHYSICS.md`.
 - Wall cells are static: fire and smoke only spread into empty cells and must not displace or erode wall.
+- Windows desktop: build/run via `scripts/build-desktop.ps1` and `scripts/run-desktop.ps1` (MSYS2 MinGW64 + ANGLE + GLAD); launch with repo root as cwd; plain `make desktop` from PowerShell or devkitPro MSYS usually fails.
+- `settings.json` engine visuals load from `visuals` (legacy `render` alias); flicker defaults off when the key is omitted.

@@ -34,7 +34,6 @@ package "nx::gpu" {
   }
   class RenderPipeline {
     +drawSimulation()
-    +drawGlow()
     +beginUiFrame()
   }
   class ActiveTileMap {

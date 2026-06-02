@@ -14,6 +14,8 @@
 
 namespace nx {
 
+static bool g_saveDirReady = false;
+
 std::string saveDirectory() {
 #if defined(__SWITCH__)
     return "sdmc:/switch/nxsand/";
@@ -71,6 +73,13 @@ bool ensureDirectoryExists(const std::string& path) {
     std::filesystem::create_directories(path, ec);
     return !ec;
 #endif
+}
+
+bool ensureSaveDirectoryReady() {
+    if (g_saveDirReady) return true;
+    if (!ensureDirectoryExists(saveDirectory())) return false;
+    g_saveDirReady = true;
+    return true;
 }
 
 bool atomicWriteFile(const std::string& finalPath, const std::string& data) {

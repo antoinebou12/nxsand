@@ -561,7 +561,12 @@ bool SimPipeline::collectActivePassRects(ActiveTileMode activeMode,
 }
 
 bool SimPipeline::readGridTo(std::vector<uint8_t>& out) {
-    out.assign(static_cast<size_t>(gw * gh), 0);
+    return readRegionTopDown(0, 0, gw, gh, out);
+}
+
+bool SimPipeline::readRegionTopDown(int x0, int y0, int w, int h, std::vector<uint8_t>& out) {
+    if (x0 < 0 || y0 < 0 || w <= 0 || h <= 0 || x0 + w > gw || y0 + h > gh) return false;
+    out.assign(static_cast<size_t>(w * h), MAT_EMPTY);
     if (backend_ == SimBackend::Compute) {
         barrierComputeToTexture();
     }
@@ -569,12 +574,19 @@ bool SimPipeline::readGridTo(std::vector<uint8_t>& out) {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo[cur]);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     if (gridPixelType_ == GL_UNSIGNED_BYTE) {
-        glReadPixels(0, 0, gw, gh, GL_RED_INTEGER, GL_UNSIGNED_BYTE, out.data());
+        for (int row = 0; row < h; ++row) {
+            const int gy = gh - 1 - (y0 + row);
+            uint8_t* dst = out.data() + static_cast<size_t>(row * w);
+            glReadPixels(x0, gy, w, 1, GL_RED_INTEGER, GL_UNSIGNED_BYTE, dst);
+        }
     } else {
-        std::vector<GLuint> tmp(static_cast<size_t>(gw * gh), 0);
-        glReadPixels(0, 0, gw, gh, GL_RED_INTEGER, GL_UNSIGNED_INT, tmp.data());
-        for (size_t i = 0; i < tmp.size(); ++i) {
-            out[i] = static_cast<uint8_t>(tmp[i] & 0xffu);
+        std::vector<GLuint> row(static_cast<size_t>(w), 0);
+        for (int r = 0; r < h; ++r) {
+            const int gy = gh - 1 - (y0 + r);
+            glReadPixels(x0, gy, w, 1, GL_RED_INTEGER, GL_UNSIGNED_INT, row.data());
+            for (int x = 0; x < w; ++x) {
+                out[static_cast<size_t>(r * w + x)] = static_cast<uint8_t>(row[static_cast<size_t>(x)] & 0xffu);
+            }
         }
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);

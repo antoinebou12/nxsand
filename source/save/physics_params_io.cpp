@@ -28,6 +28,8 @@ bool loadPhysicsParams(PhysicsParams& out) {
         g("fire_ignitePlant", out.fire_ignitePlant);
         g("fire_igniteOil", out.fire_igniteOil);
         g("fire_spreadRate", out.fire_spreadRate);
+        g("ember_spawnRate", out.ember_spawnRate);
+        g("ember_fadeRate", out.ember_fadeRate);
         g("smoke_fadeRate", out.smoke_fadeRate);
         g("smoke_driftRate", out.smoke_driftRate);
         g("water_flowRate", out.water_flowRate);
@@ -44,6 +46,16 @@ bool loadPhysicsParams(PhysicsParams& out) {
         g("oil_floatRate", out.oil_floatRate);
         g("ice_meltRate", out.ice_meltRate);
         g("ice_freezeRate", out.ice_freezeRate);
+        g("sand_wetSlideScale", out.sand_wetSlideScale);
+        g("sand_lithifyRate", out.sand_lithifyRate);
+        g("gunpowder_wetIgniteScale", out.gunpowder_wetIgniteScale);
+        g("gunpowder_packBoost", out.gunpowder_packBoost);
+        g("metal_rustRate", out.metal_rustRate);
+        g("metal_sparkRate", out.metal_sparkRate);
+        g("oil_coldScale", out.oil_coldScale);
+        g("wood_charRate", out.wood_charRate);
+        g("ember_igniteWood", out.ember_igniteWood);
+        g("salt_dissolveRate", out.salt_dissolveRate);
         g_dirty = false;
         return true;
     } catch (const std::exception&) {
@@ -52,7 +64,7 @@ bool loadPhysicsParams(PhysicsParams& out) {
 }
 
 bool savePhysicsParams(const PhysicsParams& p) {
-    ensureDirectoryExists(saveDirectory());
+    if (!ensureSaveDirectoryReady()) return false;
 
     nlohmann::json j;
     j["fire_speed"] = p.fire_speed;
@@ -60,6 +72,8 @@ bool savePhysicsParams(const PhysicsParams& p) {
     j["fire_ignitePlant"] = p.fire_ignitePlant;
     j["fire_igniteOil"] = p.fire_igniteOil;
     j["fire_spreadRate"] = p.fire_spreadRate;
+    j["ember_spawnRate"] = p.ember_spawnRate;
+    j["ember_fadeRate"] = p.ember_fadeRate;
     j["smoke_fadeRate"] = p.smoke_fadeRate;
     j["smoke_driftRate"] = p.smoke_driftRate;
     j["water_flowRate"] = p.water_flowRate;
@@ -76,8 +90,18 @@ bool savePhysicsParams(const PhysicsParams& p) {
     j["oil_floatRate"] = p.oil_floatRate;
     j["ice_meltRate"] = p.ice_meltRate;
     j["ice_freezeRate"] = p.ice_freezeRate;
+    j["sand_wetSlideScale"] = p.sand_wetSlideScale;
+    j["sand_lithifyRate"] = p.sand_lithifyRate;
+    j["gunpowder_wetIgniteScale"] = p.gunpowder_wetIgniteScale;
+    j["gunpowder_packBoost"] = p.gunpowder_packBoost;
+    j["metal_rustRate"] = p.metal_rustRate;
+    j["metal_sparkRate"] = p.metal_sparkRate;
+    j["oil_coldScale"] = p.oil_coldScale;
+    j["wood_charRate"] = p.wood_charRate;
+    j["ember_igniteWood"] = p.ember_igniteWood;
+    j["salt_dissolveRate"] = p.salt_dissolveRate;
 
-    if (!atomicWriteFile(physicsPath(), j.dump(2))) return false;
+    if (!atomicWriteFile(physicsPath(), j.dump())) return false;
     g_dirty = false;
     return true;
 }

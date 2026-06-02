@@ -17,7 +17,7 @@ From the repo root, use the Cursor **uml-mcp** `generate_uml` tool (or Kroki / M
 | Core C++ types | `core-runtime-classes.puml` | `core-runtime-classes.svg` |
 | One sim substep (4 phases) | `sim-margolus-step.mmd` | `sim-margolus-step.svg` |
 | Brush input → GPU stamp | `brush-input-flow.mmd` | `brush-input-flow.svg` |
-| Material reaction graph | `material-reactions.mmd` | `material-reactions.svg` |
+| Material reaction graph (16 mats) | `material-reactions.mmd` | `material-reactions.svg` |
 | Lava + water quench | `reaction-lava-water-quench.puml` | `reaction-lava-water-quench.svg` |
 
 Narrative docs: [`../ARCHITECTURE.md`](../ARCHITECTURE.md), [`../DIAGRAMS.md`](../DIAGRAMS.md), [`../PHYSICS.md`](../PHYSICS.md).

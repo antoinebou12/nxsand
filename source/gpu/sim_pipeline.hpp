@@ -54,6 +54,7 @@ public:
     GLuint readTexture() const { return tex[cur]; }
 
     bool readGridTo(std::vector<uint8_t>& out);
+    bool readRegionTopDown(int x0, int y0, int w, int h, std::vector<uint8_t>& out);
     void uploadGridTopDown(const std::vector<uint8_t>& data, int w, int h);
 
     void syncSimForSampling();

@@ -21,6 +21,11 @@ constexpr int PT_LAVA = 37;
 constexpr int PT_DSTW = 64;
 constexpr int PT_SLTW = 65;
 constexpr int PT_ACID = 146;
+constexpr int PT_GLAS = 52;
+constexpr int PT_WOOD = 191;
+constexpr int PT_STEM = 63;
+constexpr int PT_GUNP = 62;
+constexpr int PT_SALT = 95;
 
 inline Material mapTptType(int tptType) {
     switch (tptType) {
@@ -45,11 +50,21 @@ inline Material mapTptType(int tptType) {
         case PT_ACID:
             return MAT_ACID;
         case PT_BMTL:
-            return MAT_WALL;
+            return MAT_METAL;
+        case PT_GUNP:
+            return MAT_GUNPOWDER;
+        case PT_SALT:
+            return MAT_SALT;
         case PT_ICEI:
             return MAT_ICE;
         case PT_PLNT:
             return MAT_PLANT;
+        case PT_GLAS:
+            return MAT_GLASS;
+        case PT_WOOD:
+            return MAT_WOOD;
+        case PT_STEM:
+            return MAT_STEAM;
         default:
             return MAT_EMPTY;
     }

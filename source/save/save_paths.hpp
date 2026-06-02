@@ -7,6 +7,9 @@ std::string saveDirectory();
 std::string legacySaveDirectory();
 bool ensureDirectoryExists(const std::string& path);
 
+/// Ensures `saveDirectory()` exists once per process (cached after first success).
+bool ensureSaveDirectoryReady();
+
 /// Write `data` to `finalPath` atomically: write to `finalPath.tmp`, flush, then rename.
 /// Prevents truncated/corrupt save files when the Switch loses power or is sleep-yanked
 /// mid-write (a real risk on handheld with unbuffered SD writes).

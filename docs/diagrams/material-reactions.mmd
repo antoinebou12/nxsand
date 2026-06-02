@@ -11,38 +11,78 @@ flowchart TB
     Wall
     Plant
     Ice
+    Glass
+    Wood
+    Metal
+    Gunpowder
+    Salt
   end
   subgraph gases [Gases]
     Fire
     Smoke
+    Steam
+    Ember
     Empty
   end
 
   Acid -->|"acid_wallCorrode"| Wall
+  Acid -->|"acid_wallCorrode x0.4"| Glass
   Acid -->|"acid_stoneCorrode"| Stone
   Acid -->|"35% dissolve"| Plant
+  Acid -->|"25% dissolve"| Wood
   Acid -->|"12% dissolve"| Sand
+  Sand -->|"sand_lithifyRate"| Stone
+  Water -->|"wet drag sand_wetSlideScale"| Sand
   Acid -->|"20% weaken"| Ice
   Acid -->|"25% neutralize"| Water
 
   Fire -->|"fire_ignitePlant x2.5; x0.85 diagonal; 2+ sides instant"| Plant
+  Fire -->|"fire_ignitePlant x2.0; 2+ sides instant"| Wood
   Fire -->|"oil x3; 2+ neighbors x2.5"| Oil
-  Fire -->|"extinguish"| Water
+  Fire -->|"15% steam / 35% smoke"| Water
   Fire -->|"extinguish"| Ice
   Fire -->|"extinguish"| Acid
   Lava -->|"instant"| Plant
+  Lava -->|"instant fire"| Wood
   Lava -->|"quench"| Water
   Lava -->|"quench"| Ice
-  Lava -->|"fuse"| Sand
+  Lava -->|"vitrify on sand"| Glass
+  Sand -->|"55% near lava"| Glass
   Water -->|"lava contact"| Stone
   Oil -->|"ignite max rates"| Fire
   Smoke -->|"fire_ignitePlant x0.40"| Plant
 
   Wall -->|"corrode"| Empty
-  Plant -->|"growth x9/x14 water x4 wall x7 climb"| Empty
+  Glass -->|"slow etch"| Empty
+  Plant -->|"spread x6/x9 water x3 wall x5 climb"| Empty
+  Empty -->|"fire/lava + water 20%"| Steam
   Ice -->|"ice_freezeRate"| Water
   Ice -->|"0.2% slow thaw"| Water
   Smoke -->|"42% condense on ice"| Water
+  Steam -->|"35% condense on ice"| Water
   Smoke -->|"fade x0.35 near wall"| Smoke
+  Steam -->|"fade x1.8 default"| Empty
   Smoke -->|"fade +0.10 near stone/sand"| Empty
   Water -->|"water_levelRate wide spread"| Empty
+  Fire -->|"78-92% ignite; x gunpowder_wetIgniteScale if wet"| Gunpowder
+  Water -->|"damp ignite"| Gunpowder
+  Lava -->|"ignite"| Gunpowder
+  Gunpowder -->|"detonate chain; fire/smoke/ember blast"| Fire
+  Empty -->|"blast puff near dense gunpowder + heat"| Fire
+  Empty -->|"ember_spawnRate near fire"| Ember
+  Empty -->|"12% gunpowder blast"| Ember
+  Ember -->|"ember_fadeRate"| Empty
+  Ember -->|"ember_igniteWood"| Wood
+  Acid -->|"acid_wallCorrode x0.25"| Metal
+  Acid -->|"18% dissolve"| Gunpowder
+  Water -->|"metal_rustRate"| Metal
+  Metal -->|"stone"| Stone
+  Fire -->|"metal_sparkRate 2+ heat"| Metal
+  Lava -->|"metal_sparkRate 2+ heat"| Metal
+  Ice -->|"oil_coldScale"| Oil
+  Smoke -->|"wood_charRate no fire"| Wood
+  Wood -->|"char"| Empty
+  Gunpowder -->|"powder fall/slide"| Empty
+  Water -->|"salt_dissolveRate; x2.5 if surrounded"| Salt
+  Salt -->|"density 2 floats on water"| Water
+  Acid -->|"15% dissolve"| Salt

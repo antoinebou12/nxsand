@@ -13,7 +13,7 @@ NXSand keeps editable diagram sources under `docs/diagrams/` beside committed SV
 | Core classes | `diagrams/core-runtime-classes.puml` | `App`, `SimPipeline`, `RenderPipeline` |
 | Sim substep | `diagrams/sim-margolus-step.mmd` | Four Margolus phases, active tiles |
 | Brush path | `diagrams/brush-input-flow.mmd` | Input → `paint.frag` → `step` |
-| Material reactions | `diagrams/material-reactions.mmd` | Shader interaction matrix overview |
+| Material reactions | `diagrams/material-reactions.mmd` | 17 materials — shader interaction overview (steam/glass/wood, metal, gunpowder, salt) |
 | Lava/water quench | `diagrams/reaction-lava-water-quench.puml` | Specific quench branch in sim |
 
 ## Runtime path (summary)
@@ -23,7 +23,7 @@ GLES 3.0+ presentation is fragment-first:
 1. `paint.frag` — dirty-rect brush stamp (ping-pong `GL_R8UI`).
 2. `sim.frag` × 4 or `sim.comp` — Margolus phases (`PhysicsBlock` UBO).
 3. `palette_lookup.frag` — material ID → color, grid, AO/flicker/grain.
-4. Optional `glow_extract.frag` / `glow_blur.frag`.
+4. Optional bloom: `bloom_bright.frag` → `bloom_blur.frag` → `bloom_composite.frag`.
 5. `ui_quad` + font atlas — menus, HUD, perf overlay.
 
 **Engine → Performance → Sim backend → Compute** selects `sim.comp` (GLES 3.1) instead of fullscreen `sim.frag` passes when supported.

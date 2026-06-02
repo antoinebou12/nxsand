@@ -10,17 +10,19 @@ The simulation runs on the GPU (OpenGL ES 3.0): a Margolus cellular automaton on
 
 ## Materials & play
 
+Seventeen brush materials (IDs 1–17) plus spawn-only **Ember** (ID 18; not in the ring). ID 0 = empty — see [docs/PHYSICS.md](docs/PHYSICS.md):
+
 | Material | Behavior (short) |
 |----------|------------------|
-| Sand | Falls and piles |
-| Water | Flows, fills gaps |
-| Fire / smoke | Burns and spreads smoke |
-| Lava / acid | Hot or corrosive fluids |
-| Plant | Grows near water |
-| Ice / oil | Cold solid and slick liquid |
-| Wall / stone | Static or structural solids |
+| Sand / stone | Powders that fall and pile |
+| Water / acid / lava / oil | Fluids (layer by density) |
+| Fire / smoke / steam / ember | Gases (ember spawns from fire; not paintable) |
+| Wall / plant / ice / glass / wood / metal | Static solids |
+| Gunpowder / salt | Powders; gunpowder detonates; salt dissolves in water |
 
-Reactions follow the rules in `shaders/sim.frag` (for example, lava meeting water can form stone and smoke). Saves use the same JSON + base64 slot layout as the original nxsand web project so worlds stay portable.
+Reactions live in `shaders/sim_common.glsl` (included by `sim.frag` / `sim.comp`). Examples: lava + water → stone and smoke; lava + sand → glass; gunpowder + fire → spreading flame. Overview diagram: [docs/diagrams/material-reactions.svg](docs/diagrams/material-reactions.svg).
+
+Saves use JSON + base64 slot files (`sdmc:/switch/nxsand/` on Switch, `./nxsand_save/` on desktop). Engine visuals (palette, bloom, flicker, AO, upscale) load from `settings.json` under `visuals` (legacy `render` object is accepted).
 
 ## Controls
 
@@ -138,7 +140,7 @@ Saves go to `./nxsand_save/`; legacy `./nxengine_save/` is migrated when possibl
 | `source/platform/main.cpp` | Entry, romfs, fatal screen |
 | `source/game/app.*` | Frame loop, sim tick, render |
 | `source/gpu/sim_pipeline.*` | Ping-pong grid, Margolus passes, GPU brush |
-| `source/gpu/render_pipeline.*` | Palette, glow, world draw |
+| `source/gpu/render_pipeline.*` | Palette, bloom, world draw |
 | `shaders/sim.frag` | Cellular automaton rules |
 | `shaders/paint.frag` | Dirty-rect brush stamp |
 | `shaders/palette_lookup.frag` | Material ID → color |

@@ -27,7 +27,7 @@ constexpr int BASE_SCREEN_W = 1280;
 constexpr int BASE_SCREEN_H = 720;
 
 inline int getTopBarH(int screenH)      { return screenH / 12; }                    // ~60 @ 720
-inline int getPaletteH(int screenH)     { return screenH / 7;  }                    // ~102 @ 720
+inline int getPaletteH(int screenH)     { return screenH * 3 / 14; }                // 3-row HUD palette
 inline int getSandBandH(int screenW, int screenH, bool paletteVisible) {
     (void)screenW;
     int chrome = getTopBarH(screenH) + (paletteVisible ? getPaletteH(screenH) : 0);

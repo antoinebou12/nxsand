@@ -20,20 +20,27 @@ OpenGL coordinates increase upward inside the sim texture. UI input, cursor draw
 | 9 | Stone | Heavy solid |
 | 10 | Oil | Light fluid (floats on water) |
 | 11 | Ice | Cold solid |
-| 12–13 | Legacy | Treated as empty |
+| 12 | Steam | Rising gas; condenses on ice |
+| 13 | Glass | Static solid; acid-etchable |
+| 14 | Wood | Static solid; burns like plant |
+| 15 | Metal | Static solid; acid-corrodible; sparks near fire/lava |
+| 16 | Gunpowder | Powder; packed detonations chain through neighbors with blast puffs |
+| 17 | Salt | Powder; dissolves in water; floats above water (density 2) |
+| 18 | Ember | Spawn-only hot spark from fire/gunpowder; not in material ring |
 
 ## Movement (Margolus swaps)
 
 | Material | fallChance | flowChance / slide | Density | Static |
 |----------|------------|-------------------|---------|--------|
-| Sand | 1.0 | powder slide ~0.55–0.70 via `slideChance` | 4 | no |
+| Sand | 1.0 (×`sand_wetSlideScale` when water-adjacent) | powder slide ~0.55–0.70; wet sand uses `slideChanceAt` / `fallChanceAt` | 4 | no |
+| Gunpowder | 1.0 | powder slide | 4 | no |
 | Stone | 1.0 | powder slide | 5 | no |
 | Water | 1.0 | `water_flowRate` (default 1.0), `water_levelRate` wide spread + pocket fill under ledges (default 0.18; triggers scale ×3 wide / ×6 pocket in `boostedFlow`) | 3 | no |
 | Acid | 0.88 | `acid_flowRate` (default 0.28) | 3 | no |
 | Lava | `lava_flowRate+0.45` clamped (default fall ~0.61) | `lava_spreadRate` (default 0.09) | 3 | no |
-| Oil | 0.55 | `oil_floatRate` (default 0.16) | 2 | no |
-| Fire / Smoke | `fire_speed` | `fire_spreadRate` / `smoke_driftRate`; rise/drift only into **empty** cells (cannot displace wall, stone, plant, or ice) | 0 | no |
-| Wall / Plant / Ice | — | ice slow-thaw near water | — | yes |
+| Oil | 0.55 (×`oil_coldScale` when ice-adjacent) | `oil_floatRate` via `flowChanceAt` (default 0.16) | 2 | no |
+| Fire / Smoke / Steam / Ember | `fire_speed` (steam ×0.9 rise) | `fire_spreadRate` / `smoke_driftRate` (ember ×1.2 drift); rise/drift only into **empty** cells | 0 | no |
+| Wall / Plant / Ice / Glass / Wood / Metal | — | ice slow-thaw near water | — | yes |
 
 Liquids spread horizontally into empty or same-or-lighter liquid cells (density layering keeps oil above water). Water also gets a **pocket** boost in `boostedFlow()` when one empty cell lies ahead with solid ground below it. Wide spread and pocket attempts roll against `min(1, water_levelRate × 3)` and `min(1, water_levelRate × 6)` respectively. Presets set `water_levelRate` to **0.18** via `applyPerfPresetPhysics` in `source/game/game_settings.cpp`. Powders use `slideChance` in diagonal swaps so sand and stone fall off ledges without horizontal “flow.”
 
@@ -43,11 +50,17 @@ Each row is the **cell being updated** when a cardinal neighbor of the listed ty
 
 | Cell | Neighbor | Outcome | Tunable / notes |
 |------|----------|---------|-----------------|
-| Empty | Plant + water (surface) | Plant | `min(1, plant_growthRate×9)` (default base 0.12) |
-| Empty | Plant + water below cell | Plant | `min(1, plant_growthRate×14)` (submerged / deeper) |
-| Empty | Plant + in-grid wall | Plant | `min(1, plant_growthRate×4)` if `plant_wallSupport` on (max with water branch) |
-| Empty | Plant + wall/plant below | Plant | `min(1, plant_growthRate×7)` wall climb (longer vertical columns) |
+| Empty | Plant + water (surface) | Plant | `min(1, plant_growthRate×6)` (default base 0.07) |
+| Empty | Plant + water below cell | Plant | `min(1, plant_growthRate×9)` (submerged / deeper) |
+| Empty | Plant + in-grid wall | Plant | `min(1, plant_growthRate×3)` if `plant_wallSupport` on (max with water branch) |
+| Empty | Plant + wall/plant below | Plant | `min(1, plant_growthRate×5)` wall climb (longer vertical columns) |
+| Empty | Fire/lava + water | Steam | 20% |
 | Wall | Acid | Empty | `acid_wallCorrode` (default 0.06) |
+| Glass | Acid | Empty | `acid_wallCorrode × 0.4` |
+| Wood | Acid | Empty | 25% |
+| Wood | Fire (cardinal) | Fire | `min(1, fire_ignitePlant×2.0)`; instant if 2+ cardinal fire |
+| Wood | Lava | Fire | always |
+| Wood | Smoke (no fire/lava) | Empty | `wood_charRate` (default 0.04) |
 | Plant | Acid | Empty | 35% |
 | Plant | Fire (4- or 8-neighbor) | Fire | cardinal roll `min(1, fire_ignitePlant×2.5)`; `×0.85` diagonal-only; instant if 2+ cardinal fire |
 | Plant | Smoke | Fire | `fire_ignitePlant × 0.40` when plant ignition is enabled |
@@ -61,10 +74,11 @@ Each row is the **cell being updated** when a cardinal neighbor of the listed ty
 | Water | Ice | Ice | `ice_freezeRate` |
 | Ice | Water | Water | slow adjacency (~0.2%/frame) |
 | Lava | Water / Ice | Smoke | |
-| Lava | Sand | Stone | |
+| Lava | Sand | Glass | vitrify on contact |
 | Lava | Oil | Fire | `lava_igniteGas` |
-| Sand | Lava | Stone | 55% |
+| Sand | Lava | Glass | 55% |
 | Sand | Acid | Empty | 12% |
+| Sand | Water | Stone | `sand_lithifyRate` (default 0.005) |
 | Stone | Acid | Empty | `acid_stoneCorrode` (default 0.045) |
 | Stone | Lava + Water | Smoke | 4% |
 | Ice | Fire | Water | `ice_meltRate` |
@@ -73,19 +87,34 @@ Each row is the **cell being updated** when a cardinal neighbor of the listed ty
 | Acid | Water | Smoke | 25% |
 | Acid | Fire / Lava | Smoke | 18% |
 | Acid | Wall / Stone | Smoke | 6% fizz |
-| Fire | Water / Ice / Acid | Smoke or Empty | 35% smoke |
+| Fire | Water / Ice / Acid | Smoke, Steam, or Empty | 15% steam when water; else 35% smoke |
 | Fire | Plant / Oil | Fire | fuel contact suppresses burnout while flame is touching fuel |
 | Fire | — | Smoke | `fire_smokeRate` |
 | Smoke | Ice | Water | 42% |
 | Smoke | Wall | Smoke | linger: `smoke_fadeRate × 0.35`; horizontal drift damped beside wall |
 | Smoke | Stone / Sand | Empty | `smoke_fadeRate + 0.05` |
 | Smoke | — | Empty | `smoke_fadeRate` (default 0.010); drift `smoke_driftRate` (default 0.12) |
+| Steam | Ice | Water | 35% condense |
+| Steam | — | Empty | `smoke_fadeRate × 1.8` |
+| Metal | Acid | Empty | `acid_wallCorrode × 0.25` |
+| Metal | Water | Stone | `metal_rustRate` (default 0.003) |
+| Metal | Fire + lava (2+ heat neighbors) | Fire | `metal_sparkRate` (default 0.10) |
+| Gunpowder | Fire / Lava / chain | Fire or Smoke | ~78–92% ignite; chain through hot neighbors; +`gunpowder_packBoost` when packed; ×`gunpowder_wetIgniteScale` when wet (default 0.20) |
+| Empty | Dense gunpowder + heat | Fire or Smoke | Blast ring beside detonating piles |
+| Gunpowder | Acid | Empty | 18% |
+| Salt | Water | Empty | `salt_dissolveRate` (default **0.035**); ×1.6 with 2 water neighbors, ×2.5 when surrounded |
+| Salt | Acid | Empty | 15% |
+| Salt | — | Water | Density **2** (lighter than water **3**) — grains float and rise through water |
+| Empty | Fire (cardinal) | Ember | `ember_spawnRate` (default **0.004**) |
+| Empty | Dense gunpowder + heat | Ember | 12% in blast ring |
+| Ember | — | Empty | `ember_fadeRate` (default **0.28**) |
+| Wood | Ember (cardinal) | Fire | `ember_igniteWood` (default **0.005**) |
 
 ## Balance limits
 
 - Most reactions are **4-neighbor** and **probabilistic**—no global floods in one frame. Plant ignition also checks **8-neighbors** (diagonal fire).
 - Acid corrosion is per-cell; pooling against walls increases contact rate via `acid_flowRate`, not instant deletion.
-- Fire spreads along plant via `fire_ignitePlant` (default **0.08**, cardinal `×2.5` per-frame roll, instant if two cardinal flame neighbors); oil pools use `fire_igniteOil` / `oil_igniteRate` (defaults **0.045** / **0.07**), with faster spread when two sides touch flame. Fire touching plant or oil burns out more slowly (`fire_smokeRate × 0.35`) so contact persists. Fire and smoke **rise and drift only into empty cells**—they never swap into wall, stone, plant, or ice. Fire has no wall-specific drift or reaction. Walls change only from acid (`acid_wallCorrode`); smoke lingers on wall faces. Water and acid extinguish fire cells.
+- Fire spreads along plant via `fire_ignitePlant` (default **0.08**, cardinal `×2.5` per-frame roll, instant if two cardinal flame neighbors); oil pools use `fire_igniteOil` / `oil_igniteRate` (defaults **0.045** / **0.07**), with faster spread when two sides touch flame. Oil beside ice spreads and falls more slowly (`oil_coldScale`, default **0.40**). Fire touching plant or oil burns out more slowly (`fire_smokeRate × 0.35`) so contact persists. Fire and smoke **rise and drift only into empty cells**—they never swap into wall, stone, plant, ice, glass, wood, or metal. **Ember** (ID 18) spawns from fire-adjacent empty cells and gunpowder blast puffs; fades quickly (`ember_fadeRate`); rarely ignites wood (`ember_igniteWood`). Not paintable from the material ring. **Gunpowder** ignites from fire/lava or chain-heats through neighboring grains; packed piles add `gunpowder_packBoost` (default **0.12**) and can reach near-instant detonation, with blast smoke/fire in adjacent empty cells. Spark particles render on detonation (`source/ui/sim_fx.cpp`). Water neighbors damp ignition via `gunpowder_wetIgniteScale` (default **0.20**). **Sand** next to water falls and slides more slowly (`sand_wetSlideScale`, default **0.40**) and can lithify into stone (`sand_lithifyRate`, default **0.005**). **Wood** smolders in smoke without adjacent flame (`wood_charRate`, default **0.04**). **Metal** rusts in water (`metal_rustRate`, default **0.003**); sparks to fire only with two or more heat neighbors (`metal_sparkRate`, default **0.10**). Ice exposed on top gets a brighter snow-cap tint in Pretty palette mode. Walls change only from acid (`acid_wallCorrode`); smoke lingers on wall faces. Water and acid extinguish fire cells.
 - Lava + water: water often becomes stone; lava becomes smoke—stylized quench, not full thermodynamics.
 
 ## Tuning guide
@@ -93,7 +122,7 @@ Each row is the **cell being updated** when a cardinal neighbor of the listed ty
 | File | Contents |
 |------|----------|
 | `sdmc:/switch/nxsand/physics.json` (desktop: `./nxsand_save/physics.json`) | Element reaction rates |
-| `settings.json` | Performance, palette, bloom, flicker, grain, AO, controls, accessibility |
+| `settings.json` | Performance, `visuals` (palette, bloom, flicker, grain, AO, upscale filter), controls, accessibility. Legacy top-level `render` is merged when `visuals` is absent. Flicker defaults **off** on load if omitted. |
 
 After editing Element Settings, params upload on the next sim frame. Engine settings apply via `App::applyRuntimeSettings()` on load, tab adjust, and shutdown flush. If fire spread on plant or oil still feels slow, raise **Fire → Ignite plant / Ignite oil** or **Oil → Ignite** in Element Settings (existing `physics.json` values override new code defaults until you reset those sliders).
 
@@ -127,5 +156,16 @@ Companion to [NivMiz’s optimization video](https://www.youtube.com/watch?v=Hrr
 | Alternate L/R scan bias | Per-swap `flip` from `rng()` in horizontal rules |
 | 2 simulation steps per frame | `effectiveSubsteps` (1–2); Battery Saver preset uses 1 |
 | Full-grid dispatch | Active-tile row-run scissor/dispatch with full-grid fallback only for large or invalid active regions |
+
+## Reference: EP01_SandSim (study only)
+
+Companion to [Game Engineering EP01](https://github.com/GameEngineering/EP01_SandSim) (CPU sequential scan, gunslinger post-process):
+
+| EP01 | NXSand |
+|------|--------|
+| CPU bottom-up particle scan | GPU Margolus 4-phase `sim.frag` / `sim.comp` |
+| Ember particle + velocity | ID **18** gas, probabilistic fade (spawn-only) |
+| bright filter → blur → composite | `bloom_bright` → `bloom_blur` ×4 → `bloom_composite` |
+| Post-process toggle `b` | Engine → Visuals → Bloom Low |
 
 `sim.comp` uses GLES image load/store on a `GL_R32UI` compute grid and converts material IDs at upload/readback boundaries; no CPU atomics.

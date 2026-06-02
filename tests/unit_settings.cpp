@@ -109,6 +109,56 @@ void run_settings_tests(TestContext& ctx) {
     CHECK(ctx, nx::flushGameSettingsIfDirty(s));
     CHECK(ctx, !nx::gameSettingsDirty());
 
+    s.controls.brushRadius = 22;
+    nx::markGameSettingsDirty();
+    CHECK(ctx, nx::flushGameSettingsIfDirty(s));
+    nx::GameSettings reloaded = nx::defaultGameSettings();
+    CHECK(ctx, nx::loadGameSettings(reloaded));
+    CHECK(ctx, reloaded.controls.brushRadius == 22);
+
+    {
+        CHECK(ctx, nx::atomicWriteFile(path, R"({"version":3,"visuals":{}})"));
+        nx::GameSettings partial = nx::defaultGameSettings();
+        CHECK(ctx, nx::loadGameSettings(partial));
+        CHECK(ctx, partial.visuals.flicker == false);
+        std::filesystem::remove(path, ec);
+    }
+
+    {
+        const std::string renderPath = nx::saveDirectory() + "settings-render.json";
+        std::filesystem::remove(renderPath, ec);
+        CHECK(ctx, nx::atomicWriteFile(
+            renderPath,
+            R"({"version":3,"render":{"flicker":true,"paletteMode":1,"ao":2}})"));
+        std::filesystem::copy_file(renderPath, path, std::filesystem::copy_options::overwrite_existing,
+                                   ec);
+        nx::GameSettings fromRender = nx::defaultGameSettings();
+        CHECK(ctx, nx::loadGameSettings(fromRender));
+        CHECK(ctx, fromRender.visuals.flicker == true);
+        CHECK(ctx, fromRender.visuals.paletteMode == 1);
+        CHECK(ctx, fromRender.visuals.ao == nx::VisualAo::High);
+        std::filesystem::remove(renderPath, ec);
+        std::filesystem::remove(path, ec);
+    }
+
+    {
+        const std::string clampPath = nx::saveDirectory() + "settings-clamp.json";
+        std::filesystem::remove(clampPath, ec);
+        CHECK(ctx, nx::atomicWriteFile(
+            clampPath,
+            R"({"version":3,"visuals":{"paletteMode":99,"ao":9,"bloom":9,"upscaleFilter":99}})"));
+        std::filesystem::copy_file(clampPath, path, std::filesystem::copy_options::overwrite_existing,
+                                   ec);
+        nx::GameSettings clamped = nx::defaultGameSettings();
+        CHECK(ctx, nx::loadGameSettings(clamped));
+        CHECK(ctx, clamped.visuals.paletteMode == 2);
+        CHECK(ctx, clamped.visuals.ao == nx::VisualAo::High);
+        CHECK(ctx, clamped.visuals.bloom == nx::VisualBloom::Low);
+        CHECK(ctx, clamped.visuals.upscaleFilter == nx::UpscaleFilter::Lanczos3);
+        std::filesystem::remove(clampPath, ec);
+        std::filesystem::remove(path, ec);
+    }
+
     std::filesystem::remove_all(path, ec);
     std::filesystem::create_directories(path + "/blocked", ec);
     {

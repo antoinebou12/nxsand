@@ -11,7 +11,7 @@ flowchart LR
     Paint["paint.frag\ndirty-rect brush"]
     Sim["sim.frag or sim.comp\n4 Margolus phases"]
     Pal["palette_lookup.frag"]
-    Glow["glow_extract / glow_blur"]
+    Bloom["bloom_bright / bloom_blur / bloom_composite"]
     UI["ui_quad batched + FontAtlas"]
   end
 
@@ -24,8 +24,8 @@ flowchart LR
   Phys --> Sim
   Save <-->|readGrid / upload| Sim
   Sim --> Pal
-  Sim --> Glow
+  Pal --> Bloom
   Pal --> Present
-  Glow --> Present
+  Bloom --> Present
   App --> UI
   UI --> Present

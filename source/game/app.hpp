@@ -1,5 +1,7 @@
 #pragma once
 #include <SDL2/SDL.h>
+#include <array>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include "gpu/render_pipeline.hpp"
@@ -63,6 +65,7 @@ public:
     void applyRuntimeSettingsLight();
     void applyRuntimeSettingsHeavy();
     void flushPendingHeavySettings();
+    void schedulePendingHeavySettingsFlush();
     void markSettingsHeavyApplyPending() { settingsHeavyApplyPending_ = true; }
 
     bool computeSimSupported() const { return computeSimSupported_; }
@@ -86,15 +89,22 @@ private:
     void renderFrame();
     std::string resolveShaderDir() const;
     void tickPendingSave(double dtSec);
-    void executePendingSave();
+    void tickPendingHeavySettings();
+    void executePendingSave(PendingSaveKind kind);
+    void enqueuePendingSave(PendingSaveKind kind);
+    void beginSaveOverlayFor(PendingSaveKind kind);
+
+    static constexpr size_t kPendingSaveQueueCap = 4;
 
     int lastScreenW_ = 0;
     int lastScreenH_ = 0;
     int playSaveSuppressFrames_ = 0;
 
-    PendingSaveKind pendingSave_ = PendingSaveKind::None;
+    std::array<PendingSaveKind, kPendingSaveQueueCap> pendingSaveQueue_{};
+    size_t pendingSaveCount_ = 0;
     int pendingSlot_ = 1;
     bool settingsHeavyApplyPending_ = false;
+    bool heavyFlushScheduled_ = false;
 
     PerfStats perf_{};
     MenuRepeatState menuRepeat_{};

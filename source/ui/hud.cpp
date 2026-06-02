@@ -23,10 +23,13 @@ struct PaletteLayout {
     float rowSep;
     float r1y;
     float r2y;
+    float r3y;
     float r1SlotW;
     float r2SlotW;
+    float r3SlotW;
     float r1StartX;
     float r2StartX;
+    float r3StartX;
     float chipH;
     float chipInsetY;
 };
@@ -35,8 +38,8 @@ static PaletteLayout getPaletteLayout(int W, int H, float s) {
     PaletteLayout l{};
     l.palH = float(theme::getPaletteH(H));
     l.y0 = float(H) - l.palH;
-    l.rowSep = 10.f * s;
-    l.rowH = (l.palH - l.rowSep) * 0.5f;
+    l.rowSep = 8.f * s;
+    l.rowH = (l.palH - l.rowSep * 2.f) / 3.f;
     // Switch: keep palette chips away from the bezel / TV overscan band.
 #if defined(__SWITCH__)
     float edgePad = 36.f * s;
@@ -50,6 +53,9 @@ static PaletteLayout getPaletteLayout(int W, int H, float s) {
     l.r2SlotW = r2Total / float(HUD_PALETTE_ROW2.size());
     l.r2StartX = (float(W) - l.r2SlotW * float(HUD_PALETTE_ROW2.size())) * 0.5f;
     l.r2y = l.y0 + l.rowH + l.rowSep;
+    l.r3SlotW = float(W) * 0.22f;
+    l.r3StartX = (float(W) - l.r3SlotW * float(HUD_PALETTE_ROW3.size())) * 0.5f;
+    l.r3y = l.y0 + (l.rowH + l.rowSep) * 2.f;
     l.chipH = std::min(l.rowH - 14.f * s, 44.f * s);
     l.chipInsetY = std::max(6.f * s, (l.rowH - l.chipH) * 0.5f);
     return l;
@@ -158,6 +164,9 @@ void drawHudSolid(RenderPipeline& r, App& app, const PlayRegion& pr) {
                        app.sim.brush_mat, HUD_PALETTE_ROW1, s, W, H);
         drawPaletteRow(r, app.font, l.r2y, l.rowH, r2ChipY, l.chipH, l.r2StartX, l.r2SlotW, padX,
                        app.sim.brush_mat, HUD_PALETTE_ROW2, s, W, H);
+        float r3ChipY = l.r3y + l.chipInsetY;
+        drawPaletteRow(r, app.font, l.r3y, l.rowH, r3ChipY, l.chipH, l.r3StartX, l.r3SlotW, padX,
+                       app.sim.brush_mat, HUD_PALETTE_ROW3, s, W, H);
     }
 
     const float cellW = float(pr.w) / float(std::max(1, app.sim.grid_w));

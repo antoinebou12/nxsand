@@ -53,7 +53,7 @@ Substep detail: [`diagrams/sim-margolus-step.svg`](diagrams/sim-margolus-step.sv
 
 ## GPU presentation
 
-After sim sampling, `RenderPipeline::drawSimulation` presents the sim: by default `palette_lookup.frag` draws directly into the play region (nearest upscale). When **Engine → Visuals → Upscale filter** is not `nearest`, pass A renders palette at sim resolution into `lookTex`, then `upscale.frag` filters into the play region (tent, mitchell, catmullrom, lanczos3). Optional glow passes still read the sim R8UI texture. UI draws batched quads and the FreeType atlas on top (HUD, material wheel, menus, perf overlay).
+After sim sampling, `RenderPipeline::drawSimulation` presents the sim: by default `palette_lookup.frag` draws directly into the play region (nearest upscale). When **Engine → Visuals → Upscale filter** is not `nearest`, or **Bloom** is Low, palette renders at sim resolution into `lookTex`. With bloom, `bloom_bright.frag` (sim/8) → `bloom_blur.frag` (four passes at sim/16) → `bloom_composite.frag` (exposure/gamma/saturation) into `postTex`, then `upscale.frag` (or nearest blit) into the play region. Without bloom but with a non-nearest upscale filter, `upscale.frag` filters `lookTex` directly. UI draws batched quads and the FreeType atlas on top (HUD, material wheel, menus, perf overlay).
 
 Brush coordinate path: screen → `PlayRegion` → grid, using the same drawable size as layout. See [`diagrams/brush-input-flow.svg`](diagrams/brush-input-flow.svg).
 
@@ -65,8 +65,10 @@ Sequence: [`diagrams/save-load-flow.svg`](diagrams/save-load-flow.svg).
 
 Settings split:
 
-- `settings.json` — engine, display, performance, visuals (via `settings_io.cpp`)
+- `settings.json` — engine, display, performance, `visuals` (palette mode, AO, bloom, flicker, grain, upscale filter), controls, accessibility, debug (`settings_io.cpp`). On load, missing `visuals.flicker` defaults to off; enum fields are clamped; legacy `render` object is read if `visuals` is absent.
 - `physics.json` — per-element tunables (Element Settings)
+
+Playable materials (17 brush IDs + spawn-only ember): sand, water, fire, smoke, wall, acid, plant, lava, stone, oil, ice, steam, glass, wood, metal, gunpowder, salt — see [`PHYSICS.md`](PHYSICS.md) and [`diagrams/material-reactions.svg`](diagrams/material-reactions.svg).
 
 ## Core types (simplified)
 

@@ -13,6 +13,7 @@
 #include "ui/hud.hpp"
 #include "ui/layout.hpp"
 #include "ui/menu_fx.hpp"
+#include "ui/sim_fx.hpp"
 #include "ui/perf_overlay.hpp"
 #include "ui/boot_screen.hpp"
 #include "platform/screen_size.hpp"
@@ -476,7 +477,7 @@ bool App::setSimGridSize(int w, int h, bool preserveContent) {
     sim.brush_x = std::clamp(sim.brush_x, 0, w - 1);
     sim.brush_y = std::clamp(sim.brush_y, 0, h - 1);
 
-    if (render) render->releaseGlowTargets();
+    if (render) render->releaseBloomTargets();
 
     simPipeline->shutdown();
     if (!initSimPipeline(w, h)) {
@@ -519,10 +520,46 @@ void App::shutdown() {
 void App::onEnterPlayFromMenu() {
     flushPendingHeavySettings();
     playSaveSuppressFrames_ = kPlaySaveSuppressFrames;
+    resetSimExplosionFx();
 }
 
-void App::executePendingSave() {
-    switch (pendingSave_) {
+void App::beginSaveOverlayFor(PendingSaveKind kind) {
+#if !defined(__SWITCH__)
+    if (kind == PendingSaveKind::Slot)
+        saveOverlay.begin("Saving...");
+    else if (kind == PendingSaveKind::GameSettings || kind == PendingSaveKind::PhysicsSettings)
+        saveOverlay.begin("Saving settings...");
+#else
+    (void)kind;
+#endif
+}
+
+void App::enqueuePendingSave(PendingSaveKind kind) {
+    if (kind == PendingSaveKind::None) return;
+    for (size_t i = 0; i < pendingSaveCount_; ++i) {
+        if (pendingSaveQueue_[i] == kind) return;
+    }
+    if (pendingSaveCount_ >= kPendingSaveQueueCap) return;
+    const bool wasEmpty = pendingSaveCount_ == 0;
+    pendingSaveQueue_[pendingSaveCount_++] = kind;
+    if (wasEmpty) beginSaveOverlayFor(kind);
+}
+
+void App::schedulePendingHeavySettingsFlush() {
+    if (settingsHeavyApplyPending_) heavyFlushScheduled_ = true;
+}
+
+void App::tickPendingHeavySettings() {
+    if (!heavyFlushScheduled_) return;
+    heavyFlushScheduled_ = false;
+#if !defined(__SWITCH__)
+    if (settingsHeavyApplyPending_) toast.show("Applying sim changes...", 1.2f);
+#endif
+    flushPendingHeavySettings();
+}
+
+void App::executePendingSave(PendingSaveKind kind) {
+    switch (kind) {
         case PendingSaveKind::Slot: {
             const bool ok = saveGame(*this, pendingSlot_);
             if (pendingSlot_ == 1)
@@ -550,18 +587,22 @@ void App::executePendingSave() {
 }
 
 void App::tickPendingSave(double dtSec) {
-    if (pendingSave_ == PendingSaveKind::None) return;
+    if (pendingSaveCount_ == 0) return;
 #if !defined(__SWITCH__)
+    if (!saveOverlay.active()) beginSaveOverlayFor(pendingSaveQueue_[0]);
     saveOverlay.tick(static_cast<float>(dtSec));
     if (!saveOverlay.readyForIo()) return;
 #else
     (void)dtSec;
 #endif
-    executePendingSave();
+    const PendingSaveKind kind = pendingSaveQueue_[0];
+    executePendingSave(kind);
+    for (size_t i = 1; i < pendingSaveCount_; ++i)
+        pendingSaveQueue_[i - 1] = pendingSaveQueue_[i];
+    --pendingSaveCount_;
 #if !defined(__SWITCH__)
     saveOverlay.end();
 #endif
-    pendingSave_ = PendingSaveKind::None;
 }
 
 void App::requestSlotSave(int slot, bool fromQuickSave) {
@@ -574,28 +615,19 @@ void App::requestSlotSave(int slot, bool fromQuickSave) {
         toast.show(ok ? "Saved" : "Save failed", ok ? 1.2f : 1.5f);
     return;
 #endif
-    if (pendingSave_ != PendingSaveKind::None) return;
-    pendingSave_ = PendingSaveKind::Slot;
+    if (pendingSaveCount_ > 0) return;
     pendingSlot_ = slot;
-    saveOverlay.begin("Saving...");
+    enqueuePendingSave(PendingSaveKind::Slot);
 }
 
 void App::requestFlushGameSettings() {
     if (!gameSettingsDirty()) return;
-    if (pendingSave_ != PendingSaveKind::None) return;
-    pendingSave_ = PendingSaveKind::GameSettings;
-#if !defined(__SWITCH__)
-    saveOverlay.begin("Saving settings...");
-#endif
+    enqueuePendingSave(PendingSaveKind::GameSettings);
 }
 
 void App::requestFlushPhysicsSettings() {
     if (!physicsParamsDirty()) return;
-    if (pendingSave_ != PendingSaveKind::None) return;
-    pendingSave_ = PendingSaveKind::PhysicsSettings;
-#if !defined(__SWITCH__)
-    saveOverlay.begin("Saving settings...");
-#endif
+    enqueuePendingSave(PendingSaveKind::PhysicsSettings);
 }
 
 void App::tickMenu(double dtSec) {
@@ -620,7 +652,7 @@ void App::tickMenu(double dtSec) {
     if (input.menuBack) {
         if (menu.screen == MenuScreen::SettingsEdit) requestFlushPhysicsSettings();
         if (menu.screen == MenuScreen::EngineSettingsTab) {
-            flushPendingHeavySettings();
+            schedulePendingHeavySettingsFlush();
             requestFlushGameSettings();
         }
         menu.goBack(*this);
@@ -751,6 +783,7 @@ void App::tickPlay(double dtSec) {
             sim.brush_radius = std::clamp(sim.brush_radius, 1, 64);
             settings.controls.brushRadius = sim.brush_radius;
             markGameSettingsDirty();
+            requestFlushGameSettings();
             char radiusMsg[32];
             std::snprintf(radiusMsg, sizeof(radiusMsg), "Brush radius %d", sim.brush_radius);
             toast.show(radiusMsg, 0.55f);
@@ -761,6 +794,7 @@ void App::tickPlay(double dtSec) {
             simPipeline->clearAll(MAT_EMPTY);
             sim.gridHasMatter = false;
             sim.sleeping = false;
+            resetSimExplosionFx();
             toast.show("Cleared", 1.0f);
             input.clearSandbox = false;
         }
@@ -781,6 +815,14 @@ void App::tickPlay(double dtSec) {
             int pdw = 0, pdh = 0;
             emitBrushStroke(*simPipeline, prevX, prevY, sim.brush_x, sim.brush_y, sim.brush_radius,
                             sim.brush_mat, input.erasing, cmdCount, pdw, pdh);
+            {
+                const int pad = sim.brush_radius + 8;
+                const int bx0 = std::max(0, std::min(prevX, sim.brush_x) - pad);
+                const int by0 = std::max(0, std::min(prevY, sim.brush_y) - pad);
+                const int bx1 = std::min(sim.grid_w - 1, std::max(prevX, sim.brush_x) + pad);
+                const int by1 = std::min(sim.grid_h - 1, std::max(prevY, sim.brush_y) + pad);
+                notifySimExplosionWatch(bx0, by0, bx1, by1);
+            }
             perf_.brushCommandCount += cmdCount;
             perf_.paintDirtyW = std::max(perf_.paintDirtyW, pdw);
             perf_.paintDirtyH = std::max(perf_.paintDirtyH, pdh);
@@ -843,6 +885,21 @@ void App::tickPlay(double dtSec) {
         if (settings.performance.activeTiles != ActiveTileMode::Off) {
             simPipeline->activeTiles.tickOptimizer(settings.performance.activeTiles);
         }
+
+        const bool profilerOn = settings.debug.profilerHud != ProfilerHud::Off;
+        const PlayRegion fxPr =
+            getPlayRegionForScene(screenW, screenH, sim.grid_w, sim.grid_h,
+                                  settings.display.fullscreenSim, !sim.paletteHidden, false,
+                                  profilerOn);
+        expandSimExplosionWatch(sim.grid_w, sim.grid_h, 4);
+        int ax0 = 0;
+        int ay0 = 0;
+        int ax1 = -1;
+        int ay1 = -1;
+        if (simPipeline->activeTiles.activeBounds(ax0, ay0, ax1, ay1, 1)) {
+            notifySimExplosionWatch(ax0, ay0, ax1, ay1);
+        }
+        tickSimExplosionFx(*simPipeline, fxPr, sim.grid_w, sim.grid_h, sim.tick);
     }
 
     bool canEnterIdleSleep = false;
@@ -886,10 +943,7 @@ void App::renderFrame() {
         if (simPipeline) simPipeline->syncSimForSampling();
         render->drawSimulation(simPipeline->readTexture(), sim.grid_w, sim.grid_h, pr, screenH,
                                sim.tick, perf_.simMs);
-        if (render->bloomEnabled()) {
-            render->drawGlow(simPipeline->readTexture(), sim.grid_w, sim.grid_h, pr, screenW,
-                             screenH, sim.tick);
-        }
+        drawSimExplosionFx(*render, pr, sim.grid_w, sim.grid_h, screenW, screenH);
         perf_.endWorldRender();
 
         perf_.beginUi();
@@ -920,6 +974,7 @@ void App::renderFrame() {
 void App::frame(double dtSec) {
     perf_.beginFrame();
     tickPendingSave(dtSec);
+    tickPendingHeavySettings();
     if (window) queryDrawableSize(window, screenW, screenH, settings.display.orientation);
     if (screenW > 0 && screenH > 0 &&
         (screenW != lastScreenW_ || screenH != lastScreenH_)) {

@@ -40,8 +40,11 @@ public:
     UpscaleFilter upscaleFilter_ = UpscaleFilter::Nearest;
     bool blobEnabled_ = true;
     VisualBloom bloom_ = VisualBloom::Off;
-    int glowBlurPasses_ = 4;
-    float glowCompositeAlpha_ = 0.55f;
+    int bloomBlurPasses_ = 4;
+    float bloomScalar_ = 1.0f;
+    float bloomExposure_ = 0.5f;
+    float bloomGamma_ = 2.2f;
+    float bloomSaturation_ = 2.0f;
     bool flickerEnabled_ = true;
     bool grainEnabled_ = false;
     float aoStrength_ = 0.04f;
@@ -72,7 +75,7 @@ public:
     void setFlickerEnabled(bool on) { flickerEnabled_ = on; }
     void setGrainEnabled(bool on) { grainEnabled_ = on; }
     void setAoStrength(float v) { aoStrength_ = v; }
-    void releaseGlowTargets();
+    void releaseBloomTargets();
 
     // Solid / textured UI quads in pixel space (screen W/H).
     void drawSolidRect(float x, float y, float w, float h, float r, float g, float b, float a,
@@ -85,10 +88,6 @@ public:
     void drawAlphaMaskRect(float x, float y, float w, float h, float u0, float v0, float u1, float v1,
                            float r, float g, float b, float a, int screenW, int screenH, GLuint tex);
 
-    // Additive glow composite over play region (samples sim R32UI).
-    void drawGlow(GLuint simR8UI, int simW, int simH, const PlayRegion& pr, int screenW,
-                  int screenH, uint32_t frame);
-
     void beginUiFrame();
     void endUiFrame();
 
@@ -99,10 +98,12 @@ private:
                     float r, float g, float b, float a, int screenW, int screenH, GLuint texture,
                     int mode);
     void flushUiBatch();
-    void ensureGlowTargets(int simW, int simH);
+    void ensureBloomTargets(int simW, int simH);
     void ensureLookTargets(int simW, int simH);
     void releaseLookTargets();
     void drawPalettePass(GLuint simR8UI, int simW, int simH, uint32_t frame, int mode);
+    void runBloomPipeline();
+    void blitPostToPlayRegion(const PlayRegion& pr, int screenH, int simW, int simH, bool filtered);
 
     struct UiVertex {
         float x, y, u, v;
@@ -115,11 +116,39 @@ private:
     int uiBatchScreenW_ = 0;
     int uiBatchScreenH_ = 0;
 
-    ShaderProgram glowExtractShader;
-    ShaderProgram glowBlurShader;
-    GLuint glowFbo[2] = {0, 0};
-    GLuint glowTex[2] = {0, 0};
-    int glowW = 0, glowH = 0;
+    ShaderProgram bloomBrightShader;
+    ShaderProgram bloomBlurShader;
+    ShaderProgram bloomCompositeShader;
+
+    GLint bright_uTex = -1;
+    GLint blur_uTex = -1;
+    GLint blur_uTexSize = -1;
+    GLint blur_uDir = -1;
+    GLint comp_uTex = -1;
+    GLint comp_uBlurTex = -1;
+    GLint comp_uBloomScalar = -1;
+    GLint comp_uExposure = -1;
+    GLint comp_uGamma = -1;
+    GLint comp_uSaturation = -1;
+
+    GLuint brightFbo = 0;
+    GLuint brightTex = 0;
+    int brightW = 0;
+    int brightH = 0;
+
+    GLuint blurFbo[2] = {0, 0};
+    GLuint blurTex[2] = {0, 0};
+    int blurW = 0;
+    int blurH = 0;
+
+    GLuint postFbo = 0;
+    GLuint postTex = 0;
+    int postW = 0;
+    int postH = 0;
+
+    int bloomSimW = 0;
+    int bloomSimH = 0;
+
     GLuint lookFbo = 0;
     GLuint lookTex = 0;
     int lookW = 0;
