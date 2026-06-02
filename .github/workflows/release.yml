@@ -113,15 +113,10 @@ jobs:
         run: bash scripts/build-desktop-msys.sh
 
       - name: Package Windows zip
-        shell: pwsh
-        env:
-          MSYSTEM: MINGW64
         run: |
-          $msys = "$env:RUNNER_TEMP/setup-msys2/msys64"
-          if (-not (Test-Path $msys)) { $msys = "C:\msys64" }
-          $env:PATH = "$msys\mingw64\bin;$msys\usr\bin;" + $env:PATH
-          $env:MINGW_PREFIX = "$msys\mingw64"
-          python scripts/package-release.py windows --tag "${{ env.RELEASE_TAG }}"
+          export PATH="/mingw64/bin:/usr/bin:$PATH"
+          export MINGW_PREFIX="/mingw64"
+          python3 scripts/package-release.py windows --tag "${{ env.RELEASE_TAG }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -139,14 +134,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
-        if: ${{ !env.ACT }}
+        if: ${{ env.ACT != 'true' }}
         with:
           path: dist/release
           pattern: release-*
           merge-multiple: true
 
       - name: List release artifacts
-        if: ${{ !env.ACT }}
+        if: ${{ env.ACT != 'true' }}
         run: ls -la dist/release/
 
       - name: Skip publish under act
@@ -154,7 +149,7 @@ jobs:
         run: echo "act local run — publish skipped"
 
       - name: Publish GitHub release
-        if: ${{ !env.ACT }}
+        if: ${{ env.ACT != 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag }}

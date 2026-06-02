@@ -199,6 +199,19 @@ def gather_windows_dlls(exe: Path, dest: Path) -> None:
     queue = [exe]
     seen: set[str] = set()
 
+    for dll_name in REQUIRED_WINDOWS_DLLS:
+        if (dest / dll_name).is_file():
+            seen.add(dll_name)
+            queue.append(dest / dll_name)
+            continue
+        for directory in search_dirs:
+            candidate = directory / dll_name
+            if candidate.is_file():
+                shutil.copy2(candidate, dest / dll_name)
+                seen.add(dll_name)
+                queue.append(dest / dll_name)
+                break
+
     while queue:
         target = queue.pop()
         try:
