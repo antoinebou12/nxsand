@@ -8,6 +8,14 @@
 
 The simulation runs on the GPU (OpenGL ES 3.0): a Margolus cellular automaton on ping-pong `GL_R8UI` textures, four fragment passes per step, dirty-rect painting, and a custom OpenGL UI (no ImGui). Desktop builds exist for faster iteration; the Switch `.nro` is the primary target.
 
+## Showcase
+
+Gameplay on Nintendo Switch (materials, reactions, save slots):
+
+<video src="docs/media/nxsand-showcase.mp4" controls width="100%">
+  <a href="docs/media/nxsand-showcase.mp4">Download gameplay video</a>
+</video>
+
 ## Materials & play
 
 Seventeen brush materials (IDs 1–17) plus spawn-only **Ember** (ID 18; not in the ring). ID 0 = empty — see [docs/PHYSICS.md](docs/PHYSICS.md):
