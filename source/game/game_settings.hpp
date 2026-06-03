@@ -32,6 +32,7 @@ enum class UpscaleFilter : int {
     Count = 5,
 };
 enum class RumbleLevel : int { Off = 0, Low = 1, Medium = 2, High = 3 };
+enum class SoundLevel : int { Off = 0, Low = 1, Medium = 2, High = 3 };
 enum class ActiveTileMode : int { Off = 0, Conservative = 1, Aggressive = 2 };
 
 /// Main-menu presentation (Load/Save use the same chrome as the main menu).
@@ -71,6 +72,7 @@ struct ControlSettings {
     float deadzone = 0.18f;
     bool invertY = false;
     RumbleLevel rumble = RumbleLevel::Medium;
+    SoundLevel sound = SoundLevel::Medium;
 };
 
 struct AccessibilitySettings {

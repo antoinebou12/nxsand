@@ -25,6 +25,8 @@ constexpr int PT_GLAS = 52;
 constexpr int PT_WOOD = 191;
 constexpr int PT_STEM = 63;
 constexpr int PT_GUNP = 62;
+constexpr int PT_TNT  = 8;
+constexpr int PT_COAL = 27;
 constexpr int PT_SALT = 95;
 
 inline Material mapTptType(int tptType) {
@@ -53,6 +55,10 @@ inline Material mapTptType(int tptType) {
             return MAT_METAL;
         case PT_GUNP:
             return MAT_GUNPOWDER;
+        case PT_TNT:
+            return MAT_TNT;
+        case PT_COAL:
+            return MAT_COAL;
         case PT_SALT:
             return MAT_SALT;
         case PT_ICEI:

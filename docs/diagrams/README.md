@@ -4,7 +4,7 @@ Editable sources and committed SVG renders for NXSand architecture and game logi
 
 ## Regenerate (uml-mcp / Kroki)
 
-From the repo root, use the Cursor **uml-mcp** `generate_uml` tool (or Kroki / Mermaid Live / PlantUML locally). Pass `output_dir` as `docs/diagrams` and rename outputs to match the **SVG** column below. Mermaid sources use `diagram_type: mermaid`; PlantUML sources use `diagram_type: plantuml`.
+Regenerate with **uml-mcp** `generate_uml` (diagram_type `mermaid`) or `python scripts/regenerate-diagrams.py` (Kroki; may 403 on some networks). Pass `output_dir` as `docs/diagrams` and match **SVG** names in the table below.
 
 ## Catalog
 
@@ -19,7 +19,9 @@ From the repo root, use the Cursor **uml-mcp** `generate_uml` tool (or Kroki / M
 | Core C++ types | `core-runtime-classes.puml` | `core-runtime-classes.svg` |
 | One sim substep (4 phases) | `sim-margolus-step.mmd` | `sim-margolus-step.svg` |
 | Brush input → GPU stamp | `brush-input-flow.mmd` | `brush-input-flow.svg` |
-| Material reaction graph (16 mats) | `material-reactions.mmd` | `material-reactions.svg` |
+| Docs home overview | `home-overview.mmd` | `home-overview.svg` |
+| Material reactions (overview) | `material-reactions-overview.mmd` | `material-reactions-overview.svg` |
+| Material reactions (full graph) | `material-reactions.mmd` | `material-reactions.svg` |
 | Lava + water quench | `reaction-lava-water-quench.puml` | `reaction-lava-water-quench.svg` |
 
 Narrative docs: [`../ARCHITECTURE.md`](../ARCHITECTURE.md), [`../DIAGRAMS.md`](../DIAGRAMS.md), [`../PHYSICS.md`](../PHYSICS.md).

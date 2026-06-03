@@ -69,6 +69,7 @@ bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend ba
     const std::string paintPath = shaderDir + "/paint.frag";
 
     if (backend_ == SimBackend::Compute) {
+        setShaderCompileStage("Compiling sim.comp…");
         if (!computeShader.loadComputeFromFile(compPath)) {
             const char* diag = lastShaderDiagnostics();
             setShaderDiagnostics(diag && diag[0] ? std::string("sim.comp: ") + diag
@@ -89,6 +90,7 @@ bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend ba
         }
         glUniformBlockBinding(computeShader.program, physicsBlockIndex, kPhysicsUboBinding);
     } else {
+        setShaderCompileStage("Compiling sim.frag…");
         if (!simShader.loadFromFiles(vertPath, simPath)) {
             const char* diag = lastShaderDiagnostics();
             setShaderDiagnostics(diag && diag[0] ? std::string("sim.frag: ") + diag
@@ -109,6 +111,7 @@ bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend ba
         glUniformBlockBinding(simShader.program, physicsBlockIndex, kPhysicsUboBinding);
     }
 
+    setShaderCompileStage("Compiling paint.frag…");
     if (!paintShader.loadFromFiles(vertPath, paintPath)) {
         const char* diag = lastShaderDiagnostics();
         setShaderDiagnostics(diag && diag[0] ? std::string("paint.frag: ") + diag : "paint.frag load failed");

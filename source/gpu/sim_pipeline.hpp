@@ -50,6 +50,10 @@ public:
     int lastActiveTileCount() const { return lastActiveTileCount_; }
     ActiveTileMode lastActiveTileMode() const { return lastActiveTileMode_; }
     SimBackend backend() const { return backend_; }
+    bool ready() const {
+        return gw > 0 && gh > 0 &&
+               (simShader.program != 0 || computeShader.program != 0);
+    }
 
     GLuint readTexture() const { return tex[cur]; }
 

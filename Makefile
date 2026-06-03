@@ -21,6 +21,7 @@ DESKTOP_LDFLAGS  :=
 DESKTOP_LIBS     := $(shell pkg-config --libs sdl2 glesv2 freetype2 2>/dev/null || echo "-lSDL2 -lGLESv2 -lfreetype")
 
 DESKTOP_SRCS := $(wildcard source/platform/*.cpp) \
+                $(wildcard source/platform/audio/*.cpp) \
                 $(wildcard source/platform/input/*.cpp) \
                 $(wildcard source/game/*.cpp) \
                 $(wildcard source/gpu/*.cpp) \
@@ -66,9 +67,11 @@ GPU_UNIT_SRCS     := tests/gpu_unit_main.cpp \
                      source/gpu/sim_pipeline.cpp \
                      source/gpu/sim_backend.cpp \
                      source/gpu/shader_program.cpp \
-                     source/gpu/gl_loader.cpp
+                     source/gpu/shader_cache.cpp \
+                     source/gpu/gl_loader.cpp \
+                     source/save/save_paths.cpp
 
-.PHONY: desktop test test-gpu golden clean help dist
+.PHONY: desktop test test-gpu golden clean help dist nsp
 desktop:
 	@mkdir -p build
 	$(DESKTOP_CXX) $(DESKTOP_CXXFLAGS) $(DESKTOP_SRCS) $(DESKTOP_GLAD_C) -o build/NXSand $(DESKTOP_LDFLAGS) $(DESKTOP_LIBS)
@@ -104,6 +107,7 @@ help:
 	@echo "                    Requires devkitPro shell: (dkp-)pacman -S switch-dev switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz"
 	@echo "                    On Windows: scripts/build-native.ps1; FTP deploy: scripts/serve-nro-ftp.ps1"
 	@echo "  make dist      -> copy build/NXSand.nro to dist/switch/ (after Switch make)"
+	@echo "  make nsp       -> dist/switch/NXSand.nsp forwarder (pip install nton; prod.keys required)"
 	@echo "  make clean     -> remove build/, dist/, and legacy root artifacts"
 else
 
@@ -113,7 +117,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 
 TARGET      := NXSand
 BUILD       := build
-SOURCES     := source/game source/gpu source/sim source/ui source/platform source/platform/input source/save
+SOURCES     := source/game source/gpu source/sim source/ui source/platform source/platform/audio source/platform/input source/save
 INCLUDES    := source third_party
 ROMFS       := romfs
 
@@ -219,6 +223,10 @@ dist:
 	@test -f build/NXSand.nro || (echo "dist: missing build/NXSand.nro (run make first)" >&2; exit 1)
 	@cp -f build/NXSand.nro dist/switch/NXSand.nro
 	@echo "Staged: dist/switch/NXSand.nro"
+
+# NSP forwarder via scripts/export-nsp.py (NTON + prod.keys; optional in CI).
+nsp: dist
+	@python3 scripts/export-nsp.py
 
 clean:
 	@rm -rf build dist

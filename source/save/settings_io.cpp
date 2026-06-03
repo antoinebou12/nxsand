@@ -106,6 +106,8 @@ bool loadGameSettings(GameSettings& out) {
             out.controls.invertY = readBool(c, "invertY", false);
             out.controls.rumble = static_cast<RumbleLevel>(
                 readEnumInt(c, "rumble", static_cast<int>(RumbleLevel::Medium)));
+            out.controls.sound = static_cast<SoundLevel>(
+                readEnumInt(c, "sound", static_cast<int>(SoundLevel::Medium)));
         }
 
         if (j.contains("accessibility") && j["accessibility"].is_object()) {
@@ -168,6 +170,7 @@ bool saveGameSettings(const GameSettings& s) {
     j["controls"]["deadzone"] = s.controls.deadzone;
     j["controls"]["invertY"] = s.controls.invertY;
     j["controls"]["rumble"] = static_cast<int>(s.controls.rumble);
+    j["controls"]["sound"] = static_cast<int>(s.controls.sound);
 
     j["accessibility"]["uiScale"] = s.accessibility.uiScale;
     j["accessibility"]["reduceFlashing"] = s.accessibility.reduceFlashing;

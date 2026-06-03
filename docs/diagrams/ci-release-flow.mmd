@@ -1,23 +1,49 @@
-%% CI and release artifact flow (regenerate: docs/DIAGRAMS.md)
+%% CI and release artifact flow
+%%{init: {'theme': 'dark', 'themeVariables': {'fontSize': '14px', 'primaryColor': '#1a2438', 'primaryTextColor': '#e6eef4', 'primaryBorderColor': '#4dc9c4', 'lineColor': '#95a0ae'}}}%%
 flowchart TB
-  subgraph Build["Build targets"]
-    SW["make → NXSand.nro"]
-    LIN["make desktop → NXSand"]
-    WIN["MSYS2 + ANGLE → NXSand.exe"]
+  subgraph DEV["Developer"]
+    SRC["git push / workflow_dispatch"]
   end
-  subgraph CI["GitHub Actions"]
-    NRO["native-nro.yml"]
-    REL["release.yml"]
+
+  subgraph GHA["GitHub Actions"]
+    direction TB
+    TST["unit-tests\nmake test"]
+    NRO["native-nro.yml\nSwitch + Linux + Windows sanity"]
+    REL["release.yml\npackage-release.py"]
+    TST --> NRO
+    TST --> REL
   end
-  subgraph Artifacts["Downloads"]
-    Z1["NXSand-switch.zip"]
-    Z2["NXSand-linux.zip"]
-    Z3["NXSand-windows.zip"]
+
+  subgraph BUILD["Build outputs"]
+    direction LR
+    SW["NXSand.nro\ndevkitPro container"]
+    LIN["NXSand\nMesa desktop"]
+    WIN["NXSand.exe\nMSYS2 + ANGLE + DLLs"]
   end
-  NRO --> SW
+
+  subgraph ZIP["Portable zips"]
+    direction LR
+    Z1["NXSand-switch-v*.zip\n.nro + optional .nsp"]
+    Z2["NXSand-linux-v*.zip"]
+    Z3["NXSand-windows-v*.zip"]
+  end
+
+  subgraph NSP["NSP forwarder (optional)"]
+    EXP["export-nsp.py\nNTON + SWITCH_PROD_KEYS"]
+  end
+
+  GH["GitHub Releases\n+ CI artifacts"]
+
+  SRC --> GHA
   REL --> SW
   REL --> LIN
   REL --> WIN
+  NRO --> SW
+  SW --> EXP
+  EXP --> Z1
   SW --> Z1
   LIN --> Z2
   WIN --> Z3
+  Z1 --> GH
+  Z2 --> GH
+  Z3 --> GH

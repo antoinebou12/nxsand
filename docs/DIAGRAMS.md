@@ -15,7 +15,9 @@ NXSand keeps editable diagram sources under `docs/diagrams/` beside committed SV
 | Core classes | `diagrams/core-runtime-classes.puml` | `App`, `SimPipeline`, `RenderPipeline` |
 | Sim substep | `diagrams/sim-margolus-step.mmd` | Four Margolus phases, active tiles |
 | Brush path | `diagrams/brush-input-flow.mmd` | Input → `paint.frag` → `step` |
-| Material reactions | `diagrams/material-reactions.mmd` | 17 materials — shader interaction overview (steam/glass/wood, metal, gunpowder, salt) |
+| Docs home overview | `diagrams/home-overview.mmd` | Switch → GPU sim → materials |
+| Material reactions (overview) | `diagrams/material-reactions-overview.mmd` | Grouped overview for docs home |
+| Material reactions (full) | `diagrams/material-reactions.mmd` | All shader interaction edges |
 | Lava/water quench | `diagrams/reaction-lava-water-quench.puml` | Specific quench branch in sim |
 
 ## Runtime path (summary)

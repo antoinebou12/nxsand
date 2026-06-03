@@ -39,6 +39,7 @@ bool loadPhysicsParams(PhysicsParams& out) {
         g("acid_stoneCorrode", out.acid_stoneCorrode);
         g("plant_growthRate", out.plant_growthRate);
         g("plant_wallSupport", out.plant_wallSupport);
+        g("plant_bloomRate", out.plant_bloomRate);
         g("lava_flowRate", out.lava_flowRate);
         g("lava_spreadRate", out.lava_spreadRate);
         g("lava_igniteGas", out.lava_igniteGas);
@@ -56,6 +57,10 @@ bool loadPhysicsParams(PhysicsParams& out) {
         g("wood_charRate", out.wood_charRate);
         g("ember_igniteWood", out.ember_igniteWood);
         g("salt_dissolveRate", out.salt_dissolveRate);
+        g("coal_burnRate", out.coal_burnRate);
+        g("tnt_detonateRate", out.tnt_detonateRate);
+        g("brick_slideScale", out.brick_slideScale);
+        g("brick_cohesionScale", out.brick_cohesionScale);
         g_dirty = false;
         return true;
     } catch (const std::exception&) {
@@ -83,6 +88,7 @@ bool savePhysicsParams(const PhysicsParams& p) {
     j["acid_stoneCorrode"] = p.acid_stoneCorrode;
     j["plant_growthRate"] = p.plant_growthRate;
     j["plant_wallSupport"] = p.plant_wallSupport;
+    j["plant_bloomRate"] = p.plant_bloomRate;
     j["lava_flowRate"] = p.lava_flowRate;
     j["lava_spreadRate"] = p.lava_spreadRate;
     j["lava_igniteGas"] = p.lava_igniteGas;
@@ -100,6 +106,10 @@ bool savePhysicsParams(const PhysicsParams& p) {
     j["wood_charRate"] = p.wood_charRate;
     j["ember_igniteWood"] = p.ember_igniteWood;
     j["salt_dissolveRate"] = p.salt_dissolveRate;
+    j["coal_burnRate"] = p.coal_burnRate;
+    j["tnt_detonateRate"] = p.tnt_detonateRate;
+    j["brick_slideScale"] = p.brick_slideScale;
+    j["brick_cohesionScale"] = p.brick_cohesionScale;
 
     if (!atomicWriteFile(physicsPath(), j.dump())) return false;
     g_dirty = false;

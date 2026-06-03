@@ -1,0 +1,24 @@
+%% NXSand docs home — high-level player + runtime view
+%%{init: {'theme': 'dark', 'themeVariables': {'fontSize': '15px', 'primaryColor': '#142030', 'primaryTextColor': '#e6eef4', 'primaryBorderColor': '#4dc9c4', 'lineColor': '#4dc9c4', 'secondaryColor': '#0e141c'}}}%%
+flowchart LR
+  subgraph PLAY["Play on Switch"]
+    HB["Homebrew Menu"]
+    NRO["NXSand.nro"]
+    SD["sdmc:/switch/nxsand/\nsaves · settings"]
+    HB --> NRO --> SD
+  end
+
+  subgraph SIM["GPU simulation"]
+    direction TB
+    BR["Brush paint.frag"]
+    CA["4× Margolus\nsim.frag / sim.comp"]
+    REN["palette + bloom + UI"]
+    BR --> CA --> REN
+  end
+
+  subgraph MAT["17 materials + Ember"]
+    IDS["GL_R8UI cell IDs\nsim_common.glsl"]
+  end
+
+  PLAY --> SIM
+  CA --> IDS

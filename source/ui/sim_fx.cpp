@@ -1,4 +1,5 @@
 #include "sim_fx.hpp"
+#include "../platform/audio/tone_audio.hpp"
 #include "../sim/materials.hpp"
 #include <algorithm>
 #include <cmath>
@@ -142,18 +143,30 @@ void tickSimExplosionFx(SimPipeline& pipe, const PlayRegion& pr, int gridW, int 
     const float cellH = float(pr.h) / float(gridH);
     const float cellSize = std::max(cellW, cellH);
 
+    bool detonated = false;
+    bool heavyDetonation = false;
     for (int y = 0; y < h; ++y) {
         for (int x = 0; x < w; ++x) {
             const size_t i = static_cast<size_t>(y * w + x);
-            if (watchPrev[i] != MAT_GUNPOWDER) continue;
+            const uint8_t prev = watchPrev[i];
             const uint8_t now = cur[i];
-            if (now != MAT_FIRE && now != MAT_SMOKE) continue;
+            const bool fromGunpowder = prev == MAT_GUNPOWDER;
+            const bool fromTnt = prev == MAT_TNT;
+            if (!fromGunpowder && !fromTnt) continue;
+            const bool gunpowderBurst =
+                fromGunpowder && (now == MAT_FIRE || now == MAT_SMOKE);
+            const bool tntBurst =
+                fromTnt && (now == MAT_FIRE || now == MAT_EMPTY || now == MAT_SMOKE);
+            if (!gunpowderBurst && !tntBurst) continue;
+            detonated = true;
+            if (now == MAT_FIRE) heavyDetonation = true;
             float sx = 0.f;
             float sy = 0.f;
             gridToScreen(watch.x0 + x, watch.y0 + y, pr, gridW, gridH, sx, sy);
             spawnBurst(sx, sy, cellSize, now == MAT_FIRE ? 18 : 10, now == MAT_FIRE);
         }
     }
+    if (detonated) playTone(ToneId::Explosion, heavyDetonation);
 
     watchPrev = std::move(cur);
 }

@@ -2,7 +2,7 @@
 
 > GPU falling-sand sandbox for Nintendo Switch homebrew (SDL2 + OpenGL ES 3.0). Margolus cellular automaton on ping-pong GL_R8UI textures; custom OpenGL UI; three JSON+base64 save slots. Primary artifact: NXSand.nro. Desktop builds are for development only.
 
-NXSand simulates 17 brush materials (IDs 1–17) plus spawn-only Ember (18) in `shaders/sim_common.glsl`. Saves live under `sdmc:/switch/nxsand/` on Switch and `./nxsand_save/` on desktop. Do not renumber material IDs. Agent-oriented repo rules: `AGENTS.md` at repository root.
+NXSand simulates 19 brush materials (IDs 1–17, 20–21) plus spawn-only Ember (18) and Flower (19) in `shaders/sim_common.glsl`. Saves live under `sdmc:/switch/nxsand/` on Switch and `./nxsand_save/` on desktop. Do not renumber material IDs. Agent-oriented repo rules: `AGENTS.md` at repository root.
 
 Source: https://github.com/antoinebou12/nxsand  
 Documentation site: https://antoinebou12.github.io/nxsand/

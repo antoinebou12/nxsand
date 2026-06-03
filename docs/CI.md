@@ -12,13 +12,24 @@ NXSand uses GitHub Actions for continuous build and manual release packaging.
 
 ## CI artifact (Switch)
 
-**NXSand-switch** zip contains `switch/NXSand.nro`. Unzip at the SD card root so the file lands at `sdmc:/switch/NXSand.nro`.
+**NXSand-switch** zip contains `switch/NXSand.nro`. When repository secret **`SWITCH_PROD_KEYS`** is set, CI also runs `scripts/export-nsp.py` and adds **`switch/NXSand.nsp`**. Unzip at the SD card root so the file lands at `sdmc:/switch/NXSand.nro`.
+
+## NSP export
+
+| Item | Detail |
+|------|--------|
+| Script | `scripts/export-nsp.py` (wraps [NTON](https://github.com/rlaphoenix/nton)) |
+| Make target | `make nsp` (after `make dist`) |
+| Keys | `prod.keys` locally; **`SWITCH_PROD_KEYS`** GitHub secret for CI |
+| Output | `dist/switch/NXSand.nsp` → bundled in Switch CI/release zips when present |
+
+See [Installing NXSand](INSTALL.md#nsp-forwarder-optional) for end-user install notes.
 
 ## Release zips
 
 | Zip | Contents |
 |-----|----------|
-| `NXSand-switch-v*.zip` | `switch/NXSand.nro` |
+| `NXSand-switch-v*.zip` | `switch/NXSand.nro`; optional `switch/NXSand.nsp` |
 | `NXSand-linux-v*.zip` | `NXSand`, `shaders/`, `romfs/fonts/`, `run.sh` |
 | `NXSand-windows-v*.zip` | `NXSand.exe`, `NXSand-run.bat`, ANGLE/SDL DLLs, `shaders/`, fonts |
 

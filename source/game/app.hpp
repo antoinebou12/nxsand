@@ -71,19 +71,20 @@ public:
     bool computeSimSupported() const { return computeSimSupported_; }
 
     void onEnterPlayFromMenu();
+    bool ensureSimPipelineReady();
     void requestSlotSave(int slot, bool fromQuickSave = false);
     void requestFlushGameSettings();
     void requestFlushPhysicsSettings();
 
-#if defined(__SWITCH__)
     void presentBootProgress(float progress, const char* status);
-#endif
 
 private:
     bool computeSimSupported_ = false;
     bool forceComputeBackend_ = false;
     SimBackend resolveSimBackend() const;
     bool initSimPipeline(int w, int h);
+    bool resetGlContextForSimCompile();
+    bool restoreUiPipelinesAfterSimCompile();
     void tickMenu(double dtSec);
     void tickPlay(double dtSec);
     void renderFrame();
@@ -105,6 +106,7 @@ private:
     int pendingSlot_ = 1;
     bool settingsHeavyApplyPending_ = false;
     bool heavyFlushScheduled_ = false;
+    bool simWarmupTriggered_ = false;
 
     PerfStats perf_{};
     MenuRepeatState menuRepeat_{};

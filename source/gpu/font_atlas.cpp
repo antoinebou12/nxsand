@@ -41,9 +41,13 @@ static std::string resolveFontPath() {
         if (readableFontFile(overridePath)) return overridePath;
         std::cerr << "Font override not readable: " << overridePath << "\n";
     }
+    if (readableFontFile("romfs/fonts/NotoSans-Regular.ttf")) {
+        return "romfs/fonts/NotoSans-Regular.ttf";
+    }
+    if (readableFontFile("fonts/NotoSans-Regular.ttf")) {
+        return "fonts/NotoSans-Regular.ttf";
+    }
     const char* candidates[] = {
-        "romfs/fonts/NotoSans-Regular.ttf",
-        "fonts/NotoSans-Regular.ttf",
         "/usr/share/fonts/truetype/inter/Inter-Regular.ttf",
         "/usr/share/fonts/opentype/inter/Inter-Regular.otf",
         "/usr/share/fonts/truetype/noto/NotoSansDisplay-Regular.ttf",

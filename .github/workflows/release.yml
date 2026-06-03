@@ -44,6 +44,13 @@ jobs:
       - name: Build NRO
         run: make
 
+      - name: Export NSP forwarder
+        env:
+          SWITCH_PROD_KEYS: ${{ secrets.SWITCH_PROD_KEYS }}
+        run: |
+          python3 -m pip install --quiet nton
+          python3 scripts/export-nsp.py --skip-if-no-keys
+
       - name: Package Switch zip
         run: python3 scripts/package-release.py switch --tag "${{ env.RELEASE_TAG }}"
 

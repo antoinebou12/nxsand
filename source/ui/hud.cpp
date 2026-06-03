@@ -53,8 +53,9 @@ static PaletteLayout getPaletteLayout(int W, int H, float s) {
     l.r2SlotW = r2Total / float(HUD_PALETTE_ROW2.size());
     l.r2StartX = (float(W) - l.r2SlotW * float(HUD_PALETTE_ROW2.size())) * 0.5f;
     l.r2y = l.y0 + l.rowH + l.rowSep;
-    l.r3SlotW = float(W) * 0.22f;
-    l.r3StartX = (float(W) - l.r3SlotW * float(HUD_PALETTE_ROW3.size())) * 0.5f;
+    const float r3Total = float(W) * 0.85f;
+    l.r3SlotW = r3Total / float(HUD_PALETTE_ROW3.size());
+    l.r3StartX = (float(W) - r3Total) * 0.5f;
     l.r3y = l.y0 + (l.rowH + l.rowSep) * 2.f;
     l.chipH = std::min(l.rowH - 14.f * s, 44.f * s);
     l.chipInsetY = std::max(6.f * s, (l.rowH - l.chipH) * 0.5f);

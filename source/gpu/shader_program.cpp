@@ -1,13 +1,109 @@
 #include "shader_program.hpp"
+#include "shader_cache.hpp"
+#include <chrono>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <thread>
 #include <vector>
 
 namespace nx {
 
 static std::string g_shader_diag;
+
+namespace {
+
+constexpr uint64_t kCompileTimeoutMs = 120000;
+constexpr int kCompilePollSleepMs = 16;
+
+ShaderCompileProgressFn g_progressFn = nullptr;
+void* g_progressUser = nullptr;
+const char* g_compileStage = "Compiling shader…";
+std::chrono::steady_clock::time_point g_compileStart{};
+
+uint64_t compileElapsedMs() {
+    return static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - g_compileStart)
+            .count());
+}
+
+} // namespace
+
+void setShaderCompileProgress(ShaderCompileProgressFn fn, void* user) {
+    g_progressFn = fn;
+    g_progressUser = user;
+}
+
+void setShaderCompileStage(const char* stage) {
+    g_compileStage = (stage && stage[0]) ? stage : "Compiling shader…";
+    g_compileStart = std::chrono::steady_clock::now();
+}
+
+static void reportCompileProgress() {
+    if (!g_progressFn) return;
+    g_progressFn(g_compileStage, compileElapsedMs(), g_progressUser);
+}
+
+static bool compileTimedOut() {
+    return compileElapsedMs() > kCompileTimeoutMs;
+}
+
+/// Drain UI draws and reset bindings before glLinkProgram (ANGLE can hang if UI program/FBO
+/// are still active — gpu_unit_tests never repaints during compile).
+static void prepareGlContextForShaderLink() {
+    glFlush();
+    glFinish();
+    glUseProgram(0);
+    glBindVertexArray(0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_BLEND);
+    glActiveTexture(GL_TEXTURE0);
+}
+
+static bool bootLogEnabled() {
+    const char* v = std::getenv("NXSAND_BOOT_LOG");
+    if (!v || !v[0]) v = std::getenv("NXENGINE_BOOT_LOG");
+    if (!v || !v[0]) return false;
+    if (v[0] == '0' && v[1] == '\0') return false;
+    if (std::strcmp(v, "false") == 0 || std::strcmp(v, "FALSE") == 0) return false;
+    if (std::strcmp(v, "off") == 0 || std::strcmp(v, "OFF") == 0) return false;
+    if (std::strcmp(v, "no") == 0 || std::strcmp(v, "NO") == 0) return false;
+    return true;
+}
+
+static uint64_t elapsedMs(std::chrono::steady_clock::time_point start) {
+    return static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start)
+            .count());
+}
+
+static void bootLog(const std::string& msg) {
+    if (!bootLogEnabled()) return;
+    std::cerr << "[shader] " << msg << "\n";
+}
+
+static const char* cacheResultName(ShaderCacheResult result) {
+    switch (result) {
+        case ShaderCacheResult::Disabled: return "disabled";
+        case ShaderCacheResult::Miss: return "miss";
+        case ShaderCacheResult::Failed: return "failed";
+        case ShaderCacheResult::Hit: return "hit";
+    }
+    return "unknown";
+}
+
+static bool shouldSaveProgramBinary(const std::string& label) {
+    if (!shaderCacheEnabled()) return false;
+    // On ANGLE, asking for retrievable binaries can make the large sim shaders spend
+    // minutes in glLinkProgram. Existing binary hits are still loaded before compile.
+    return label != "sim.frag" && label != "sim.comp";
+}
 
 void setShaderDiagnostics(const std::string& msg) {
     g_shader_diag = msg;
@@ -119,16 +215,36 @@ std::string ShaderProgram::readFile(const std::string& path) {
 }
 
 GLuint ShaderProgram::compile(GLenum type, const char* src) {
+    const char* kind = "shader";
+    if (type == GL_VERTEX_SHADER) kind = "vertex";
+    else if (type == GL_FRAGMENT_SHADER) kind = "fragment";
+    else if (type == GL_COMPUTE_SHADER) kind = "compute";
+    const auto t0 = std::chrono::steady_clock::now();
     GLuint s = glCreateShader(type);
     glShaderSource(s, 1, &src, nullptr);
     glCompileShader(s);
+
+    if (GLAD_GL_KHR_parallel_shader_compile) {
+        for (;;) {
+            GLint done = GL_FALSE;
+            glGetShaderiv(s, GL_COMPLETION_STATUS_KHR, &done);
+            if (done == GL_TRUE) break;
+            if (compileTimedOut()) {
+                setShaderDiagnostics(std::string("Shader compile timed out (") + g_compileStage +
+                                     ")");
+                glDeleteShader(s);
+                return 0;
+            }
+            reportCompileProgress();
+            std::this_thread::sleep_for(std::chrono::milliseconds(kCompilePollSleepMs));
+        }
+    }
+
     GLint ok = 0;
     glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+    bootLog(std::string(kind) + " compile " + std::to_string(elapsedMs(t0)) + "ms " +
+            (ok ? "ok" : "failed"));
     if (!ok) {
-        const char* kind = "shader";
-        if (type == GL_VERTEX_SHADER) kind = "vertex";
-        else if (type == GL_FRAGMENT_SHADER) kind = "fragment";
-        else if (type == GL_COMPUTE_SHADER) kind = "compute";
         logShader(s, kind);
         glDeleteShader(s);
         return 0;
@@ -136,34 +252,71 @@ GLuint ShaderProgram::compile(GLenum type, const char* src) {
     return s;
 }
 
-bool ShaderProgram::linkCompute(GLuint cs) {
+static std::string cacheLabelFromPath(const std::string& path) {
+    const size_t slash = path.find_last_of("/\\");
+    return slash != std::string::npos ? path.substr(slash + 1) : path;
+}
+
+bool ShaderProgram::linkCompute(GLuint cs, bool binaryRetrievable) {
+    const auto t0 = std::chrono::steady_clock::now();
+    ShaderCompileProgressFn savedProgress = g_progressFn;
+    void* savedProgressUser = g_progressUser;
+    g_progressFn = nullptr;
+    g_progressUser = nullptr;
+    prepareGlContextForShaderLink();
     program = glCreateProgram();
+    if (binaryRetrievable) {
+        glProgramParameteri(program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+    }
     glAttachShader(program, cs);
+    bootLog("glLinkProgram (compute) …");
     glLinkProgram(program);
     GLint ok = 0;
     glGetProgramiv(program, GL_LINK_STATUS, &ok);
+    bootLog(std::string("compute program link ") + std::to_string(elapsedMs(t0)) + "ms " +
+            (ok ? "ok" : "failed"));
     if (!ok) {
         logProgram(program);
         glDeleteProgram(program);
         program = 0;
+        g_progressFn = savedProgress;
+        g_progressUser = savedProgressUser;
         return false;
     }
+    g_progressFn = savedProgress;
+    g_progressUser = savedProgressUser;
     return true;
 }
 
-bool ShaderProgram::link(GLuint vs, GLuint fs) {
+bool ShaderProgram::link(GLuint vs, GLuint fs, bool binaryRetrievable) {
+    const auto t0 = std::chrono::steady_clock::now();
+    ShaderCompileProgressFn savedProgress = g_progressFn;
+    void* savedProgressUser = g_progressUser;
+    g_progressFn = nullptr;
+    g_progressUser = nullptr;
+    prepareGlContextForShaderLink();
     program = glCreateProgram();
+    if (binaryRetrievable) {
+        glProgramParameteri(program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+    }
     glAttachShader(program, vs);
     glAttachShader(program, fs);
+    bootLog("glLinkProgram …");
     glLinkProgram(program);
     GLint ok = 0;
     glGetProgramiv(program, GL_LINK_STATUS, &ok);
+    bootLog(std::string("program link ") + std::to_string(elapsedMs(t0)) + "ms " +
+            (ok ? "ok" : "failed"));
     if (!ok) {
         logProgram(program);
         glDeleteProgram(program);
         program = 0;
+        g_progressFn = savedProgress;
+        g_progressUser = savedProgressUser;
         return false;
     }
+    g_progressFn = savedProgress;
+    g_progressUser = savedProgressUser;
     return true;
 }
 
@@ -176,6 +329,21 @@ bool ShaderProgram::loadFromFiles(const std::string& vertPath, const std::string
         std::cerr << g_shader_diag << "\n";
         return false;
     }
+
+    const ShaderCacheKey cacheKey{cacheLabelFromPath(fragPath), vsrc, fsrc};
+    ShaderCacheResult cacheResult = ShaderCacheResult::Miss;
+    if (GLuint cached = tryLoadShaderProgramBinary(cacheKey, &cacheResult)) {
+        program = cached;
+        return true;
+    }
+    bootLog(cacheKey.label + " compiling after cache " + cacheResultName(cacheResult));
+    const bool binaryRetrievable = shouldSaveProgramBinary(cacheKey.label);
+    if (!binaryRetrievable) {
+        bootLog(cacheKey.label + " binary save skipped for faster first link");
+    }
+    g_compileStart = std::chrono::steady_clock::now();
+
+    const auto t0 = std::chrono::steady_clock::now();
     GLuint vs = compile(GL_VERTEX_SHADER, vsrc.c_str());
     if (!vs) {
         std::cerr << "shader compile failed (vertex): " << vertPath << "\n";
@@ -190,12 +358,15 @@ bool ShaderProgram::loadFromFiles(const std::string& vertPath, const std::string
         }
         return false;
     }
-    bool ok = link(vs, fs);
+    bool ok = link(vs, fs, binaryRetrievable);
     glDeleteShader(vs);
     glDeleteShader(fs);
     if (!ok && g_shader_diag.empty()) {
         g_shader_diag = "shader link failed: " + vertPath + " / " + fragPath;
     }
+    bootLog(cacheKey.label + " load " + std::to_string(elapsedMs(t0)) + "ms " +
+            (ok ? "ok" : "failed"));
+    if (ok && binaryRetrievable) queueShaderProgramBinarySave(cacheKey, program);
     return ok;
 }
 
@@ -207,6 +378,21 @@ bool ShaderProgram::loadComputeFromFile(const std::string& compPath) {
         std::cerr << g_shader_diag << "\n";
         return false;
     }
+
+    const ShaderCacheKey cacheKey{cacheLabelFromPath(compPath), {}, src};
+    ShaderCacheResult cacheResult = ShaderCacheResult::Miss;
+    if (GLuint cached = tryLoadShaderProgramBinary(cacheKey, &cacheResult)) {
+        program = cached;
+        return true;
+    }
+    bootLog(cacheKey.label + " compiling after cache " + cacheResultName(cacheResult));
+    const bool binaryRetrievable = shouldSaveProgramBinary(cacheKey.label);
+    if (!binaryRetrievable) {
+        bootLog(cacheKey.label + " binary save skipped for faster first link");
+    }
+    g_compileStart = std::chrono::steady_clock::now();
+
+    const auto t0 = std::chrono::steady_clock::now();
     GLuint cs = compile(GL_COMPUTE_SHADER, src.c_str());
     if (!cs) {
         if (g_shader_diag.empty()) {
@@ -214,11 +400,14 @@ bool ShaderProgram::loadComputeFromFile(const std::string& compPath) {
         }
         return false;
     }
-    bool ok = linkCompute(cs);
+    bool ok = linkCompute(cs, binaryRetrievable);
     glDeleteShader(cs);
     if (!ok && g_shader_diag.empty()) {
         g_shader_diag = "compute link failed: " + compPath;
     }
+    bootLog(cacheKey.label + " load " + std::to_string(elapsedMs(t0)) + "ms " +
+            (ok ? "ok" : "failed"));
+    if (ok && binaryRetrievable) queueShaderProgramBinarySave(cacheKey, program);
     return ok;
 }
 

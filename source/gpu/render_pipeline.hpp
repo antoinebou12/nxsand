@@ -92,6 +92,7 @@ public:
     void endUiFrame();
 
 private:
+    bool initWorldShaders();
     void ensureQuadVbo();
     void ensureUiQuadVbo();
     void drawUiQuad(float x, float y, float w, float h, float u0, float v0, float u1, float v1,
@@ -153,6 +154,7 @@ private:
     GLuint lookTex = 0;
     int lookW = 0;
     int lookH = 0;
+    std::string shaderDir_;
 };
 
 } // namespace nx

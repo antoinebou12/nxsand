@@ -71,6 +71,7 @@ void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app) {
     const float rad = wl.rad;
 
     const int n = static_cast<int>(PICKER_MATERIALS.size());
+    const float ringScale = n > 17 ? 17.f / float(n) : 1.f;
 
     r.drawSolidRect(0.f, 0.f, float(W), float(H), 0.f, 0.f, 0.f, 0.45f, W, H);
 
@@ -79,7 +80,8 @@ void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app) {
         const float a = (float(i) / float(n)) * 6.2831853f - 1.5707963f;
         const float x = cx + std::cos(a) * rad;
         const float y = cy + std::sin(a) * rad;
-        const float chipR = (i == app.menu.materialWheelIndex ? 29.f : 24.f) * s;
+        const float baseChip = (i == app.menu.materialWheelIndex ? 29.f : 24.f) * s * ringScale;
+        const float chipR = baseChip;
         const Material m = PICKER_MATERIALS[static_cast<size_t>(i)];
         const uint32_t c = pal[static_cast<size_t>(m)];
         const float cr = float(c & 0xff) / 255.f;

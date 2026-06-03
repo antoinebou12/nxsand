@@ -59,6 +59,7 @@ void RenderPipeline::shutdown() {
     bloomBrightShader = ShaderProgram{};
     bloomBlurShader = ShaderProgram{};
     bloomCompositeShader = ShaderProgram{};
+    shaderDir_.clear();
 }
 
 void RenderPipeline::buildPaletteTexture() {
@@ -82,10 +83,29 @@ void RenderPipeline::buildPaletteTexture() {
 }
 
 bool RenderPipeline::init(const std::string& shaderDir) {
+    shaderDir_ = shaderDir;
     buildPaletteTexture();
 
-    std::string vfull = shaderDir + "/fullscreen.vert";
-    std::string fpal  = shaderDir + "/palette_lookup.frag";
+    std::string vui = shaderDir + "/ui_quad.vert";
+    std::string fui = shaderDir + "/ui_quad.frag";
+    if (!uiShader.loadFromFiles(vui, fui)) return false;
+
+    uiShader.use();
+    ui_uScreen = uiShader.uniformLocation("uScreen");
+    ui_uTex    = uiShader.uniformLocation("uTex");
+    ui_uMode   = uiShader.uniformLocation("uMode");
+
+    return true;
+}
+
+bool RenderPipeline::initWorldShaders() {
+    if (palShader.program != 0 && upscaleShader.program != 0) return true;
+    if (shaderDir_.empty()) return false;
+
+    buildPaletteTexture();
+
+    std::string vfull = shaderDir_ + "/fullscreen.vert";
+    std::string fpal  = shaderDir_ + "/palette_lookup.frag";
     if (!palShader.loadFromFiles(vfull, fpal)) return false;
 
     palShader.use();
@@ -99,18 +119,9 @@ bool RenderPipeline::init(const std::string& shaderDir) {
     pal_uBlob = palShader.uniformLocation("uBlob");
     pal_uAo = palShader.uniformLocation("uAoStrength");
 
-    std::string vui = shaderDir + "/ui_quad.vert";
-    std::string fui = shaderDir + "/ui_quad.frag";
-    if (!uiShader.loadFromFiles(vui, fui)) return false;
-
-    uiShader.use();
-    ui_uScreen = uiShader.uniformLocation("uScreen");
-    ui_uTex    = uiShader.uniformLocation("uTex");
-    ui_uMode   = uiShader.uniformLocation("uMode");
-
-    std::string fbright = shaderDir + "/bloom_bright.frag";
-    std::string fblur = shaderDir + "/bloom_blur.frag";
-    std::string fcomp = shaderDir + "/bloom_composite.frag";
+    std::string fbright = shaderDir_ + "/bloom_bright.frag";
+    std::string fblur = shaderDir_ + "/bloom_blur.frag";
+    std::string fcomp = shaderDir_ + "/bloom_composite.frag";
     if (!bloomBrightShader.loadFromFiles(vfull, fbright)) return false;
     if (!bloomBlurShader.loadFromFiles(vfull, fblur)) return false;
     if (!bloomCompositeShader.loadFromFiles(vfull, fcomp)) return false;
@@ -131,7 +142,7 @@ bool RenderPipeline::init(const std::string& shaderDir) {
     comp_uGamma = bloomCompositeShader.uniformLocation("uGamma");
     comp_uSaturation = bloomCompositeShader.uniformLocation("uSaturation");
 
-    std::string fup = shaderDir + "/upscale.frag";
+    std::string fup = shaderDir_ + "/upscale.frag";
     if (!upscaleShader.loadFromFiles(vfull, fup)) return false;
     upscaleShader.use();
     up_uSrc = upscaleShader.uniformLocation("uSrc");
@@ -475,6 +486,8 @@ void RenderPipeline::blitPostToPlayRegion(const PlayRegion& pr, int screenH, int
 
 void RenderPipeline::drawSimulation(GLuint simR8UI, int simW, int simH, const PlayRegion& pr,
                                      int screenH, uint32_t frame, double simMsForStressMode) {
+    if (!initWorldShaders()) return;
+
     int mode = paletteMode_;
 #if !defined(__SWITCH__)
     if (simMsForStressMode > 14.0 && mode == 0) {

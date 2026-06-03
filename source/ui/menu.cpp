@@ -120,6 +120,10 @@ void MenuState::handleConfirm(App& app) {
     if (screen == MenuScreen::Main) {
         switch (index) {
             case 0:
+                if (!app.ensureSimPipelineReady()) {
+                    app.toast.show("Simulation failed to start", 2.5f);
+                    break;
+                }
                 app.simPipeline->clearAll(MAT_EMPTY);
                 app.sim.gridHasMatter = false;
                 app.sim.sleeping = false;
@@ -130,6 +134,10 @@ void MenuState::handleConfirm(App& app) {
                 app.toast.show("New empty sandbox", 1.0f);
                 break;
             case 1:
+                if (!app.ensureSimPipelineReady()) {
+                    app.toast.show("Simulation failed to start", 2.5f);
+                    break;
+                }
                 seedStarterScene(app);
                 app.hasEnteredPlay = true;
                 app.scene = Scene::Play;
@@ -153,6 +161,10 @@ void MenuState::handleConfirm(App& app) {
                 index = 0;
                 break;
             case 6:
+                if (!app.ensureSimPipelineReady()) {
+                    app.toast.show("Simulation failed to start", 2.5f);
+                    break;
+                }
                 app.simPipeline->clearAll(MAT_EMPTY);
                 app.sim.gridHasMatter = false;
                 app.sim.sleeping = false;
@@ -167,6 +179,8 @@ void MenuState::handleConfirm(App& app) {
         const SlotMeta meta = getSlotMeta(index + 1);
         if (meta.empty) {
             app.toast.show("Slot is empty", 1.5f);
+        } else if (!app.ensureSimPipelineReady()) {
+            app.toast.show("Simulation failed to start", 2.5f);
         } else if (loadGame(app, index + 1)) {
             app.hasEnteredPlay = true;
             app.scene = Scene::Play;
@@ -196,7 +210,9 @@ void MenuState::handleConfirm(App& app) {
     } else if (screen == MenuScreen::EngineSettingsTab) {
         if (index > 0 && engineTab == EngineTab::Debug &&
             index - 1 == engineTabRowCount(EngineTab::Debug) - 1) {
-            seedBenchmarkScene(app, app.settings.debug.benchmarkScene);
+            if (app.ensureSimPipelineReady()) {
+                seedBenchmarkScene(app, app.settings.debug.benchmarkScene);
+            }
         }
     }
 }

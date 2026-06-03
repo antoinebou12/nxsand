@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <string>
 #include "gl_loader.hpp"
 
@@ -7,6 +8,11 @@ namespace nx {
 // Last load/compile/link failure (for Switch fatal screen).
 void setShaderDiagnostics(const std::string& msg);
 const char* lastShaderDiagnostics();
+
+using ShaderCompileProgressFn = void (*)(const char* stage, uint64_t elapsedMs, void* user);
+
+void setShaderCompileProgress(ShaderCompileProgressFn fn, void* user);
+void setShaderCompileStage(const char* stage);
 
 class ShaderProgram {
 public:
@@ -29,8 +35,8 @@ public:
 private:
     static std::string readFile(const std::string& path);
     static GLuint compile(GLenum type, const char* src);
-    bool link(GLuint vs, GLuint fs);
-    bool linkCompute(GLuint cs);
+    bool link(GLuint vs, GLuint fs, bool binaryRetrievable);
+    bool linkCompute(GLuint cs, bool binaryRetrievable);
 };
 
 } // namespace nx

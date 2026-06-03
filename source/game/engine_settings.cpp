@@ -1,5 +1,6 @@
 #include "engine_settings.hpp"
 #include "app.hpp"
+#include "../platform/audio/tone_audio.hpp"
 #include "../gpu/sim_backend.hpp"
 #include "benchmark_scene.hpp"
 #include <SDL2/SDL.h>
@@ -26,7 +27,7 @@ int engineTabRowCount(EngineTab tab) {
     switch (tab) {
         case EngineTab::Performance: return 7;
         case EngineTab::Visuals: return 6;
-        case EngineTab::Controls: return 4;
+        case EngineTab::Controls: return 5;
         case EngineTab::Accessibility: return 3;
         case EngineTab::Display: return 3;
         case EngineTab::Debug: return 4;
@@ -132,6 +133,13 @@ const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settin
                                   c.rumble == RumbleLevel::Off     ? "Off"
                                   : c.rumble == RumbleLevel::Low   ? "Low"
                                   : c.rumble == RumbleLevel::Medium ? "Medium"
+                                                                    : "High");
+                    break;
+                case 4:
+                    std::snprintf(buf, bufSize, "Sound: %s",
+                                  c.sound == SoundLevel::Off     ? "Off"
+                                  : c.sound == SoundLevel::Low   ? "Low"
+                                  : c.sound == SoundLevel::Medium ? "Medium"
                                                                     : "High");
                     break;
             }
@@ -332,6 +340,13 @@ void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir) {
                     int m = static_cast<int>(s.controls.rumble) + dir;
                     m = std::clamp(m, 0, static_cast<int>(RumbleLevel::High));
                     s.controls.rumble = static_cast<RumbleLevel>(m);
+                    break;
+                }
+                case 4: {
+                    int m = static_cast<int>(s.controls.sound) + dir;
+                    m = std::clamp(m, 0, static_cast<int>(SoundLevel::High));
+                    s.controls.sound = static_cast<SoundLevel>(m);
+                    toneAudioSetLevel(s.controls.sound);
                     break;
                 }
             }

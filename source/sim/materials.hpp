@@ -1,12 +1,13 @@
 // Material IDs and palette (GPU sim, saves, HUD).
 //
-// IDs 0–18; slot JSON stores raw bytes — do not renumber existing IDs.
-// ID 18 (Ember) is spawn-only — not in PICKER_MATERIALS.
+// IDs 0–22; slot JSON stores raw bytes — do not renumber existing IDs.
+// IDs 18–19 (Ember, Flower) are spawn-only — not in PICKER_MATERIALS.
 // GPU rules live in shaders/sim.frag (`M_*` constants must stay in sync).
 //
 // Notable reaction (NXSand vs nxsand CPU): lava on water produces STONE + SMOKE here
 // (nxsand writes WALL under the lava). Stone is a separate playable solid (palette slot 9).
-#pragma once
+#ifndef NX_MATERIALS_HPP
+#define NX_MATERIALS_HPP
 #include <cstddef>
 #include <cstdint>
 #include <array>
@@ -33,10 +34,14 @@ enum Material : uint8_t {
     MAT_GUNPOWDER = 16,
     MAT_SALT      = 17,
     MAT_EMBER     = 18,
+    MAT_FLOWER    = 19,  // spawn-only bloom from wet plant; not in material ring
+    MAT_COAL      = 20,
+    MAT_TNT       = 21,
+    MAT_BRICK     = 22,
 };
 
-// Highest material ID in saves (includes spawn-only Ember).
-constexpr int MATERIAL_COUNT = 18;
+// Highest material ID in saves (includes spawn-only Ember and Flower).
+constexpr int MATERIAL_COUNT = 22;
 constexpr int PALETTE_SIZE   = 256;
 
 // Same packing as packRgb(r,g,b) in materials.ts: 0xff000000 | b<<16 | g<<8 | r.
@@ -57,28 +62,32 @@ inline std::array<uint32_t, PALETTE_SIZE> build_palette() {
     p[MAT_PLANT]     = pack_rgb(38, 210, 48);
     p[MAT_LAVA]      = pack_rgb(255, 70, 15);
     p[MAT_STONE]     = pack_rgb(90, 105, 125);
-    p[MAT_OIL]       = pack_rgb(25, 45, 95);
+    p[MAT_OIL]       = pack_rgb(18, 62, 128);
     p[MAT_ICE]       = pack_rgb(190, 230, 255);
     p[MAT_STEAM]     = pack_rgb(200, 220, 240);
     p[MAT_GLASS]     = pack_rgb(180, 220, 230);
     p[MAT_WOOD]      = pack_rgb(120, 72, 38);
     p[MAT_METAL]     = pack_rgb(160, 165, 175);
-    p[MAT_GUNPOWDER] = pack_rgb(45, 42, 38);
+    p[MAT_GUNPOWDER] = pack_rgb(118, 108, 78);
     p[MAT_SALT]      = pack_rgb(235, 240, 248);
     p[MAT_EMBER]     = pack_rgb(200, 120, 20);
+    p[MAT_FLOWER]    = pack_rgb(255, 130, 200);
+    p[MAT_COAL]      = pack_rgb(35, 32, 28);
+    p[MAT_TNT]       = pack_rgb(180, 50, 45);
+    p[MAT_BRICK]     = pack_rgb(140, 75, 55);
     return p;
 }
 
-constexpr std::array<Material, 17> PLAYABLE_MATERIALS{
+constexpr std::array<Material, 20> PLAYABLE_MATERIALS{
     MAT_SAND, MAT_WATER, MAT_WALL, MAT_PLANT, MAT_FIRE, MAT_LAVA,
     MAT_ACID, MAT_SMOKE, MAT_STONE, MAT_OIL, MAT_ICE, MAT_WOOD, MAT_GLASS, MAT_STEAM,
-    MAT_METAL, MAT_GUNPOWDER, MAT_SALT,
+    MAT_METAL, MAT_GUNPOWDER, MAT_COAL, MAT_TNT, MAT_SALT, MAT_BRICK,
 };
 
-constexpr std::array<Material, 17> PICKER_MATERIALS{
+constexpr std::array<Material, 20> PICKER_MATERIALS{
     MAT_SAND, MAT_WATER, MAT_WALL, MAT_PLANT, MAT_FIRE, MAT_LAVA,
     MAT_ACID, MAT_SMOKE, MAT_STONE, MAT_OIL, MAT_ICE, MAT_WOOD, MAT_GLASS, MAT_STEAM,
-    MAT_METAL, MAT_GUNPOWDER, MAT_SALT,
+    MAT_METAL, MAT_GUNPOWDER, MAT_COAL, MAT_TNT, MAT_SALT, MAT_BRICK,
 };
 
 struct HudSlot {
@@ -94,8 +103,9 @@ constexpr std::array<HudSlot, 6> HUD_PALETTE_ROW2{{
     {MAT_STONE, ""}, {MAT_OIL, ""}, {MAT_ICE, ""},
     {MAT_WOOD,  ""}, {MAT_GLASS, ""}, {MAT_STEAM, ""},
 }};
-constexpr std::array<HudSlot, 3> HUD_PALETTE_ROW3{{
-    {MAT_METAL, ""}, {MAT_GUNPOWDER, ""}, {MAT_SALT, ""},
+constexpr std::array<HudSlot, 6> HUD_PALETTE_ROW3{{
+    {MAT_METAL, ""}, {MAT_GUNPOWDER, ""}, {MAT_COAL, ""}, {MAT_TNT, ""}, {MAT_SALT, ""},
+    {MAT_BRICK, ""},
 }};
 
 inline int selectorMaterialCount() {
@@ -126,9 +136,13 @@ inline const char* material_short_name(Material m) {
         case MAT_GLASS:     return "GLS";
         case MAT_WOOD:      return "WOD";
         case MAT_METAL:     return "MTL";
-        case MAT_GUNPOWDER: return "GNP";
+        case MAT_GUNPOWDER: return "GUN";
         case MAT_SALT:      return "SLT";
         case MAT_EMBER:     return "EMB";
+        case MAT_FLOWER:    return "FLW";
+        case MAT_COAL:      return "COL";
+        case MAT_TNT:       return "TNT";
+        case MAT_BRICK:     return "BRK";
         default:            return "---";
     }
 }
@@ -151,16 +165,20 @@ inline const char* material_name(Material m) {
         case MAT_GLASS:     return "Glass";
         case MAT_WOOD:      return "Wood";
         case MAT_METAL:     return "Metal";
-        case MAT_GUNPOWDER: return "Gunpowder";
+        case MAT_GUNPOWDER: return "GUN";
         case MAT_SALT:      return "Salt";
         case MAT_EMBER:     return "Ember";
+        case MAT_FLOWER:    return "Flower";
+        case MAT_COAL:      return "Coal";
+        case MAT_TNT:       return "TNT";
+        case MAT_BRICK:     return "Brick";
     }
     return "?";
 }
 
 inline bool material_is_solid(Material m) {
     return m != MAT_EMPTY && m != MAT_SMOKE && m != MAT_FIRE && m != MAT_STEAM &&
-           m != MAT_EMBER && m != MAT_GUNPOWDER;
+           m != MAT_EMBER && m != MAT_GUNPOWDER && m != MAT_COAL;
 }
 
 inline Material sanitizeBrushMaterial(int id) {
@@ -172,3 +190,5 @@ inline Material sanitizeBrushMaterial(int id) {
 }
 
 } // namespace nx
+
+#endif // NX_MATERIALS_HPP

@@ -62,6 +62,10 @@ README_SWITCH = """NXSand {version} — Nintendo Switch
 Unzip at the microSD root so the file is: switch/NXSand.nro
 Copy to sdmc:/switch/NXSand.nro and launch from the homebrew menu.
 
+Optional NXSand.nsp (when present): NRO-to-NSP forwarder that launches
+sdmc:/switch/NXSand.nro. Install with your CFW installer (Tinfoil, DBI, etc.).
+The NRO must stay at sdmc:/switch/NXSand.nro. See docs/INSTALL.md.
+
 Saves: sdmc:/switch/nxsand/
 See docs/INSTALL.md in the repository for setup details.
 """
@@ -266,10 +270,16 @@ def package_switch(root: Path, version: str, out_dir: Path) -> Path:
         shutil.rmtree(staging)
     switch_dir.mkdir(parents=True)
     shutil.copy2(nro, switch_dir / "NXSand.nro")
+    nsp = root / "dist" / "switch" / "NXSand.nsp"
+    if nsp.is_file():
+        shutil.copy2(nsp, switch_dir / "NXSand.nsp")
     write_readme(staging, README_SWITCH.format(version=version))
     zip_path = out_dir / f"NXSand-switch-v{version}.zip"
     zip_dir(staging, zip_path, arc_prefix=staging)
-    verify_zip(zip_path, ["switch/NXSand.nro", "README.txt"])
+    required = ["switch/NXSand.nro", "README.txt"]
+    if (switch_dir / "NXSand.nsp").is_file():
+        required.append("switch/NXSand.nsp")
+    verify_zip(zip_path, required)
     print(f"OK: {zip_path}")
     return zip_path
 

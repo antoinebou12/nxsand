@@ -37,6 +37,8 @@ API: `nx::importTptStampJson` in [`source/save/tpt_stamp_import.cpp`](https://gi
 | 146 | ACID | Acid |
 | 28 | BMTL | Metal |
 | 62 | GUNP | Gunpowder |
+| 8 | TNT | TNT |
+| 27 | COAL | Coal |
 | 17 | ICEI | Ice |
 | 34 | PLNT | Plant |
 | 52 | GLAS | Glass |

@@ -16,6 +16,7 @@ layout(std140) uniform PhysicsBlock {
     float acid_stoneCorrode;
     float plant_growthRate;
     float plant_wallSupport;
+    float plant_bloomRate;
     float lava_flowRate;
     float lava_spreadRate;
     float lava_igniteGas;
@@ -36,6 +37,10 @@ layout(std140) uniform PhysicsBlock {
     float ember_spawnRate;
     float ember_fadeRate;
     float ember_igniteWood;
+    float coal_burnRate;
+    float tnt_detonateRate;
+    float brick_slideScale;
+    float brick_cohesionScale;
 };
 
 uint hash1(uint v) {
@@ -62,15 +67,19 @@ bool isLiquid(uint m) {
     return m == M_WATER || m == M_ACID || m == M_LAVA || m == M_OIL;
 }
 
+bool isPlant(uint m) {
+    return m == M_PLANT || m == M_FLOWER;
+}
+
 bool isStatic(uint m) {
-    return m == M_WALL || m == M_PLANT || m == M_ICE || m == M_GLASS || m == M_WOOD ||
-           m == M_METAL;
+    return m == M_WALL || isPlant(m) || m == M_ICE || m == M_GLASS || m == M_WOOD ||
+           m == M_METAL || m == M_TNT;
 }
 
 bool isMovable(uint m) {
     return m == M_SAND || m == M_WATER || m == M_FIRE || m == M_SMOKE ||
            m == M_ACID || m == M_LAVA || m == M_STONE || m == M_OIL || m == M_STEAM ||
-           m == M_GUNPOWDER || m == M_SALT || m == M_EMBER;
+           m == M_GUNPOWDER || m == M_SALT || m == M_EMBER || m == M_COAL || m == M_BRICK;
 }
 
 float flowChance(uint m) {
@@ -89,7 +98,7 @@ float fallChance(uint m) {
     if (m == M_WATER) return 1.0;
     if (m == M_ACID) return 0.88;
     if (m == M_LAVA) return clamp(lava_flowRate + 0.45, 0.25, 0.95);
-    if (m == M_OIL) return 0.55;
+    if (m == M_OIL) return 0.46;
     if (m == M_FIRE || m == M_SMOKE || m == M_EMBER) return fire_speed;
     if (m == M_STEAM) return fire_speed * 0.9;
     return 1.0;
@@ -102,20 +111,22 @@ int density(uint m) {
     if (m == M_SALT) return 2;
     if (m == M_WATER || m == M_ACID || m == M_LAVA) return 3;
     if (m == M_SAND) return 4;
-    if (m == M_GUNPOWDER) return 4;
+    if (m == M_GUNPOWDER || m == M_COAL) return 4;
     if (m == M_STONE) return 5;
+    if (m == M_BRICK) return 6;
     return 9;
 }
 
 bool canDisplace(uint moving, uint target) {
     if (!isMovable(moving)) return false;
-    if (target == M_WALL || target == M_PLANT || target == M_ICE ||
-        target == M_GLASS || target == M_WOOD || target == M_METAL) return false;
+    if (target == M_WALL || isPlant(target) || target == M_ICE ||
+        target == M_GLASS || target == M_WOOD || target == M_METAL || target == M_TNT)
+        return false;
     return density(moving) > density(target);
 }
 
 bool isPowder(uint m) {
-    return m == M_SAND || m == M_STONE || m == M_GUNPOWDER || m == M_SALT;
+    return m == M_SAND || m == M_STONE || m == M_GUNPOWDER || m == M_SALT || m == M_COAL;
 }
 
 bool sandNearWater(ivec2 pos) {
@@ -132,52 +143,6 @@ bool oilNearIce(ivec2 pos) {
            cell(pos + ivec2(-1,  0)) == M_ICE ||
            cell(pos + ivec2( 0,  1)) == M_ICE ||
            cell(pos + ivec2( 0, -1)) == M_ICE;
-}
-
-float flowChanceAt(uint m, ivec2 pos) {
-    float ch = flowChance(m);
-    if (m == M_OIL && oil_coldScale > 0.0 && oilNearIce(pos))
-        return ch * oil_coldScale;
-    return ch;
-}
-
-float slideChance(uint m) {
-    if (isPowder(m)) return clamp(fallChance(m) * 0.62, 0.55, 0.70);
-    if (m == M_SMOKE || m == M_STEAM) return max(0.14, flowChance(m) * 0.90);
-    if (m == M_WATER) return max(0.92, flowChance(m));
-    return max(0.30, flowChance(m));
-}
-
-float slideChanceAt(uint m, ivec2 pos) {
-    float ch = slideChance(m);
-    if (m == M_SAND && sand_wetSlideScale > 0.0 && sandNearWater(pos))
-        return clamp(ch * sand_wetSlideScale, 0.12, ch);
-    return ch;
-}
-
-float fallChanceAt(uint m, ivec2 pos) {
-    if (m == M_SAND && sand_wetSlideScale > 0.0 && sandNearWater(pos))
-        return clamp(fallChance(m) * sand_wetSlideScale, 0.15, 1.0);
-    if (m == M_OIL && oil_coldScale > 0.0 && oilNearIce(pos))
-        return clamp(fallChance(m) * oil_coldScale, 0.12, 1.0);
-    return fallChance(m);
-}
-
-bool isSolidSurface(uint m) {
-    return m == M_WALL || m == M_STONE || m == M_SAND || m == M_SALT || m == M_PLANT || m == M_ICE ||
-           m == M_GLASS || m == M_WOOD || m == M_METAL;
-}
-
-// Horizontal gas drift: less skimming along floors; smoke clings beside wall.
-float gasHorizFlow(uint gas, ivec2 pos, ivec2 dir) {
-    float ch = flowChance(gas);
-    if (gas != M_SMOKE && gas != M_FIRE && gas != M_STEAM && gas != M_EMBER) return ch;
-    if (isSolidSurface(cell(pos + ivec2(0, -1)))) ch *= 0.55;
-    if (gas == M_SMOKE || gas == M_STEAM) {
-        uint block = cell(pos + ivec2(-dir.x, -dir.y));
-        if (block == M_WALL) ch *= 0.42;
-    }
-    return ch;
 }
 
 bool anyNeighbor(ivec2 c, uint m) {
@@ -241,8 +206,144 @@ bool gunpowderChainHeat(ivec2 c) {
            gunpowderNeighborHot(c + ivec2( 0, -1));
 }
 
+const int TNT_BLAST_R = 6;
+
+bool tntContactNeighbor(uint m) {
+    return m != M_EMPTY && m != M_TNT && m != M_EMBER && m != M_WALL;
+}
+
+bool tntContactFuse(ivec2 p) {
+    return tntContactNeighbor(cell(p + ivec2( 1,  0))) ||
+           tntContactNeighbor(cell(p + ivec2(-1,  0))) ||
+           tntContactNeighbor(cell(p + ivec2( 0,  1))) ||
+           tntContactNeighbor(cell(p + ivec2( 0, -1))) ||
+           tntContactNeighbor(cell(p + ivec2( 1,  1))) ||
+           tntContactNeighbor(cell(p + ivec2(-1,  1))) ||
+           tntContactNeighbor(cell(p + ivec2( 1, -1))) ||
+           tntContactNeighbor(cell(p + ivec2(-1, -1)));
+}
+
+bool tntHeatFuseOnly(ivec2 p) {
+    return anyNeighbor(p, M_FIRE) || anyNeighbor(p, M_LAVA) || anyNeighbor(p, M_EMBER) ||
+           neighborHas8Fire(p);
+}
+
+bool tntFuseCandidate(ivec2 p) {
+    if (!inGrid(p) || cell(p) != M_TNT) return false;
+    return tntContactFuse(p) || tntHeatFuseOnly(p);
+}
+
+bool tntNeighborHot(ivec2 n) {
+    if (!inGrid(n) || cell(n) != M_TNT) return false;
+    return tntHeatFuseOnly(n) || tntContactFuse(n);
+}
+
+bool tntChainHeat(ivec2 c) {
+    return tntNeighborHot(c + ivec2( 1,  0)) ||
+           tntNeighborHot(c + ivec2(-1,  0)) ||
+           tntNeighborHot(c + ivec2( 0,  1)) ||
+           tntNeighborHot(c + ivec2( 0, -1)) ||
+           tntFuseCandidate(c + ivec2( 1,  0)) ||
+           tntFuseCandidate(c + ivec2(-1,  0)) ||
+           tntFuseCandidate(c + ivec2( 0,  1)) ||
+           tntFuseCandidate(c + ivec2( 0, -1));
+}
+
+bool tntHasFuse(ivec2 p) {
+    if (!inGrid(p) || cell(p) != M_TNT) return false;
+    return tntFuseCandidate(p) || tntChainHeat(p);
+}
+
+float tntBlastStrengthNearby(ivec2 c, int nearTnt, bool nearFireIn, bool nearEmberIn) {
+    if (nearTnt < 1 && !nearFireIn && !nearEmberIn) return 0.0;
+    float strength = 0.0;
+    for (int dy = -TNT_BLAST_R; dy <= TNT_BLAST_R; dy++) {
+        for (int dx = -TNT_BLAST_R; dx <= TNT_BLAST_R; dx++) {
+            int d = max(abs(dx), abs(dy));
+            if (d > TNT_BLAST_R) continue;
+            ivec2 p = c + ivec2(dx, dy);
+            if (!inGrid(p)) continue;
+            uint m = cell(p);
+            float src = 0.0;
+            if (m == M_TNT && tntFuseCandidate(p))
+                src = 1.0;
+            else if (m == M_FIRE || m == M_EMBER) {
+                int tntN = countCardinal(
+                               cell(p + ivec2( 1,  0)), cell(p + ivec2(-1,  0)),
+                               cell(p + ivec2( 0,  1)), cell(p + ivec2( 0, -1)), M_TNT) +
+                           countDiagonal(p, M_TNT);
+                if (tntN >= 1) src = 0.9;
+            }
+            if (src <= 0.0) continue;
+            strength = max(strength, src * (1.0 - float(d) / float(TNT_BLAST_R)));
+            if (strength >= 0.95) return strength;
+        }
+    }
+    return strength;
+}
+
+float flowChanceAt(uint m, ivec2 pos) {
+    float ch = flowChance(m);
+    if (m == M_OIL && oil_coldScale > 0.0 && oilNearIce(pos))
+        return ch * oil_coldScale;
+    return ch;
+}
+
+float slideChance(uint m) {
+    if (m == M_BRICK && brick_slideScale > 0.0)
+        return clamp(brick_slideScale, 0.08, 0.45);
+    if (isPowder(m)) return clamp(fallChance(m) * 0.62, 0.55, 0.70);
+    if (m == M_SMOKE || m == M_STEAM) return max(0.14, flowChance(m) * 0.90);
+    if (m == M_WATER) return max(0.92, flowChance(m));
+    return max(0.30, flowChance(m));
+}
+
+float slideChanceAt(uint m, ivec2 pos) {
+    float ch = slideChance(m);
+    if (m == M_SAND && sand_wetSlideScale > 0.0 && sandNearWater(pos))
+        return clamp(ch * sand_wetSlideScale, 0.12, ch);
+    if (m == M_BRICK && brick_cohesionScale > 0.0) {
+        int brickN = countCardinal(
+            cell(pos + ivec2(1, 0)), cell(pos + ivec2(-1, 0)),
+            cell(pos + ivec2(0, 1)), cell(pos + ivec2(0, -1)), M_BRICK);
+        if (brickN >= 2)
+            ch = clamp(ch * brick_cohesionScale, 0.06, ch);
+    }
+    return ch;
+}
+
+float fallChanceAt(uint m, ivec2 pos) {
+    if (m == M_SAND && sand_wetSlideScale > 0.0 && sandNearWater(pos))
+        return clamp(fallChance(m) * sand_wetSlideScale, 0.15, 1.0);
+    if (m == M_OIL && oil_coldScale > 0.0 && oilNearIce(pos))
+        return clamp(fallChance(m) * oil_coldScale, 0.12, 1.0);
+    return fallChance(m);
+}
+
+bool isSolidSurface(uint m) {
+    return m == M_WALL || m == M_STONE || m == M_SAND || m == M_SALT || isPlant(m) || m == M_ICE ||
+           m == M_GLASS || m == M_WOOD || m == M_METAL || m == M_TNT || m == M_BRICK;
+}
+
+bool nearPlantNeigh(uint right, uint left, uint up, uint down) {
+    return neighborHas(right, left, up, down, M_PLANT) ||
+           neighborHas(right, left, up, down, M_FLOWER);
+}
+
+// Horizontal gas drift: less skimming along floors; smoke clings beside wall.
+float gasHorizFlow(uint gas, ivec2 pos, ivec2 dir) {
+    float ch = flowChance(gas);
+    if (gas != M_SMOKE && gas != M_FIRE && gas != M_STEAM && gas != M_EMBER) return ch;
+    if (isSolidSurface(cell(pos + ivec2(0, -1)))) ch *= 0.55;
+    if (gas == M_SMOKE || gas == M_STEAM) {
+        uint block = cell(pos + ivec2(-dir.x, -dir.y));
+        if (block == M_WALL) ch *= 0.42;
+    }
+    return ch;
+}
+
 uint react(uint self, ivec2 c) {
-    if (self > 18u) return M_EMPTY;
+    if (self > 22u) return M_EMPTY;
 
     uint nRight = cell(c + ivec2( 1,  0));
     uint nLeft  = cell(c + ivec2(-1,  0));
@@ -254,12 +355,39 @@ uint react(uint self, ivec2 c) {
     bool nearAcid = neighborHas(nRight, nLeft, nUp, nDown, M_ACID);
     bool nearIce = neighborHas(nRight, nLeft, nUp, nDown, M_ICE);
     bool nearOil = neighborHas(nRight, nLeft, nUp, nDown, M_OIL);
-    bool nearPlant = neighborHas(nRight, nLeft, nUp, nDown, M_PLANT);
+    bool nearPlant = nearPlantNeigh(nRight, nLeft, nUp, nDown);
     bool nearSmoke = neighborHas(nRight, nLeft, nUp, nDown, M_SMOKE);
     bool nearWall = neighborHas(nRight, nLeft, nUp, nDown, M_WALL);
     bool nearStone = neighborHas(nRight, nLeft, nUp, nDown, M_STONE);
+    bool nearBrick = neighborHas(nRight, nLeft, nUp, nDown, M_BRICK);
     bool nearSand = neighborHas(nRight, nLeft, nUp, nDown, M_SAND);
     bool nearEmber = neighborHas(nRight, nLeft, nUp, nDown, M_EMBER);
+    int nearTnt = countCardinal(nRight, nLeft, nUp, nDown, M_TNT) +
+                  countDiagonal(c, M_TNT);
+
+    if (self != M_WALL && self != M_STONE && self != M_BRICK && self != M_METAL && self != M_TNT &&
+        (nearTnt >= 1 || nearFire || nearEmber) &&
+        (!isStatic(self) || self == M_WOOD || self == M_GLASS)) {
+        float blast = tntBlastStrengthNearby(c, nearTnt, nearFire, nearEmber);
+        if (blast >= 0.22) {
+            if (rand01(c, 82u) < min(1.0, 0.70 + blast * 0.30)) return M_FIRE;
+            if (rand01(c, 83u) < min(1.0, 0.55 + blast * 0.45)) return M_EMBER;
+            if (isPowder(self) || isLiquid(self)) {
+                if (rand01(c, 84u) < min(1.0, blast * 2.8)) return M_EMPTY;
+            }
+        } else if (blast >= 0.06) {
+            if (isPowder(self) || isLiquid(self)) {
+                if (rand01(c, 84u) < min(1.0, blast * 3.5)) return M_EMPTY;
+                if (rand01(c, 85u) < min(1.0, blast * 2.8)) return M_FIRE;
+            }
+            if (self == M_WOOD || self == M_GLASS) {
+                if (rand01(c, 86u) < min(1.0, blast * 2.0)) return M_FIRE;
+            }
+            if (isGas(self) && self != M_EMPTY) {
+                if (rand01(c, 87u) < min(1.0, blast * 2.5)) return M_EMPTY;
+            }
+        }
+    }
 
     if (self == M_EMPTY) {
         if (nearFire && ember_spawnRate > 0.0 && rand01(c, 59u) < ember_spawnRate)
@@ -273,11 +401,19 @@ uint react(uint self, ivec2 c) {
             if (rand01(c, 60u) < 0.12) return M_EMBER;
             if (nearGnp >= 3 && rand01(c, 56u) < 0.10) return M_FIRE;
         }
+        if (nearTnt >= 1 || nearFire || nearEmber) {
+            float blast = tntBlastStrengthNearby(c, nearTnt, nearFire, nearEmber);
+            if (blast > 0.0) {
+                if (rand01(c, 73u) < min(1.0, 0.35 + 0.55 * blast)) return M_SMOKE;
+                if (rand01(c, 74u) < min(1.0, 0.20 + 0.45 * blast)) return M_EMBER;
+                if (rand01(c, 75u) < min(1.0, 0.30 + 0.55 * blast)) return M_FIRE;
+            }
+        }
         if (nearPlant) {
             bool wallSupport = plant_wallSupport >= 0.5 && nearWallInGrid(c);
             uint below = cell(c + ivec2(0, -1));
             bool waterBelow = below == M_WATER;
-            bool wallClimb = wallSupport && (below == M_WALL || below == M_PLANT);
+            bool wallClimb = wallSupport && (below == M_WALL || isPlant(below));
             float chance = 0.0;
             if (nearWater && waterBelow)
                 chance = min(1.0, plant_growthRate * 9.0);
@@ -296,7 +432,7 @@ uint react(uint self, ivec2 c) {
         if (nearAcid && rand01(c, 25u) < acid_wallCorrode) return M_EMPTY;
         return M_WALL;
     }
-    if (self == M_PLANT) {
+    if (self == M_PLANT || self == M_FLOWER) {
         if (nearAcid && rand01(c, 27u) < 0.35) return M_EMPTY;
         if (nearLava) return M_FIRE;
         if (nearFire && fire_ignitePlant > 0.0) {
@@ -311,9 +447,22 @@ uint react(uint self, ivec2 c) {
                 ignite = 1.0;
             if (rand01(c, 11u) < ignite) return M_FIRE;
         }
-        if (nearSmoke && fire_ignitePlant > 0.0 &&
-            rand01(c, 37u) < fire_ignitePlant * 0.40) return M_FIRE;
-        return M_PLANT;
+        if (self == M_PLANT && plant_bloomRate > 0.0) {
+            int waterCard = countCardinal(nRight, nLeft, nUp, nDown, M_WATER);
+            int waterDiag = countDiagonal(c, M_WATER);
+            int wet = waterCard + waterDiag;
+            if (wet >= 3) {
+                bool lush = waterCard >= 2 &&
+                            (nDown == M_WATER || nUp == M_WATER || waterDiag >= 2);
+                bool tip = nUp == M_EMPTY;
+                if (lush || tip) {
+                    float bloom = min(1.0, plant_bloomRate * (0.40 + 0.11 * float(wet)));
+                    if (tip) bloom = min(1.0, bloom * 1.4);
+                    if (rand01(c, 72u) < bloom) return M_FLOWER;
+                }
+            }
+        }
+        return self;
     }
     if (self == M_OIL) {
         if (nearFire) {
@@ -354,6 +503,11 @@ uint react(uint self, ivec2 c) {
         if (nearLava && nearWater && rand01(c, 29u) < 0.04) return M_SMOKE;
         return M_STONE;
     }
+    if (self == M_BRICK) {
+        if (nearAcid && rand01(c, 82u) < acid_stoneCorrode * 0.5) return M_EMPTY;
+        if (nearLava && nearWater && rand01(c, 83u) < 0.04) return M_SMOKE;
+        return M_BRICK;
+    }
     if (self == M_ICE) {
         if (nearWater && rand01(c, 38u) < 0.002) return M_WATER;
         if (nearFire && rand01(c, 33u) < ice_meltRate) return M_WATER;
@@ -364,7 +518,7 @@ uint react(uint self, ivec2 c) {
     if (self == M_ACID) {
         if (nearWater && rand01(c, 20u) < 0.25) return M_SMOKE;
         if ((nearFire || nearLava) && rand01(c, 30u) < 0.18) return M_SMOKE;
-        if ((nearWall || nearStone) && rand01(c, 35u) < 0.06)
+        if ((nearWall || nearStone || nearBrick) && rand01(c, 35u) < 0.06)
             return M_SMOKE;
         return M_ACID;
     }
@@ -383,7 +537,7 @@ uint react(uint self, ivec2 c) {
         float fade = smoke_fadeRate;
         if (nearWall)
             fade = smoke_fadeRate * 0.35;
-        else if (nearStone || nearSand)
+        else if (nearStone || nearSand || nearBrick)
             fade = min(1.0, fade + 0.05);
         if (rand01(c, 23u) < fade) return M_EMPTY;
         return M_SMOKE;
@@ -393,7 +547,7 @@ uint react(uint self, ivec2 c) {
         float fade = smoke_fadeRate * 1.8;
         if (nearWall)
             fade = smoke_fadeRate * 0.55;
-        else if (nearStone || nearSand)
+        else if (nearStone || nearSand || nearBrick)
             fade = min(1.0, fade + 0.04);
         if (rand01(c, 40u) < fade) return M_EMPTY;
         return M_STEAM;
@@ -410,7 +564,7 @@ uint react(uint self, ivec2 c) {
         if (nearAcid && rand01(c, 36u) < 0.25) return M_EMPTY;
         if (nearSmoke && !nearFire && !nearLava && wood_charRate > 0.0 &&
             rand01(c, 52u) < wood_charRate)
-            return M_EMPTY;
+            return M_COAL;
         if (nearLava) return M_FIRE;
         if (nearEmber && ember_igniteWood > 0.0 && rand01(c, 61u) < ember_igniteWood)
             return M_FIRE;
@@ -419,6 +573,8 @@ uint react(uint self, ivec2 c) {
             if (countCardinal(nRight, nLeft, nUp, nDown, M_FIRE) >= 2)
                 ignite = 1.0;
             if (rand01(c, 13u) < ignite) return M_FIRE;
+            if (wood_charRate > 0.0 && rand01(c, 89u) < wood_charRate * 0.65)
+                return M_COAL;
         }
         return M_WOOD;
     }
@@ -452,6 +608,49 @@ uint react(uint self, ivec2 c) {
         }
         if (nearAcid && rand01(c, 50u) < 0.18) return M_EMPTY;
         return M_GUNPOWDER;
+    }
+    if (self == M_COAL) {
+        bool heat = nearFire || nearLava || nearEmber;
+        if (heat && coal_burnRate > 0.0) {
+            float burn = min(1.0, coal_burnRate * (nearLava ? 3.5 : 1.0));
+            if (countCardinal(nRight, nLeft, nUp, nDown, M_FIRE) >= 2)
+                burn = min(1.0, burn * 2.0);
+            if (nearWater)
+                burn *= 0.15;
+            if (rand01(c, 76u) < burn) return M_FIRE;
+            if (rand01(c, 77u) < burn * 0.45) return M_SMOKE;
+        }
+        if (nearAcid && rand01(c, 78u) < 0.12) return M_EMPTY;
+        return M_COAL;
+    }
+    if (self == M_TNT) {
+        if (tntHasFuse(c) && tnt_detonateRate > 0.0) {
+            bool contact = tntContactFuse(c);
+            int packC = countCardinal(nRight, nLeft, nUp, nDown, M_TNT);
+            int pack8 = packC + countDiagonal(c, M_TNT);
+            float det = contact ? 1.0 : tnt_detonateRate;
+            if (!contact && nearLava)
+                det = min(1.0, det * 1.35);
+            if (!contact && (nearFire || nearEmber))
+                det = min(1.0, det + 0.28);
+            if (!contact && countCardinal(nRight, nLeft, nUp, nDown, M_FIRE) >= 1)
+                det = min(1.0, det + 0.22);
+            if (!contact && countCardinal(nRight, nLeft, nUp, nDown, M_FIRE) >= 2)
+                det = min(1.0, det + 0.35);
+            if (packC >= 2)
+                det = 1.0;
+            if (pack8 >= 3)
+                det = 1.0;
+            if (tntChainHeat(c) && packC >= 1)
+                det = 1.0;
+            if (rand01(c, 79u) < det)
+                return M_FIRE;
+            float blast = packC >= 2 ? 0.72 : 0.48;
+            if (rand01(c, 80u) < blast) return M_SMOKE;
+            if (rand01(c, 88u) < 0.35) return M_EMBER;
+        }
+        if (nearAcid && rand01(c, 81u) < 0.08) return M_EMPTY;
+        return M_TNT;
     }
     if (self == M_SALT) {
         if (nearWater && salt_dissolveRate > 0.0) {
@@ -529,7 +728,7 @@ bool cellEmpty(ivec2 p) {
 float levelBoost(uint m) {
     if (m == M_WATER) return water_levelRate;
     if (m == M_ACID) return water_levelRate * 0.35;
-    if (m == M_OIL) return water_levelRate * 0.15;
+    if (m == M_OIL) return water_levelRate * 0.10;
     return 0.0;
 }
 

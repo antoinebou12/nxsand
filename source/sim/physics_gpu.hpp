@@ -23,6 +23,7 @@ struct alignas(16) PhysicsParamsGPU {
     float acid_stoneCorrode;
     float plant_growthRate;
     float plant_wallSupport;
+    float plant_bloomRate;
 
     float lava_flowRate;
     float lava_spreadRate;
@@ -45,6 +46,10 @@ struct alignas(16) PhysicsParamsGPU {
     float ember_spawnRate;
     float ember_fadeRate;
     float ember_igniteWood;
+    float coal_burnRate;
+    float tnt_detonateRate;
+    float brick_slideScale;
+    float brick_cohesionScale;
 };
 
 static_assert(sizeof(PhysicsParamsGPU) % 16 == 0, "PhysicsParamsGPU must be 16-byte aligned");
@@ -64,6 +69,7 @@ inline PhysicsParamsGPU to_gpu(const PhysicsParams& p, int /*simW*/ = SIM_W) {
     g.acid_stoneCorrode = p.acid_stoneCorrode;
     g.plant_growthRate = p.plant_growthRate;
     g.plant_wallSupport = p.plant_wallSupport;
+    g.plant_bloomRate = p.plant_bloomRate;
     g.lava_flowRate = p.lava_flowRate;
     g.lava_spreadRate = p.lava_spreadRate;
     g.lava_igniteGas = p.lava_igniteGas;
@@ -84,6 +90,10 @@ inline PhysicsParamsGPU to_gpu(const PhysicsParams& p, int /*simW*/ = SIM_W) {
     g.ember_spawnRate = p.ember_spawnRate;
     g.ember_fadeRate = p.ember_fadeRate;
     g.ember_igniteWood = p.ember_igniteWood;
+    g.coal_burnRate = p.coal_burnRate;
+    g.tnt_detonateRate = p.tnt_detonateRate;
+    g.brick_slideScale = p.brick_slideScale;
+    g.brick_cohesionScale = p.brick_cohesionScale;
     return g;
 }
 

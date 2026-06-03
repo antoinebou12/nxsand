@@ -22,9 +22,9 @@ struct alignas(16) PhysicsParams {
     float smoke_fadeRate     = 0.010f;
     float smoke_driftRate    = 0.12f;
 
-    // Water (high spread/level = very fast, pool-like flow)
-    float water_flowRate     = 1.0f;
-    float water_levelRate    = 0.18f;
+    // Water (moderate spread/level — pools without instant wide fill)
+    float water_flowRate     = 0.80f;
+    float water_levelRate    = 0.12f;
 
     // Acid
     float acid_flowRate      = 0.28f;
@@ -34,6 +34,7 @@ struct alignas(16) PhysicsParams {
     // Plant
     float plant_growthRate   = 0.07f;
     float plant_wallSupport  = 1.0f;
+    float plant_bloomRate    = 0.035f;
 
     // Lava: fall/spread/ignite gas; lava+water quench is hard-coded in sim.frag
     // (water -> stone, lava -> smoke), not driven by these floats.
@@ -43,7 +44,7 @@ struct alignas(16) PhysicsParams {
 
     // Oil
     float oil_igniteRate     = 0.07f;
-    float oil_floatRate      = 0.16f;
+    float oil_floatRate      = 0.11f;
 
     // Ice
     float ice_meltRate       = 0.015f;
@@ -70,6 +71,16 @@ struct alignas(16) PhysicsParams {
 
     // Salt (dissolve in water; less dense than water so it floats)
     float salt_dissolveRate = 0.035f;
+
+    // Coal (slow burn; no chain detonation)
+    float coal_burnRate = 0.025f;
+
+    // TNT (static explosive; chain detonation)
+    float tnt_detonateRate = 0.92f;
+
+    // Brick (cohesive heavy powder; no ignition)
+    float brick_slideScale    = 0.30f;
+    float brick_cohesionScale = 0.35f;
 };
 
 } // namespace nx

@@ -41,6 +41,13 @@ jobs:
           make
           make dist
 
+      - name: Export NSP forwarder
+        env:
+          SWITCH_PROD_KEYS: ${{ secrets.SWITCH_PROD_KEYS }}
+        run: |
+          python3 -m pip install --quiet nton
+          python3 scripts/export-nsp.py --skip-if-no-keys
+
       - name: Package switch zip
         run: python3 -c "import shutil; shutil.make_archive('NXSand-switch', 'zip', 'dist', 'switch')"
 
@@ -54,8 +61,9 @@ jobs:
       - name: Install hint
         if: success()
         run: |
-          echo "Artifact: NXSand-switch.zip (switch/NXSand.nro inside)"
+          echo "Artifact: NXSand-switch.zip (switch/NXSand.nro inside; NXSand.nsp when SWITCH_PROD_KEYS is set)"
           echo "Install: unzip at SD card root, or copy to sdmc:/switch/NXSand.nro"
+          echo "NSP forwarder: see docs/INSTALL.md (requires prod.keys locally or SWITCH_PROD_KEYS in CI)"
           echo "See docs/INSTALL.md"
 
   desktop:

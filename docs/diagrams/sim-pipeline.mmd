@@ -1,31 +1,42 @@
-%% NXSand play frame - GLES fragment CA (regenerate: docs/DIAGRAMS.md)
-flowchart LR
-  subgraph CPU["CPU"]
-    Input["platform/input\npoll / brush"]
-    App["game/app.cpp\ntickPlay fixed dt"]
-    Save["save.cpp\nslots"]
-    Phys["PhysicsBlock UBO\nphysics_gpu.hpp"]
+%% NXSand play frame — GPU Margolus CA (regenerate: docs/DIAGRAMS.md)
+%%{init: {'theme': 'dark', 'themeVariables': {'fontSize': '14px', 'primaryColor': '#1a2438', 'primaryTextColor': '#e6eef4', 'primaryBorderColor': '#4dc9c4', 'lineColor': '#4dc9c4', 'secondaryColor': '#101828', 'tertiaryColor': '#0c1018'}}}%%
+flowchart TB
+  subgraph CPU["CPU — game loop"]
+    direction TB
+    IN["SDL input\nJoy-Con · touch · keyboard"]
+    APP["App::frame\nfixed dt · scenes"]
+    SAVE["save.cpp\n3 slots · JSON grid"]
+    UBO["PhysicsBlock UBO\nphysics.json tunables"]
   end
 
-  subgraph GPU["GPU"]
-    Paint["paint.frag\ndirty-rect brush"]
-    Sim["sim.frag or sim.comp\n4 Margolus phases"]
-    Pal["palette_lookup.frag"]
-    Bloom["bloom_bright / bloom_blur / bloom_composite"]
-    UI["ui_quad batched + FontAtlas"]
+  subgraph GRID["Ping-pong grid GL_R8UI"]
+    direction LR
+    TEX_A["texture A"]
+    TEX_B["texture B"]
+    TEX_A <--> TEX_B
   end
 
-  Present["Drawable framebuffer\nsim upscaled in play region"]
+  subgraph GPU["GPU passes"]
+    direction TB
+    PNT["paint.frag\ndirty-rect brush stamp"]
+    SIM["sim.frag ×4 or sim.comp\nMargolus phases 0,0 → 1,1"]
+    PAL["palette_lookup.frag\nIDs → color · AO · flicker"]
+    BLM["bloom chain\nbright → blur → composite"]
+    UI["ui_quad + FontAtlas\nmenus · HUD · overlay"]
+  end
 
-  Input --> App
-  App -->|paintDisk| Paint
-  Paint --> Sim
-  App -->|step| Sim
-  Phys --> Sim
-  Save <-->|readGrid / upload| Sim
-  Sim --> Pal
-  Pal --> Bloom
-  Pal --> Present
-  Bloom --> Present
-  App --> UI
-  UI --> Present
+  OUT["Handheld / window\nupscaled play region"]
+
+  IN --> APP
+  APP --> PNT
+  PNT --> SIM
+  UBO -.-> SIM
+  APP --> SIM
+  SIM --> GRID
+  GRID --> PAL
+  PAL --> BLM
+  PAL --> OUT
+  BLM --> OUT
+  APP --> UI
+  UI --> OUT
+  SAVE <-. readback / upload .-> GRID

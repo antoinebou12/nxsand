@@ -19,6 +19,7 @@ bool saveGame(App& app, int slot) {
     if (!ensureSwitchStorageReady())
         return false;
 #endif
+    if (!app.simPipeline || !app.simPipeline->ready()) return false;
     std::string dir = saveDirectory();
     ensureDirectoryExists(dir);
     std::vector<uint8_t> raw;

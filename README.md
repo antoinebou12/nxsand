@@ -8,19 +8,23 @@
 
 **Documentation:** [antoinebou12.github.io/nxsand](https://antoinebou12.github.io/nxsand/) (MkDocs Material site; sources in `docs/`).
 
-The simulation runs on the GPU (OpenGL ES 3.0): a Margolus cellular automaton on ping-pong `GL_R8UI` textures, four fragment passes per step, dirty-rect painting, and a custom OpenGL UI (no ImGui). Desktop builds exist for faster iteration; the Switch `.nro` is the primary target.
+The simulation runs on the GPU (OpenGL ES 3.0): a Margolus cellular automaton on ping-pong `GL_R8UI` textures, four fragment or compute passes per step, dirty-rect painting, and a custom OpenGL UI (no ImGui). Desktop builds exist for faster iteration; the Switch `.nro` is the primary target.
 
 ## Showcase
 
-Gameplay on Nintendo Switch (materials, reactions, save slots):
+Gameplay on Nintendo Switch — materials, reactions, and save slots:
+
+**[▶ Watch gameplay showcase (MP4)](https://github.com/antoinebou12/nxsand/raw/main/docs/media/nxsand-showcase.mp4)**
 
 <video src="docs/media/nxsand-showcase.mp4" controls width="100%">
-  <a href="docs/media/nxsand-showcase.mp4">Download gameplay video</a>
+  <a href="https://github.com/antoinebou12/nxsand/raw/main/docs/media/nxsand-showcase.mp4">Download gameplay video</a>
 </video>
+
+![Play frame pipeline](docs/diagrams/sim-pipeline.svg)
 
 ## Materials & play
 
-Seventeen brush materials (IDs 1–17) plus spawn-only **Ember** (ID 18; not in the ring). ID 0 = empty — see [docs/PHYSICS.md](docs/PHYSICS.md):
+Twenty brush materials (IDs 1–17, 20–22) plus spawn-only **Ember** (18) and **Flower** (19). ID 0 = empty — see [docs/PHYSICS.md](docs/PHYSICS.md):
 
 | Material | Behavior (short) |
 |----------|------------------|
@@ -28,9 +32,11 @@ Seventeen brush materials (IDs 1–17) plus spawn-only **Ember** (ID 18; not in 
 | Water / acid / lava / oil | Fluids (layer by density) |
 | Fire / smoke / steam / ember | Gases (ember spawns from fire; not paintable) |
 | Wall / plant / ice / glass / wood / metal | Static solids |
-| Gunpowder / salt | Powders; gunpowder detonates; salt dissolves in water |
+| Gunpowder / coal / TNT / salt / brick | Powders and explosives; **brick** is heavy cohesive (no detonation); salt dissolves in water |
 
-Reactions live in `shaders/sim_common.glsl` (included by `sim.frag` / `sim.comp`). Examples: lava + water → stone and smoke; lava + sand → glass; gunpowder + fire → spreading flame. Overview diagram: [docs/diagrams/material-reactions.svg](docs/diagrams/material-reactions.svg).
+Reactions live in `shaders/sim_common.glsl` (included by `sim.frag` / `sim.comp`). Examples: lava + water → stone and smoke; lava + sand → glass; gunpowder + fire → spreading flame.
+
+![Material reactions (overview)](docs/diagrams/material-reactions-overview.svg) — [full diagram catalog](docs/DIAGRAMS.md).
 
 Saves use JSON + base64 slot files (`sdmc:/switch/nxsand/` on Switch, `./nxsand_save/` on desktop). Engine visuals (palette, bloom, flicker, AO, upscale) load from `settings.json` under `visuals` (legacy `render` object is accepted).
 
@@ -50,7 +56,7 @@ Saves use JSON + base64 slot files (`sdmc:/switch/nxsand/` on Switch, `./nxsand_
 
 You need a homebrew-ready Switch ([setup guide](https://switch.hacks.guide/)).
 
-1. Get **`NXSand.nro`** — build it yourself (below), download the latest **NXSand-switch** zip from [GitHub Actions](https://github.com/antoinebou12/nxsand/actions/workflows/native-nro.yml) (`switch/NXSand.nro` inside), or use a [release](https://github.com/antoinebou12/nxsand/releases) tag (Switch + Linux + Windows portable zips).
+1. Get **`NXSand.nro`** — build it yourself (below), download the latest **NXSand-switch** zip from [GitHub Actions](https://github.com/antoinebou12/nxsand/actions/workflows/native-nro.yml) (`switch/NXSand.nro` inside; optional `NXSand.nsp` forwarder when CI has `SWITCH_PROD_KEYS`), or use a [release](https://github.com/antoinebou12/nxsand/releases) tag (Switch + Linux + Windows portable zips).
 2. Copy to the SD card: `sdmc:/switch/NXSand.nro` (unzip the artifact at the card root, or copy `switch/NXSand.nro` into `switch/`).
 3. Launch from the Homebrew Menu.
 
@@ -101,7 +107,7 @@ From the repository root:
 make
 ```
 
-Output: **`build/NXSand.nro`** (also **`dist/switch/NXSand.nro`** after `make dist`). Copy to `sdmc:/switch/NXSand.nro`.
+Output: **`build/NXSand.nro`** (also **`dist/switch/NXSand.nro`** after `make dist`). Copy to `sdmc:/switch/NXSand.nro`. Optional NSP forwarder: `make nsp` or CI with **`SWITCH_PROD_KEYS`** — see [docs/INSTALL.md](docs/INSTALL.md#nsp-forwarder-optional).
 
 CI runs Switch `make`, Linux desktop, and Windows desktop (`build/NXSand.exe` via MSYS2 + ANGLE) on every push to `main`; see the workflow badge above for status.
 

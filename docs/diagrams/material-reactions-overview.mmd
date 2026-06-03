@@ -1,0 +1,47 @@
+%% Material reaction overview (docs home) — see material-reactions.mmd for full graph
+%%{init: {'theme': 'dark', 'themeVariables': {'fontSize': '13px', 'primaryColor': '#1a2838', 'primaryTextColor': '#e6eef4', 'lineColor': '#4dc9c4'}}}%%
+flowchart TB
+  subgraph fluids ["Fluids"]
+    Water
+    Acid
+    Lava
+    Oil
+  end
+  subgraph solids ["Solids"]
+    Sand
+    Stone
+    Wall
+    Plant
+    Ice
+    Glass
+    Wood
+    Metal
+    Gunpowder
+    Salt
+  end
+  subgraph gases ["Gases"]
+    Fire
+    Smoke
+    Steam
+    Ember
+    Empty
+  end
+
+  Lava -->|quench| Water
+  Lava -->|vitrify| Glass
+  Sand -->|near lava| Glass
+  Fire -->|ignite| Plant
+  Fire -->|ignite| Wood
+  Fire -->|ignite| Oil
+  Oil --> Fire
+  Acid -->|corrode| Wall
+  Acid -->|dissolve| Plant
+  Water -->|dissolve| Salt
+  Salt -->|floats on| Water
+  Gunpowder -->|detonate| Fire
+  Fire -->|ignite| Gunpowder
+  Ice -->|freeze| Water
+  Steam --> Empty
+  Smoke --> Empty
+  Plant -->|spread| Empty
+  Ember -->|fade| Empty

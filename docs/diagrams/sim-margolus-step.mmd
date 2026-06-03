@@ -1,23 +1,22 @@
-%% One sim substep (source/gpu/sim_pipeline.cpp)
+%% One sim substep — source/gpu/sim_pipeline.cpp
+%%{init: {'theme': 'dark', 'themeVariables': {'fontSize': '13px', 'primaryColor': '#1e2a42', 'primaryTextColor': '#e6eef4', 'primaryBorderColor': '#f0b43c', 'lineColor': '#4dc9c4'}}}%%
 flowchart TB
-  Start([step frameTick]) --> Upload[uploadPhysics\nPhysicsBlock UBO]
-  Upload --> Backend{SimBackend?}
-  Backend --> Bounds[active tile row-runs\nor full grid fallback]
-  Bounds -->|Compute| C0[phase 0,0 clipped dispatch]
-  Bounds -->|Fragment| F0[phase 0,0 scissored pass]
-  C0 --> C1[phase 1,0]
-  C1 --> C2[phase 0,1]
-  C2 --> C3[phase 1,1]
-  F0 --> F1[phase 1,0]
-  F1 --> F2[phase 0,1]
-  F2 --> F3[phase 1,1]
-  C3 --> Swap[cur ping-pong index]
-  F3 --> Swap
-  Swap --> Done([lastPasses = 4])
+  START([step · frameTick]) --> UBO[upload PhysicsBlock UBO]
+  UBO --> MODE{Sim backend?}
+  MODE -->|Compute GLES 3.1| ACT[active tile row-runs\nor full-grid fallback]
+  MODE -->|Fragment| ACT
+  ACT --> P0["phase (0,0)"]
+  P0 --> P1["phase (1,0)"]
+  P1 --> P2["phase (0,1)"]
+  P2 --> P3["phase (1,1)"]
+  P3 --> SWAP[pointer swap\ncur = write texture]
+  SWAP --> DONE([4 passes recorded])
 
-  subgraph Pass["Each phase pass"]
-    Read[tex read] --> Preserve[preserve inactive cells\nwhen partial]
-    Preserve --> Shader[sim.frag scissor/fullscreen\nor sim.comp clipped 16x16]
-    Shader --> Write[tex write]
-    Write --> Flip[cur = write]
+  subgraph PASS["Each phase (fragment or compute)"]
+    direction LR
+    R[read texelFetch] --> K[preserve inactive\ncells when tiled]
+    K --> S[sim_common.glsl rules\n2×2 Margolus block]
+    S --> W[write + ping-pong flip]
   end
+
+  P0 -.-> PASS

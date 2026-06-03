@@ -46,7 +46,7 @@ void applyPerfPresetPhysics(PhysicsParams& phys, PerfPreset preset) {
         case PerfPreset::BatterySaver:
         case PerfPreset::Balanced:
         case PerfPreset::Quality:
-            phys.water_levelRate = 0.18f;
+            phys.water_levelRate = 0.12f;
             break;
         case PerfPreset::Manual:
             break;

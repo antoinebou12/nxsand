@@ -1,3 +1,5 @@
+%% Material reaction graph — shaders/sim_common.glsl
+%%{init: {'theme': 'dark', 'themeVariables': {'fontSize': '12px', 'primaryColor': '#1a2838', 'primaryTextColor': '#e6eef4', 'lineColor': '#95a0ae'}}}%%
 flowchart TB
   subgraph fluids [Fluids]
     Water
@@ -15,7 +17,10 @@ flowchart TB
     Wood
     Metal
     Gunpowder
+    Coal
+    TNT
     Salt
+    Brick
   end
   subgraph gases [Gases]
     Fire
@@ -50,7 +55,6 @@ flowchart TB
   Sand -->|"55% near lava"| Glass
   Water -->|"lava contact"| Stone
   Oil -->|"ignite max rates"| Fire
-  Smoke -->|"fire_ignitePlant x0.40"| Plant
 
   Wall -->|"corrode"| Empty
   Glass -->|"slow etch"| Empty
@@ -75,14 +79,35 @@ flowchart TB
   Ember -->|"ember_igniteWood"| Wood
   Acid -->|"acid_wallCorrode x0.25"| Metal
   Acid -->|"18% dissolve"| Gunpowder
+  Acid -->|"12% dissolve"| Coal
+  Acid -->|"8% dissolve"| TNT
+  Fire -->|"coal_burnRate slow"| Coal
+  Lava -->|"coal_burnRate x3.5"| Coal
+  Coal -->|"slow burn fire/smoke"| Fire
+  Sand -->|"contact fuse"| TNT
+  Water -->|"contact fuse"| TNT
+  Fire -->|"tnt_detonateRate chain"| TNT
+  Lava -->|"detonate"| TNT
+  TNT -->|"contact or heat detonate"| Fire
+  TNT -->|"blast radius 5"| Fire
+  Empty -->|"blast near fused TNT"| Fire
+  Empty -->|"blast near TNT + heat"| Fire
+  Ember -->|"tnt_detonateRate chain"| TNT
+  Sand -->|"blast victim"| Fire
+  Water -->|"blast victim"| Empty
   Water -->|"metal_rustRate"| Metal
   Metal -->|"stone"| Stone
   Fire -->|"metal_sparkRate 2+ heat"| Metal
   Lava -->|"metal_sparkRate 2+ heat"| Metal
   Ice -->|"oil_coldScale"| Oil
   Smoke -->|"wood_charRate no fire"| Wood
-  Wood -->|"char"| Empty
+  Wood -->|"char"| Coal
   Gunpowder -->|"powder fall/slide"| Empty
+  Coal -->|"powder fall/slide"| Empty
   Water -->|"salt_dissolveRate; x2.5 if surrounded"| Salt
   Salt -->|"density 2 floats on water"| Water
   Acid -->|"15% dissolve"| Salt
+  Acid -->|"acid_stoneCorrode x0.5"| Brick
+  Brick -->|"lava+water 4% smoke"| Smoke
+  Acid -->|"6% fizz with brick"| Brick
+  Brick -->|"brick_slideScale cohesion"| Empty
