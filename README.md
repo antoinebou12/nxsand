@@ -6,6 +6,8 @@
 
 **NXSand** is a falling-sand sandbox for Nintendo Switch homebrew. Pour sand, spill water, light fires, grow plants, melt ice, and watch materials react on a live pixel grid. Paint with the touchscreen or Joy-Con, pick materials from a ring, save up to three worlds, and tune performance when you want smoother play on handheld.
 
+**Documentation:** [antoinebou12.github.io/nxsand](https://antoinebou12.github.io/nxsand/) (MkDocs Material site; sources in `docs/`).
+
 The simulation runs on the GPU (OpenGL ES 3.0): a Margolus cellular automaton on ping-pong `GL_R8UI` textures, four fragment passes per step, dirty-rect painting, and a custom OpenGL UI (no ImGui). Desktop builds exist for faster iteration; the Switch `.nro` is the primary target.
 
 ## Showcase
@@ -154,7 +156,7 @@ Saves go to `./nxsand_save/`; legacy `./nxengine_save/` is migrated when possibl
 | `shaders/palette_lookup.frag` | Material ID → color |
 | `source/save/save.cpp` | JSON save slots |
 
-Deeper write-ups: [docs/NATIVE.md](docs/NATIVE.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/PHYSICS.md](docs/PHYSICS.md) · [docs/INSTALL.md](docs/INSTALL.md)
+Deeper write-ups: [docs site](https://antoinebou12.github.io/nxsand/) · [docs/NATIVE.md](docs/NATIVE.md) · [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [docs/PHYSICS.md](docs/PHYSICS.md) · [docs/INSTALL.md](docs/INSTALL.md)
 
 ## License
 

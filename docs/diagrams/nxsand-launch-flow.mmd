@@ -1,0 +1,11 @@
+%% Launch and save sequence (regenerate: docs/DIAGRAMS.md)
+sequenceDiagram
+  actor Player
+  participant HB as Homebrew Menu
+  participant App as NXSand.nro
+  participant Save as nxsand saves
+  Player->>HB: Launch NXSand
+  HB->>App: Load romfs + GLES
+  App->>Save: Read settings and slots
+  Player->>App: Paint / quick save
+  App->>Save: Atomic slot write

@@ -1,0 +1,35 @@
+# NXSand
+
+> GPU falling-sand sandbox for Nintendo Switch homebrew (SDL2 + OpenGL ES 3.0). Margolus cellular automaton on ping-pong GL_R8UI textures; custom OpenGL UI; three JSON+base64 save slots. Primary artifact: NXSand.nro. Desktop builds are for development only.
+
+NXSand simulates 17 brush materials (IDs 1–17) plus spawn-only Ember (18) in `shaders/sim_common.glsl`. Saves live under `sdmc:/switch/nxsand/` on Switch and `./nxsand_save/` on desktop. Do not renumber material IDs. Agent-oriented repo rules: `AGENTS.md` at repository root.
+
+Source: https://github.com/antoinebou12/nxsand  
+Documentation site: https://antoinebou12.github.io/nxsand/
+
+## Getting started
+
+- [Home](https://antoinebou12.github.io/nxsand/): overview, showcase, downloads
+- [Install on Switch](https://antoinebou12.github.io/nxsand/INSTALL/): SD card, FTP, CI artifacts, release zips, troubleshooting
+- [Controls](https://antoinebou12.github.io/nxsand/CONTROLS/): Joy-Con, desktop keyboard/mouse, menus, material ring
+- [Settings and saves](https://antoinebou12.github.io/nxsand/SETTINGS/): settings.json, physics.json, slots, migration paths
+
+## Architecture and build
+
+- [Architecture](https://antoinebou12.github.io/nxsand/ARCHITECTURE/): App loop, SimPipeline, RenderPipeline, persistence, performance defaults
+- [Native build](https://antoinebou12.github.io/nxsand/NATIVE/): devkitPro Switch build, desktop, paths, CI summary
+- [Development](https://antoinebou12.github.io/nxsand/DEVELOPMENT/): repo layout, make targets, env vars, tests, local MkDocs
+- [Diagram catalog](https://antoinebou12.github.io/nxsand/DIAGRAMS/): when to regenerate SVGs from .mmd/.puml sources
+
+## Physics and tuning
+
+- [Physics and materials](https://antoinebou12.github.io/nxsand/PHYSICS/): material IDs, Margolus movement, reaction matrix, shader tunables
+- [Switch performance matrix](https://antoinebou12.github.io/nxsand/SWITCH_PERF_MATRIX/): handheld FPS profiling template, presets, bloom/upscale notes
+
+## Optional
+
+- [CI and releases](https://antoinebou12.github.io/nxsand/CI/): GitHub Actions workflows, artifact names, act dry-run
+- [TPT stamp import](https://antoinebou12.github.io/nxsand/TPT_IMPORT/): JSON stamp v1, material map, limits vs Powder Toy
+- [Diagram assets README](https://antoinebou12.github.io/nxsand/diagrams/): catalog of committed SVG sources under docs/diagrams/
+- [Repository AGENTS.md](https://github.com/antoinebou12/nxsand/blob/main/AGENTS.md): coding-agent constraints, build commands, non-negotiables
+- [README](https://github.com/antoinebou12/nxsand/blob/main/README.md): quick install, controls table, reference versions

@@ -10,6 +10,8 @@ From the repo root, use the Cursor **uml-mcp** `generate_uml` tool (or Kroki / M
 
 | Topic | Source | SVG |
 |-------|--------|-----|
+| CI / release zips | `ci-release-flow.mmd` | `ci-release-flow.svg` |
+| Launch & save sequence | `nxsand-launch-flow.mmd` | `nxsand-launch-flow.svg` |
 | Play frame GPU path | `sim-pipeline.mmd` | `sim-pipeline.svg` |
 | Source module map | `source-modules.mmd` | `source-modules.svg` |
 | Menu / Play scenes | `game-scenes.mmd` | `game-scenes.svg` |

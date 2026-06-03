@@ -45,6 +45,7 @@ jobs:
         run: python3 -c "import shutil; shutil.make_archive('NXSand-switch', 'zip', 'dist', 'switch')"
 
       - uses: actions/upload-artifact@v4
+        if: ${{ !env.ACT }}
         with:
           name: NXSand-switch
           path: NXSand-switch.zip

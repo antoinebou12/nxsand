@@ -2,6 +2,8 @@
 
 NXSand ships as a homebrew `.nro`. You need a Switch setup that can run homebrew.
 
+For controls, settings, and architecture, see the [full documentation site](https://antoinebou12.github.io/nxsand/).
+
 ## Build Output
 
 After `make` in a devkitPro shell:

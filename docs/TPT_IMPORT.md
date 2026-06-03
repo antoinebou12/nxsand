@@ -21,7 +21,7 @@ Minimal JSON export (desktop dev / tests):
 - `x`, `y` are pixel coordinates in the stamp (top-left origin).
 - Import scales the stamp into the target sim resolution and writes a top-down byte grid.
 
-API: `nx::importTptStampJson` in [`source/save/tpt_stamp_import.cpp`](../source/save/tpt_stamp_import.cpp).
+API: `nx::importTptStampJson` in [`source/save/tpt_stamp_import.cpp`](https://github.com/antoinebou12/nxsand/blob/main/source/save/tpt_stamp_import.cpp).
 
 ## Material mapping
 
@@ -44,7 +44,7 @@ API: `nx::importTptStampJson` in [`source/save/tpt_stamp_import.cpp`](../source/
 | 191 | WOOD | Wood |
 | other | — | Empty (skipped) |
 
-Mapping table: [`source/save/tpt_material_map.hpp`](../source/save/tpt_material_map.hpp).
+Mapping table: [`source/save/tpt_material_map.hpp`](https://github.com/antoinebou12/nxsand/blob/main/source/save/tpt_material_map.hpp).
 
 ## Canonical saves (unchanged)
 
@@ -59,7 +59,7 @@ Slot saves remain **JSON + base64** grid bytes under `sdmc:/switch/nxsand/slot-N
 
 ## Physics parity note
 
-Shader rules in [`shaders/sim_common.glsl`](../shaders/sim_common.glsl) borrow **ideas** from TPT (liquid leveling, slow ice–water adjacency) but are not a port of `Simulation::UpdateParticles`. Tune via `physics.json` (`water_levelRate`, `ice_freezeRate`, etc.).
+Shader rules in [`shaders/sim_common.glsl`](https://github.com/antoinebou12/nxsand/blob/main/shaders/sim_common.glsl) borrow **ideas** from TPT (liquid leveling, slow ice–water adjacency) but are not a port of `Simulation::UpdateParticles`. Tune via `physics.json` (`water_levelRate`, `ice_freezeRate`, etc.).
 
 ## Performance analogy (TPT → NXSand)
 
@@ -67,9 +67,9 @@ Shader rules in [`shaders/sim_common.glsl`](../shaders/sim_common.glsl) borrow *
 
 | TPT idea | NXSand lever | Where |
 |----------|--------------|--------|
-| `NPART` / `XRES×YRES` | Sim grid size | [`source/sim/sim_grid_policy.hpp`](../source/sim/sim_grid_policy.hpp), Engine → Performance, `NXSAND_SIM_W` / `NXSAND_SIM_H` |
-| `CELL` (coarse aux maps) | Active tiles + idle sleep + brush dirty rect | [`source/gpu/active_tiles.hpp`](../source/gpu/active_tiles.hpp), [`source/game/app.cpp`](../source/game/app.cpp) |
-| `flood_water` / wide horizontal spread | `water_levelRate` | [`shaders/sim_common.glsl`](../shaders/sim_common.glsl) `boostedFlow()` |
+| `NPART` / `XRES×YRES` | Sim grid size | [`sim_grid_policy.hpp`](https://github.com/antoinebou12/nxsand/blob/main/source/sim/sim_grid_policy.hpp), Engine → Performance, `NXSAND_SIM_W` / `NXSAND_SIM_H` |
+| `CELL` (coarse aux maps) | Active tiles + idle sleep + brush dirty rect | [`active_tiles.hpp`](https://github.com/antoinebou12/nxsand/blob/main/source/gpu/active_tiles.hpp), [`app.cpp`](https://github.com/antoinebou12/nxsand/blob/main/source/game/app.cpp) |
+| `flood_water` / wide horizontal spread | `water_levelRate` | [`sim_common.glsl`](https://github.com/antoinebou12/nxsand/blob/main/shaders/sim_common.glsl) `boostedFlow()` |
 | Air / velocity integrators (`AIR_*`, `ISTP`, `CFDS`) | *Not implemented* | — |
 
 ### Preset cheat sheet (handheld)
@@ -82,4 +82,4 @@ Shader rules in [`shaders/sim_common.glsl`](../shaders/sim_common.glsl) borrow *
 
 Also prefer **Active tiles: Off** unless profiling needs Stable fallback, **Bloom Off**, and **Upscale filter: nearest** when profiling on Switch. Fill measured FPS / sim ms in [`SWITCH_PERF_MATRIX.md`](SWITCH_PERF_MATRIX.md).
 
-Preset physics overrides are **runtime only** (`applyPerfPresetPhysics` in [`source/game/game_settings.cpp`](../source/game/game_settings.cpp)); they do not rewrite `physics.json` until you save from Element Settings.
+Preset physics overrides are **runtime only** (`applyPerfPresetPhysics` in [`game_settings.cpp`](https://github.com/antoinebou12/nxsand/blob/main/source/game/game_settings.cpp)); they do not rewrite `physics.json` until you save from Element Settings.

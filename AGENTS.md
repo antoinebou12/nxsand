@@ -64,11 +64,12 @@ Do not default **1280x720** sim on handheld OLED.
 
 - **Build:** `.github/workflows/native-nro.yml` — `make test`, then Switch `make` + `make dist`, artifact `NXSand-switch.zip` (`switch/NXSand.nro`); Linux and Windows desktop sanity builds (`build/NXSand` / `build/NXSand.exe`).
 - **Release:** `.github/workflows/release.yml` — `workflow_dispatch` with tag; builds Switch, Linux, and Windows portable zips via `scripts/package-release.py`, then publishes to GitHub Releases (`replace_existing_assets: true`). Local dry-run: `powershell -File scripts/run-act-ci.ps1 -Workflow release -Tag v0.0.1`.
+- **Docs site:** `.github/workflows/docs.yml` — MkDocs Material (IPC Toolkit–style theme) from `docs/` + `mkdocs.yml`; publishes to GitHub Pages at `https://antoinebou12.github.io/nxsand/`. Local: `pip install -r requirements-docs.txt` then `mkdocs serve`. LLM index: `docs/llms.txt` → `https://antoinebou12.github.io/nxsand/llms.txt`.
 - Align artifact paths with README / `docs/INSTALL.md` when they change.
 
 ## Documentation touch list
 
-When behavior or paths change, update any of: `README.md`, `docs/INSTALL.md`, `docs/NATIVE.md`, `docs/PHYSICS.md`, `docs/DIAGRAMS.md`, `AGENTS.md`, verify scripts, CI notes.
+When behavior or paths change, update any of: `README.md`, `docs/` (including MkDocs nav in `mkdocs.yml`), `docs/INSTALL.md`, `docs/NATIVE.md`, `docs/PHYSICS.md`, `docs/DIAGRAMS.md`, `AGENTS.md`, verify scripts, CI notes.
 
 ## Git
 

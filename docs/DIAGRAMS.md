@@ -6,6 +6,8 @@ NXSand keeps editable diagram sources under `docs/diagrams/` beside committed SV
 
 | Diagram | Source | Use when |
 |---------|--------|----------|
+| CI / release artifacts | `diagrams/ci-release-flow.mmd` | GitHub Actions → portable zips |
+| Launch & save sequence | `diagrams/nxsand-launch-flow.mmd` | Homebrew → app → `nxsand/` persistence |
 | Play frame pipeline | `diagrams/sim-pipeline.mmd` | End-to-end CPU/GPU per frame |
 | Source modules | `diagrams/source-modules.mmd` | Repo layout and dependencies |
 | Scenes (Menu / Play) | `diagrams/game-scenes.mmd` | `App::frame`, menu transitions |
@@ -34,7 +36,8 @@ Update sources first, then render SVGs and commit both when behavior changes:
 
 - Sim/render wiring → `sim-pipeline.mmd`, `sim-margolus-step.mmd`
 - `sim.frag` / `sim_common.glsl` reactions → `material-reactions.mmd`, `reaction-lava-water-quench.puml`
-- Save format or paths → `save-load-flow.puml`
+- Save format or paths → `save-load-flow.puml`, `nxsand-launch-flow.mmd`
+- CI / release packaging → `ci-release-flow.mmd`
 - New `source/` area or public type → `source-modules.mmd`, `core-runtime-classes.puml`
 
 Do not commit generated copies under `romfs/` (build copies from `shaders/` via `prepare_romfs`).

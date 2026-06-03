@@ -1,0 +1,23 @@
+%% CI and release artifact flow (regenerate: docs/DIAGRAMS.md)
+flowchart TB
+  subgraph Build["Build targets"]
+    SW["make → NXSand.nro"]
+    LIN["make desktop → NXSand"]
+    WIN["MSYS2 + ANGLE → NXSand.exe"]
+  end
+  subgraph CI["GitHub Actions"]
+    NRO["native-nro.yml"]
+    REL["release.yml"]
+  end
+  subgraph Artifacts["Downloads"]
+    Z1["NXSand-switch.zip"]
+    Z2["NXSand-linux.zip"]
+    Z3["NXSand-windows.zip"]
+  end
+  NRO --> SW
+  REL --> SW
+  REL --> LIN
+  REL --> WIN
+  SW --> Z1
+  LIN --> Z2
+  WIN --> Z3

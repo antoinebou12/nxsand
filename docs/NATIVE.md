@@ -1,5 +1,8 @@
 # NXSand Native Switch + Desktop
 
+!!! tip "Documentation site"
+    Browse the full docs at [antoinebou12.github.io/nxsand](https://antoinebou12.github.io/nxsand/).
+
 NXSand is a C++ / SDL2 / OpenGL ES homebrew falling-sand game. Simulation uses `GL_R8UI` ping-pong textures with **`sim.frag`** (fragment) or **`sim.comp`** (compute) Margolus passes, plus `paint.frag` for brush stamps and `palette_lookup.frag` for presentation.
 
 It mirrors the read-only reference project `E:\nxapplication` for save shape, material IDs, menu flow, and Joy-Con-first controls, while using a GPU-native runtime.

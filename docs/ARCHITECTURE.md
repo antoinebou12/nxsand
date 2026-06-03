@@ -1,5 +1,8 @@
 # NXSand Architecture
 
+!!! info "Online docs"
+    This page is part of the [NXSand documentation site](https://antoinebou12.github.io/nxsand/).
+
 NXSand is a GPU-first falling-sand sandbox for Nintendo Switch and desktop: SDL2 owns the window and input; simulation, menus, HUD, and presentation are custom OpenGL ES (no ImGui, no `SDL_Renderer` for game UI).
 
 Deeper references:
