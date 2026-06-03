@@ -457,21 +457,33 @@ bool App::resetGlContextForSimCompile() {
     SDL_GL_SetSwapInterval(settings.performance.targetFps == 60 ? 1 : 2);
     queryDrawableSize(window, screenW, screenH, settings.display.orientation);
     simPipeline = std::make_unique<SimPipeline>();
+
+    render = std::make_unique<RenderPipeline>();
+    if (!render->init(shaderDir)) {
+        initError = "Render pipeline failed after GL reset";
+        return false;
+    }
+    if (!font.init()) {
+        initError = "Font atlas failed after GL reset";
+        return false;
+    }
     return true;
 }
 
 bool App::restoreUiPipelinesAfterSimCompile() {
     bootLogStage("render pipeline restore after sim compile");
-    if (!render) render = std::make_unique<RenderPipeline>();
-    if (!render->init(shaderDir)) {
-        initError = "Render pipeline restore failed";
-        return false;
+    if (!render || render->uiShader.program == 0) {
+        if (!render) render = std::make_unique<RenderPipeline>();
+        if (!render->init(shaderDir)) {
+            initError = "Render pipeline restore failed";
+            return false;
+        }
     }
-    flushPendingShaderCacheSaves();
-    if (!font.init()) {
+    if (font.tex == 0 && !font.init()) {
         initError = "Font atlas restore failed";
         return false;
     }
+    flushPendingShaderCacheSaves();
     if (!menuSim.init()) {
         initError = "Menu backdrop restore failed";
         return false;
@@ -1106,6 +1118,7 @@ void App::renderFrame() {
                                sim.tick, perf_.simMs);
         drawSimExplosionFx(*render, pr, sim.grid_w, sim.grid_h, screenW, screenH);
         perf_.endWorldRender();
+        render->prepareUiDraw(screenW, screenH);
 
         perf_.beginUi();
         drawHudSolid(*render, *this, pr);

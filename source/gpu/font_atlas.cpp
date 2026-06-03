@@ -303,6 +303,10 @@ bool FontAtlas::init() {
     err = FT_Set_Pixel_Sizes(g_ft.face, 0, rasterPx);
     if (err) {
         std::cerr << "FT_Set_Pixel_Sizes failed: " << err << "\n";
+        if (tex) {
+            glDeleteTextures(1, &tex);
+            tex = 0;
+        }
         releaseFontResources();
         return false;
     }

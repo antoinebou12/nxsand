@@ -95,6 +95,7 @@ bool RenderPipeline::init(const std::string& shaderDir) {
     ui_uTex    = uiShader.uniformLocation("uTex");
     ui_uMode   = uiShader.uniformLocation("uMode");
 
+    ensureUiQuadVbo();
     return true;
 }
 
@@ -220,6 +221,21 @@ void RenderPipeline::beginUiFrame() {
 
 void RenderPipeline::endUiFrame() {
     flushUiBatch();
+}
+
+void RenderPipeline::prepareUiDraw(int screenW, int screenH) {
+    flushUiBatch();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, screenW, screenH);
+    glDisable(GL_SCISSOR_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindVertexArray(0);
+    glUseProgram(0);
 }
 
 void RenderPipeline::drawUiQuad(float x, float y, float w, float h, float u0, float v0, float u1,

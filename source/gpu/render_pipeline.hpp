@@ -91,6 +91,9 @@ public:
     void beginUiFrame();
     void endUiFrame();
 
+    /// Reset FBO/viewport/blend after world passes so HUD font quads draw correctly.
+    void prepareUiDraw(int screenW, int screenH);
+
 private:
     bool initWorldShaders();
     void ensureQuadVbo();
