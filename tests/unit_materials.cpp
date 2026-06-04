@@ -1,5 +1,6 @@
 #include "test_harness.hpp"
 #include "sim/materials.hpp"
+#include <algorithm>
 #include <cstring>
 
 void run_materials_tests(TestContext& ctx) {
@@ -56,8 +57,6 @@ void run_materials_tests(TestContext& ctx) {
     CHECK(ctx, nx::PICKER_MATERIALS[nx::materialSelectorIndex(nx::MAT_BRICK)] == nx::MAT_BRICK);
     CHECK(ctx, nx::PICKER_MATERIALS[nx::materialSelectorIndex(nx::MAT_GUNPOWDER)] ==
                    nx::MAT_GUNPOWDER);
-    CHECK(ctx, nx::HUD_PALETTE_ROW2.size() == 6);
-    CHECK(ctx, nx::HUD_PALETTE_ROW3.size() == 5);
     CHECK(ctx, nx::sanitizeBrushMaterial(12) == nx::MAT_STEAM);
     CHECK(ctx, nx::sanitizeBrushMaterial(15) == nx::MAT_METAL);
     CHECK(ctx, nx::sanitizeBrushMaterial(16) == nx::MAT_GUNPOWDER);
@@ -68,5 +67,12 @@ void run_materials_tests(TestContext& ctx) {
     CHECK(ctx, nx::sanitizeGridMaterial(22) == nx::MAT_BRICK);
     CHECK(ctx, nx::sanitizeBrushMaterial(22) == nx::MAT_BRICK);
     CHECK(ctx, nx::sanitizeBrushMaterial(18) == nx::MAT_SAND);
+    CHECK(ctx, nx::sanitizeBrushMaterial(19) == nx::MAT_SAND);
+    for (int id = 0; id <= static_cast<int>(nx::MATERIAL_COUNT); ++id) {
+        const nx::Material brushed = nx::sanitizeBrushMaterial(id);
+        const auto it = std::find(nx::PICKER_MATERIALS.begin(), nx::PICKER_MATERIALS.end(),
+                                  brushed);
+        CHECK(ctx, it != nx::PICKER_MATERIALS.end());
+    }
     CHECK(ctx, nx::MATERIAL_COUNT == 22);
 }

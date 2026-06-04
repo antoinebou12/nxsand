@@ -18,11 +18,24 @@ enum class ShaderCacheResult {
     Hit,
 };
 
-/// Desktop: honors NXSAND_SHADER_CACHE (default on). Switch: always false (no SD shader_cache/).
+/// Desktop: honors NXSAND_SHADER_CACHE (default on). Switch: opt-in via
+/// NXSAND_SWITCH_SHADER_CACHE=1 and only saves target-driver sim binaries.
 bool shaderCacheEnabled();
 
-/// GLES program-binary cache supported on this platform (false on Switch).
+/// GLES program-binary cache supported on the active GL context.
 bool shaderProgramBinaryCacheSupported();
+
+/// Log renderer/version/program-binary support once for Switch launch diagnostics.
+void logShaderProgramBinarySupport();
+void disableShaderCacheLoadsForSession();
+
+/// Pure cache-key helper used by tests to guard source/rules fingerprinting.
+uint64_t shaderCacheKeyHashForTest(const ShaderCacheKey& key,
+                                   const std::string& renderer,
+                                   const std::string& version,
+                                   uint32_t binaryFormat,
+                                   uint32_t rulesBodySize,
+                                   uint64_t rulesBodyHash);
 
 /// Load a linked program from disk cache. Returns program id on hit, 0 otherwise.
 GLuint tryLoadShaderProgramBinary(const ShaderCacheKey& key, ShaderCacheResult* outResult);

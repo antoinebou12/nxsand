@@ -99,6 +99,21 @@ static const char* simBackendName(SimBackend b) {
 }
 #endif
 
+#if defined(__SWITCH__)
+static const char* pendingSaveKindName(PendingSaveKind kind) {
+    switch (kind) {
+        case PendingSaveKind::Slot: return "slot";
+        case PendingSaveKind::GameSettings: return "settings";
+        case PendingSaveKind::PhysicsSettings: return "physics";
+        default: return "none";
+    }
+}
+
+static bool isSettingsSaveKind(PendingSaveKind kind) {
+    return kind == PendingSaveKind::GameSettings || kind == PendingSaveKind::PhysicsSettings;
+}
+#endif
+
 std::string App::resolveShaderDir() const {
     std::string e = getenvStr("NXSAND_SHADER_DIR");
     if (!e.empty()) return e;
@@ -245,6 +260,7 @@ bool App::init() {
 #if defined(__SWITCH__)
     appendLaunchLogf("GL_VERSION=%s", glVer ? glVer : "?");
     appendLaunchLogf("GLSL_VERSION=%s", glSl ? glSl : "?");
+    logShaderProgramBinarySupport();
 #endif
 #if !defined(NDEBUG)
     std::cerr << "GL_VERSION=" << (glVer ? glVer : "?")
@@ -294,9 +310,7 @@ bool App::init() {
 #endif
         return false;
     }
-#if !defined(__SWITCH__)
     flushPendingShaderCacheSaves();
-#endif
     presentBootProgress(0.05f, "Loading shaders...");
     {
         const char* palMode = SDL_getenv("NXSAND_PALETTE_MODE");
@@ -466,6 +480,47 @@ struct SimCompileAudioGuard {
     ~SimCompileAudioGuard() { toneAudioSetOutputPaused(false); }
 };
 
+static float shaderCompileBarProgress(const char* stage, uint64_t elapsedMs) {
+    float base = 0.12f;
+    float span = 0.68f;
+    float budgetMs = 90000.f;
+    if (stage) {
+        if (std::strstr(stage, "Preparing")) {
+            base = 0.06f;
+            span = 0.10f;
+            budgetMs = 8000.f;
+        } else if (std::strstr(stage, "Linking sim")) {
+            base = 0.52f;
+            span = 0.38f;
+#if defined(__SWITCH__)
+            budgetMs = 300000.f;
+#else
+            budgetMs = 120000.f;
+#endif
+        } else if (std::strstr(stage, "Compiling sim")) {
+            base = 0.22f;
+            span = 0.30f;
+#if defined(__SWITCH__)
+            budgetMs = 180000.f;
+#else
+            budgetMs = 90000.f;
+#endif
+        } else if (std::strstr(stage, "paint") || std::strstr(stage, "Paint")) {
+            base = 0.72f;
+            span = 0.12f;
+            budgetMs = 20000.f;
+        } else if (std::strstr(stage, "palette") || std::strstr(stage, "Palette") ||
+                   std::strstr(stage, "upscale") || std::strstr(stage, "ui_quad") ||
+                   std::strstr(stage, "UI shader") || std::strstr(stage, "bloom")) {
+            base = 0.80f;
+            span = 0.14f;
+            budgetMs = 25000.f;
+        }
+    }
+    const float t = std::min(1.f, static_cast<float>(elapsedMs) / budgetMs);
+    return std::clamp(base + span * t, 0.f, 0.92f);
+}
+
 static void shaderCompileProgress(const char* stage, uint64_t elapsedMs, void* user) {
     auto* app = static_cast<App*>(user);
     if (!app || !stage) return;
@@ -476,30 +531,22 @@ static void shaderCompileProgress(const char* stage, uint64_t elapsedMs, void* u
         appendLaunchLogf("shader stage: %s", stage);
     }
 #endif
-    char buf[160];
-    const unsigned long long sec = static_cast<unsigned long long>(elapsedMs / 1000u);
-    std::snprintf(buf, sizeof(buf), "%s (%llus)", stage, sec);
-    float linkBudgetMs = 90000.f;
-#if defined(__SWITCH__)
-    if (stage && (std::strstr(stage, "Linking sim.frag") || std::strstr(stage, "Linking sim.comp") ||
-                  std::strstr(stage, "Compiling sim.frag") ||
-                  std::strstr(stage, "Compiling sim.comp"))) {
-        linkBudgetMs = 300000.f;
-    }
-#endif
-    const float t = std::min(1.f, static_cast<float>(elapsedMs) / linkBudgetMs);
+    const float bar = shaderCompileBarProgress(stage, elapsedMs);
     SDL_PumpEvents();
 #if defined(__SWITCH__)
     char status[96];
     compileStatusText(stage, elapsedMs, status, sizeof(status));
     app->ensureUiFontReady();
     if (app->font.isReady()) {
-        app->presentBootProgress(0.5f + 0.2f * t, status);
+        app->presentBootProgress(bar, status);
     } else {
-        app->presentCompileOverlay(0.5f + 0.2f * t);
+        app->presentCompileOverlay(bar);
     }
 #else
-    app->presentBootProgress(0.5f + 0.2f * t, buf);
+    char buf[160];
+    const unsigned long long sec = static_cast<unsigned long long>(elapsedMs / 1000u);
+    std::snprintf(buf, sizeof(buf), "%s (%llus)", stage, sec);
+    app->presentBootProgress(bar, buf);
 #endif
 }
 
@@ -531,7 +578,7 @@ bool App::ensureSimPipelineReady() {
     const SimCompileAudioGuard audioGuard;
 #if defined(__SWITCH__)
     releaseMemoryBeforeSimCompile();
-    presentBootProgress(0.35f, "Preparing simulation shaders...");
+    presentBootProgress(0.35f, "Preparing sim...");
 #else
     presentBootProgress(0.5f, "Preparing simulation shaders...");
 #endif
@@ -558,12 +605,7 @@ bool App::ensureSimPipelineReady() {
     appendLaunchLogTimed("boot phase: sim compile begin");
 #endif
     const auto compileStart = std::chrono::steady_clock::now();
-#if defined(__SWITCH__)
     const bool showCompileProgress = true;
-#else
-    const bool showCompileProgress =
-        getenvEnabled("NXSAND_SHADER_PROGRESS") || getenvEnabled("NXENGINE_SHADER_PROGRESS");
-#endif
     if (showCompileProgress) setShaderCompileProgress(shaderCompileProgress, this);
     bool ok = initSimPipeline(sim.grid_w, sim.grid_h);
 #if !defined(__SWITCH__)
@@ -590,7 +632,7 @@ bool App::ensureSimPipelineReady() {
 #if defined(__SWITCH__)
         appendLaunchLogTimed("boot phase: world warmup begin");
 #endif
-        presentBootProgress(0.85f, "Loading render shaders...");
+        presentBootProgress(0.85f, "Render shaders...");
         if (!render->warmupWorldShaders()) {
             initError = "World shader warmup failed";
 #if defined(__SWITCH__)
@@ -616,8 +658,7 @@ bool App::ensureSimPipelineReady() {
         const char* diag = lastShaderDiagnostics();
         if (diag && std::strstr(diag, "timed out")) {
 #if defined(__SWITCH__)
-            toast.show("Shader compile timed out. Wait for compile to finish; do not force power off.",
-                       4.f);
+            toast.show("Shader timed out. Please wait.", 4.f);
 #else
             toast.show(
                 "Shader compile timed out. Delete nxsand_save/shader_cache/ or set "
@@ -626,9 +667,7 @@ bool App::ensureSimPipelineReady() {
 #endif
         } else {
 #if defined(__SWITCH__)
-            toast.show(
-                "Simulation failed to start. Wait for compile to finish; do not force power off.",
-                4.f);
+            toast.show("Simulation failed to start.", 4.f);
 #else
             toast.show("Simulation failed to start", 2.5f);
 #endif
@@ -798,20 +837,40 @@ bool App::initSimPipeline(int w, int h) {
     appendLaunchLogf("initSimPipeline: trying %s", simBackendName(backend));
 #endif
     if (simPipeline->init(w, h, shaderDir, backend)) {
-        if (backend != SimBackend::Compute) return true;
         std::string selfTestErr;
         if (simPipeline->runMovementSelfTest(&selfTestErr)) {
 #if defined(__SWITCH__)
-            appendLaunchLog("compute self-test: pass");
+            appendLaunchLogf("%s self-test: pass", simBackendName(backend));
 #endif
             return true;
         }
 #if defined(__SWITCH__)
-        appendLaunchLogf("compute self-test: failed: %s",
+        appendLaunchLogf("%s self-test: failed: %s", simBackendName(backend),
                          selfTestErr.empty() ? "?" : selfTestErr.c_str());
 #endif
-        setShaderDiagnostics(selfTestErr.empty() ? "Compute self-test failed"
-                                                 : "Compute self-test failed: " + selfTestErr);
+        if (shaderCacheEnabled()) {
+            disableShaderCacheLoadsForSession();
+            simPipeline->shutdown();
+            setShaderDiagnostics("");
+            if (simPipeline->init(w, h, shaderDir, backend)) {
+                selfTestErr.clear();
+                if (simPipeline->runMovementSelfTest(&selfTestErr)) {
+#if defined(__SWITCH__)
+                    appendLaunchLogf("%s self-test after source compile: pass",
+                                     simBackendName(backend));
+#endif
+                    return true;
+                }
+#if defined(__SWITCH__)
+                appendLaunchLogf("%s source self-test: failed: %s", simBackendName(backend),
+                                 selfTestErr.empty() ? "?" : selfTestErr.c_str());
+#endif
+            }
+        }
+        const std::string backendLabel =
+            backend == SimBackend::Compute ? "Compute" : "Fragment";
+        setShaderDiagnostics(selfTestErr.empty() ? backendLabel + " self-test failed"
+                                                 : backendLabel + " self-test failed: " + selfTestErr);
         simPipeline->shutdown();
     }
     if (backend != SimBackend::Compute) return false;
@@ -830,8 +889,8 @@ bool App::initSimPipeline(int w, int h) {
         return false;
     }
     setShaderDiagnostics("");
-    if (simPipeline->init(w, h, shaderDir, SimBackend::Fragment)) {
-        toast.show("Compute unavailable - using Fragment", 2.5f);
+    if (initSimPipeline(w, h)) {
+        toast.show("Compute failed: Fragment", 2.5f);
         return true;
     }
     return false;
@@ -1076,11 +1135,19 @@ void App::beginSaveOverlayFor(PendingSaveKind kind) {
 void App::enqueuePendingSave(PendingSaveKind kind) {
     if (kind == PendingSaveKind::None) return;
     for (size_t i = 0; i < pendingSaveCount_; ++i) {
-        if (pendingSaveQueue_[i] == kind) return;
+        if (pendingSaveQueue_[i] == kind) {
+#if defined(__SWITCH__)
+            if (isSettingsSaveKind(kind)) pendingSaveDelaySec_ = 0.20;
+#endif
+            return;
+        }
     }
     if (pendingSaveCount_ >= kPendingSaveQueueCap) return;
     const bool wasEmpty = pendingSaveCount_ == 0;
     pendingSaveQueue_[pendingSaveCount_++] = kind;
+#if defined(__SWITCH__)
+    if (isSettingsSaveKind(kind)) pendingSaveDelaySec_ = 0.20;
+#endif
     if (wasEmpty) beginSaveOverlayFor(kind);
 }
 
@@ -1109,6 +1176,9 @@ void App::tickPendingHeavySettings() {
 }
 
 void App::executePendingSave(PendingSaveKind kind) {
+#if defined(__SWITCH__)
+    const auto saveStart = std::chrono::steady_clock::now();
+#endif
     switch (kind) {
         case PendingSaveKind::Slot: {
             const bool ok = saveGame(*this, pendingSlot_);
@@ -1134,6 +1204,15 @@ void App::executePendingSave(PendingSaveKind kind) {
         }
         default: break;
     }
+#if defined(__SWITCH__)
+    if (isSettingsSaveKind(kind)) {
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - saveStart)
+                            .count();
+        appendLaunchLogf("save %s: %lldms", pendingSaveKindName(kind),
+                         static_cast<long long>(ms));
+    }
+#endif
 }
 
 void App::tickPendingSave(double dtSec) {
@@ -1143,7 +1222,11 @@ void App::tickPendingSave(double dtSec) {
     saveOverlay.tick(static_cast<float>(dtSec));
     if (!saveOverlay.readyForIo()) return;
 #else
-    (void)dtSec;
+    const PendingSaveKind front = pendingSaveQueue_[0];
+    if (isSettingsSaveKind(front) && pendingSaveDelaySec_ > 0.0) {
+        pendingSaveDelaySec_ = std::max(0.0, pendingSaveDelaySec_ - dtSec);
+        if (pendingSaveDelaySec_ > 0.0) return;
+    }
 #endif
     const PendingSaveKind kind = pendingSaveQueue_[0];
     executePendingSave(kind);
@@ -1152,6 +1235,11 @@ void App::tickPendingSave(double dtSec) {
     --pendingSaveCount_;
 #if !defined(__SWITCH__)
     saveOverlay.end();
+#else
+    pendingSaveDelaySec_ = 0.0;
+    if (pendingSaveCount_ > 0 && isSettingsSaveKind(pendingSaveQueue_[0])) {
+        pendingSaveDelaySec_ = 0.20;
+    }
 #endif
 }
 
@@ -1268,8 +1356,8 @@ void App::tickPlay(double dtSec) {
 
     const bool profilerOn = settings.debug.profilerHud != ProfilerHud::Off;
     PlayRegion pr = getPlayRegionForScene(screenW, screenH, sim.grid_w, sim.grid_h,
-                                          settings.display.fullscreenSim, !sim.paletteHidden,
-                                          false, profilerOn, settings.accessibility.uiScale);
+                                          settings.display.fullscreenSim, false, profilerOn,
+                                          settings.accessibility.uiScale);
 
     pollInput(input, menu.materialWheelOpen, false, window, &pr, sim.grid_w, sim.grid_h,
               settings.controls.cursorSpeed, settings.controls.deadzone,
@@ -1300,11 +1388,12 @@ void App::tickPlay(double dtSec) {
 
     if (menu.materialWheelOpen) {
         if (n > 0) {
-#if !defined(__SWITCH__)
             if (input.materialWheelHoverIndex >= 0) {
                 menu.materialWheelIndex =
                     std::clamp(input.materialWheelHoverIndex, 0, maxI);
-            } else if (input.menuLeft || input.menuUp) {
+            }
+#if !defined(__SWITCH__)
+            else if (input.menuLeft || input.menuUp) {
                 menu.materialWheelIndex = (menu.materialWheelIndex + n - 1) % n;
                 input.menuLeft = false;
                 input.menuUp = false;
@@ -1312,16 +1401,13 @@ void App::tickPlay(double dtSec) {
                 menu.materialWheelIndex = (menu.materialWheelIndex + 1) % n;
                 input.menuRight = false;
                 input.menuDown = false;
-            } else {
+            }
+#endif
+            else {
                 const int idx = materialWheelIndexFromStick(input.ringStickX, input.ringStickY, n,
                                                             0.01f);
                 if (idx >= 0) menu.materialWheelIndex = std::clamp(idx, 0, maxI);
             }
-#else
-            const int idx =
-                materialWheelIndexFromStick(input.ringStickX, input.ringStickY, n, 0.01f);
-            if (idx >= 0) menu.materialWheelIndex = std::clamp(idx, 0, maxI);
-#endif
         }
         if (input.materialRingConfirm || input.menuConfirm) {
             if (n > 0) {
@@ -1376,11 +1462,6 @@ void App::tickPlay(double dtSec) {
             std::snprintf(radiusMsg, sizeof(radiusMsg), "Brush radius %d", sim.brush_radius);
             toast.show(radiusMsg, 0.55f);
             input.brushRadiusDelta = 0;
-        }
-
-        if (input.togglePaletteHud) {
-            sim.paletteHidden = !sim.paletteHidden;
-            input.togglePaletteHud = false;
         }
 
         if (input.clearSandbox) {
@@ -1489,8 +1570,8 @@ void App::tickPlay(double dtSec) {
         const bool profilerOn = settings.debug.profilerHud != ProfilerHud::Off;
         const PlayRegion fxPr =
             getPlayRegionForScene(screenW, screenH, sim.grid_w, sim.grid_h,
-                                  settings.display.fullscreenSim, !sim.paletteHidden, false,
-                                  profilerOn, settings.accessibility.uiScale);
+                                  settings.display.fullscreenSim, false, profilerOn,
+                                  settings.accessibility.uiScale);
         expandSimExplosionWatch(sim.grid_w, sim.grid_h, 4);
         int ax0 = 0;
         int ay0 = 0;
@@ -1541,8 +1622,7 @@ void App::renderFrame() {
 #endif
         const bool profilerOn = settings.debug.profilerHud != ProfilerHud::Off;
         PlayRegion pr = getPlayRegionForScene(screenW, screenH, sim.grid_w, sim.grid_h,
-                                              settings.display.fullscreenSim, !sim.paletteHidden,
-                                              false, profilerOn,
+                                              settings.display.fullscreenSim, false, profilerOn,
                                               settings.accessibility.uiScale);
         perf_.beginWorldRender();
 #if defined(__SWITCH__)
@@ -1600,8 +1680,8 @@ void App::renderFrame() {
         if (!playRenderLogged_) appendLaunchLog("render play: perf enter");
 #endif
         if (!menu.materialWheelOpen) {
-            drawPerfOverlay(*render, font, perf_, settings.debug, pr, !sim.paletteHidden, screenW,
-                            screenH, settings.accessibility.uiScale);
+            drawPerfOverlay(*render, font, perf_, settings.debug, pr, screenW, screenH,
+                            settings.accessibility.uiScale);
         }
 #if defined(__SWITCH__)
         if (!playRenderLogged_) appendLaunchLog("render play: perf exit");

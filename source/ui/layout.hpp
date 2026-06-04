@@ -48,29 +48,33 @@ inline float playHudMainBandPx(float s) {
 }
 
 // Top HUD band height in pixels (matches hud.cpp + optional profiler second line).
-inline float playHudTopBarPx(int screenW, int screenH, bool paletteVisible, bool profilerVisible,
+inline float playHudTopBarPx(int screenW, int screenH, bool profilerVisible,
                              float uiScale = 1.f) {
     const float s = theme::uiScale(screenW, screenH) * uiScale;
     const float topMargin = 12.f * s;
 #if defined(__SWITCH__)
-    float top = (paletteVisible ? 42.f : 34.f) * s;
+    float top = 28.f * s;
 #else
-    float top = (paletteVisible ? 50.f : 46.f) * s;
+    float top = 46.f * s;
 #endif
     top = std::max(top, topMargin + playHudMainBandPx(s));
     if (profilerVisible) top += 18.f * s;
     return top;
 }
 
-// HUD bands reserved above/below the sand (matches hud.cpp top bar + optional palette).
-inline std::pair<int, int> playHudInsets(int screenW, int screenH, bool paletteVisible,
-                                         bool profilerVisible = false, float uiScale = 1.f) {
-    const bool topBar = paletteVisible;
-    const bool bottomPalette = paletteVisible;
-    const int top =
-        int(playHudTopBarPx(screenW, screenH, topBar, profilerVisible, uiScale));
-    const int bottom = bottomPalette ? theme::getPaletteH(screenH) : 0;
-    return {top, bottom};
+// HUD band reserved above the sand (desktop). Switch: zero insets — top HUD draws over the sim.
+inline std::pair<int, int> playHudInsets(int screenW, int screenH, bool profilerVisible = false,
+                                         float uiScale = 1.f) {
+#if defined(__SWITCH__)
+    (void)screenW;
+    (void)screenH;
+    (void)profilerVisible;
+    (void)uiScale;
+    return {0, 0};
+#else
+    const int top = int(playHudTopBarPx(screenW, screenH, profilerVisible, uiScale));
+    return {top, 0};
+#endif
 }
 
 // withChrome=false: play mode. withChrome=true: legacy top bar inset.
@@ -87,7 +91,7 @@ inline PlayRegion getPlayRegion(int screenW, int screenH, int gridW, int gridH,
     int band   = screenH;
     if (withChrome) {
         topBar = theme::getTopBarH(screenH);
-        band   = theme::getSandBandH(screenW, screenH, false);
+        band   = theme::getSandBandH(screenW, screenH);
     } else if (topInset > 0 || bottomInset > 0) {
         topBar = topInset;
         band   = std::max(1, screenH - topInset - bottomInset);
@@ -112,14 +116,12 @@ inline PlayRegion getPlayRegion(int screenW, int screenH, int gridW, int gridH,
 }
 
 inline PlayRegion getPlayRegionForScene(int screenW, int screenH, int gridW, int gridH,
-                                        bool fullscreenSim, bool paletteVisible,
-                                        bool withChrome = false, bool profilerVisible = false,
-                                        float uiScale = 1.f) {
+                                        bool fullscreenSim, bool withChrome = false,
+                                        bool profilerVisible = false, float uiScale = 1.f) {
     int top = 0;
     int bottom = 0;
     if (fullscreenSim && !withChrome) {
-        const auto insets =
-            playHudInsets(screenW, screenH, paletteVisible, profilerVisible, uiScale);
+        const auto insets = playHudInsets(screenW, screenH, profilerVisible, uiScale);
         top = insets.first;
         bottom = insets.second;
     }

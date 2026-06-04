@@ -117,6 +117,7 @@ private:
 
     std::array<PendingSaveKind, kPendingSaveQueueCap> pendingSaveQueue_{};
     size_t pendingSaveCount_ = 0;
+    double pendingSaveDelaySec_ = 0.0;
     int pendingSlot_ = 1;
     bool settingsHeavyApplyPending_ = false;
     bool heavyFlushScheduled_ = false;

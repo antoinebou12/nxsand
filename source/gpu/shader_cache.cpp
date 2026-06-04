@@ -57,6 +57,18 @@ bool envEnabledDefaultOn(const char* name) {
 }
 #endif
 
+#if defined(__SWITCH__)
+bool envEnabledDefaultOff(const char* name) {
+    const char* v = std::getenv(name);
+    if (!v || !v[0]) return false;
+    if (v[0] == '0' && v[1] == '\0') return false;
+    if (std::strcmp(v, "false") == 0 || std::strcmp(v, "FALSE") == 0) return false;
+    if (std::strcmp(v, "off") == 0 || std::strcmp(v, "OFF") == 0) return false;
+    if (std::strcmp(v, "no") == 0 || std::strcmp(v, "NO") == 0) return false;
+    return true;
+}
+#endif
+
 bool bootLogEnabled() {
     const char* v = std::getenv("NXSAND_BOOT_LOG");
     if (!v || !v[0]) v = std::getenv("NXENGINE_BOOT_LOG");
@@ -77,6 +89,7 @@ struct GpuFingerprint {
     std::string renderer;
     std::string version;
     uint32_t binaryFormat = 0;
+    std::vector<uint32_t> binaryFormats;
     bool supported = false;
 };
 
@@ -97,6 +110,10 @@ GpuFingerprint queryGpuFingerprint() {
 
     std::vector<GLint> formats(static_cast<size_t>(numFormats));
     glGetIntegerv(GL_PROGRAM_BINARY_FORMATS, formats.data());
+    fp.binaryFormats.reserve(formats.size());
+    for (GLint fmt : formats) {
+        if (fmt > 0) fp.binaryFormats.push_back(static_cast<uint32_t>(fmt));
+    }
     fp.binaryFormat = static_cast<uint32_t>(formats[0]);
     fp.supported = fp.binaryFormat != 0;
     return fp;
@@ -123,10 +140,43 @@ long romfsRulesBodySizeBytes() {
     return -1;
 }
 
-uint32_t simRulesBodyRevision() {
+std::string readRulesBody() {
+    static const char* kPaths[] = {"shaders/sim_rules_body.glsl", "romfs:/shaders/sim_rules_body.glsl"};
+    for (const char* path : kPaths) {
+        FILE* f = std::fopen(path, "rb");
+        if (!f) continue;
+        std::fseek(f, 0, SEEK_END);
+        const long sz = std::ftell(f);
+        std::fseek(f, 0, SEEK_SET);
+        if (sz > 0) {
+            std::string out(static_cast<size_t>(sz), '\0');
+            if (std::fread(out.data(), 1, out.size(), f) == out.size()) {
+                std::fclose(f);
+                return out;
+            }
+        }
+        std::fclose(f);
+    }
+    return {};
+}
+
+struct RulesBodyFingerprint {
+    uint32_t size = 0;
+    uint64_t hash = 0;
+};
+
+RulesBodyFingerprint simRulesBodyFingerprint() {
+    const std::string body = readRulesBody();
+    RulesBodyFingerprint fp{};
+    if (!body.empty()) {
+        fp.size = static_cast<uint32_t>(body.size());
+        fp.hash = fnv1a64(kFnvOffset, body);
+        return fp;
+    }
     const long sz = romfsRulesBodySizeBytes();
-    if (sz < 0) return 0;
-    return static_cast<uint32_t>(sz);
+    fp.size = sz > 0 ? static_cast<uint32_t>(sz) : 0u;
+    fp.hash = fnv1a64(kFnvOffset, fp.size);
+    return fp;
 }
 
 void logShaderCacheOffOnce(const char* reason) {
@@ -137,20 +187,36 @@ void logShaderCacheOffOnce(const char* reason) {
 }
 #endif
 
-uint64_t makeKeyHash(const ShaderCacheKey& key, const GpuFingerprint& fp) {
+uint64_t makeKeyHashParts(const ShaderCacheKey& key,
+                          const std::string& renderer,
+                          const std::string& version,
+                          uint32_t binaryFormat,
+                          uint32_t rulesBodySize,
+                          uint64_t rulesBodyHash) {
     uint64_t h = kFnvOffset;
     h = fnv1a64(h, key.label);
     h = fnv1a64(h, key.vertSource);
     h = fnv1a64(h, key.fragOrCompSource);
-    h = fnv1a64(h, fp.renderer);
-    h = fnv1a64(h, fp.version);
-    h = fnv1a64(h, fp.binaryFormat);
+    h = fnv1a64(h, renderer);
+    h = fnv1a64(h, version);
+    h = fnv1a64(h, binaryFormat);
+    h = fnv1a64(h, rulesBodySize);
+    h = fnv1a64(h, static_cast<uint32_t>(rulesBodyHash & 0xffffffffu));
+    h = fnv1a64(h, static_cast<uint32_t>(rulesBodyHash >> 32));
+    return h;
+}
+
+uint64_t makeKeyHash(const ShaderCacheKey& key, const GpuFingerprint& fp) {
+    uint32_t rulesSize = 0;
+    uint64_t rulesHash = 0;
 #if defined(__SWITCH__)
     if (isSimCacheLabel(key.label)) {
-        h = fnv1a64(h, simRulesBodyRevision());
+        const RulesBodyFingerprint rules = simRulesBodyFingerprint();
+        rulesSize = rules.size;
+        rulesHash = rules.hash;
     }
 #endif
-    return h;
+    return makeKeyHashParts(key, fp.renderer, fp.version, fp.binaryFormat, rulesSize, rulesHash);
 }
 
 std::string cacheDirectory() {
@@ -189,11 +255,7 @@ bool readCacheFile(const std::string& path, ShaderCacheHeader& hdr, std::vector<
 }
 
 bool ensureCacheDirReady() {
-#if defined(__SWITCH__)
-    return false;
-#else
     return ensureSaveDirectoryReady() && ensureDirectoryExists(cacheDirectory());
-#endif
 }
 
 std::vector<std::pair<ShaderCacheKey, GLuint>>& pendingSaves() {
@@ -201,27 +263,63 @@ std::vector<std::pair<ShaderCacheKey, GLuint>>& pendingSaves() {
     return queue;
 }
 
-#if !defined(__SWITCH__)
+bool& shaderCacheLoadBypassed() {
+    static bool bypassed = false;
+    return bypassed;
+}
+
 bool gpuProgramBinaryCacheSupported() {
     return queryGpuFingerprint().supported;
 }
-#endif
 
 } // namespace
 
 bool shaderProgramBinaryCacheSupported() {
-#if defined(__SWITCH__)
-    return false;
-#else
     return gpuProgramBinaryCacheSupported();
-#endif
 }
 
 bool shaderCacheEnabled() {
 #if defined(__SWITCH__)
-    return false;
+    return envEnabledDefaultOff("NXSAND_SWITCH_SHADER_CACHE");
 #else
     return envEnabledDefaultOn("NXSAND_SHADER_CACHE");
+#endif
+}
+
+void logShaderProgramBinarySupport() {
+#if defined(__SWITCH__)
+    const GpuFingerprint fp = queryGpuFingerprint();
+    std::string formats;
+    for (uint32_t fmt : fp.binaryFormats) {
+        if (!formats.empty()) formats += ",";
+        formats += std::to_string(fmt);
+    }
+    if (formats.empty()) formats = "none";
+    appendLaunchLogf("shader binary: renderer=%s", fp.renderer.c_str());
+    appendLaunchLogf("shader binary: version=%s", fp.version.c_str());
+    appendLaunchLogf("shader binary: formats=%zu [%s] funcs=yes supported=%s cache=%s",
+                     fp.binaryFormats.size(), formats.c_str(),
+                     fp.supported ? "yes" : "no",
+                     shaderCacheEnabled() ? "opt-in on" : "off");
+    if (!shaderCacheEnabled()) {
+        logShaderCacheOffOnce("NXSAND_SWITCH_SHADER_CACHE not set");
+    }
+#endif
+}
+
+uint64_t shaderCacheKeyHashForTest(const ShaderCacheKey& key,
+                                   const std::string& renderer,
+                                   const std::string& version,
+                                   uint32_t binaryFormat,
+                                   uint32_t rulesBodySize,
+                                   uint64_t rulesBodyHash) {
+    return makeKeyHashParts(key, renderer, version, binaryFormat, rulesBodySize, rulesBodyHash);
+}
+
+void disableShaderCacheLoadsForSession() {
+    shaderCacheLoadBypassed() = true;
+#if defined(__SWITCH__)
+    appendLaunchLog("shader cache: binary loads disabled for this session");
 #endif
 }
 
@@ -229,12 +327,28 @@ GLuint tryLoadShaderProgramBinary(const ShaderCacheKey& key, ShaderCacheResult* 
     if (outResult) *outResult = ShaderCacheResult::Miss;
 
     if (!shaderCacheEnabled()) {
-#if !defined(__SWITCH__)
         cacheLog((key.label + " cache disabled").c_str());
+#if defined(__SWITCH__)
+        if (isSimCacheLabel(key.label)) {
+            logShaderCacheOffOnce("NXSAND_SWITCH_SHADER_CACHE not set");
+        }
 #endif
         if (outResult) *outResult = ShaderCacheResult::Disabled;
         return 0;
     }
+
+    if (shaderCacheLoadBypassed()) {
+        cacheLog((key.label + " cache load bypassed").c_str());
+        if (outResult) *outResult = ShaderCacheResult::Disabled;
+        return 0;
+    }
+
+#if defined(__SWITCH__)
+    if (!isSimCacheLabel(key.label)) {
+        if (outResult) *outResult = ShaderCacheResult::Disabled;
+        return 0;
+    }
+#endif
 
     const GpuFingerprint fp = queryGpuFingerprint();
     if (!fp.supported) {
@@ -263,7 +377,7 @@ GLuint tryLoadShaderProgramBinary(const ShaderCacheKey& key, ShaderCacheResult* 
         if (outResult) *outResult = ShaderCacheResult::Miss;
         return 0;
     }
-    if (hdr.keyHash != keyHash || hdr.binaryFormat != fp.binaryFormat) {
+    if (hdr.keyHash != keyHash || hdr.binaryFormat == 0) {
         cacheLog((key.label + " stale header").c_str());
 #if defined(__SWITCH__)
         if (isSimCacheLabel(key.label)) {
@@ -296,7 +410,9 @@ GLuint tryLoadShaderProgramBinary(const ShaderCacheKey& key, ShaderCacheResult* 
     cacheLog((key.label + " hit").c_str());
 #if defined(__SWITCH__)
     if (isSimCacheLabel(key.label)) {
-        appendLaunchLogf("sim cache hit: %s rev=%u", key.label.c_str(), simRulesBodyRevision());
+        const RulesBodyFingerprint rules = simRulesBodyFingerprint();
+        appendLaunchLogf("sim cache hit: %s rules=%u/%08x", key.label.c_str(), rules.size,
+                         static_cast<unsigned>(rules.hash & 0xffffffffu));
     }
 #endif
     if (outResult) *outResult = ShaderCacheResult::Hit;
@@ -308,6 +424,11 @@ void saveShaderProgramBinary(const ShaderCacheKey& key, GLuint program) {
         cacheLog((key.label + " not saved: cache disabled").c_str());
         return;
     }
+#if defined(__SWITCH__)
+    if (!isSimCacheLabel(key.label)) {
+        return;
+    }
+#endif
     if (program == 0) {
         cacheLog((key.label + " not saved: no program").c_str());
         return;
@@ -376,7 +497,9 @@ void saveShaderProgramBinary(const ShaderCacheKey& key, GLuint program) {
         cacheLog((key.label + " saved").c_str());
 #if defined(__SWITCH__)
         if (isSimCacheLabel(key.label)) {
-            appendLaunchLogf("sim cache saved: %s rev=%u", key.label.c_str(), simRulesBodyRevision());
+            const RulesBodyFingerprint rules = simRulesBodyFingerprint();
+            appendLaunchLogf("sim cache saved: %s rules=%u/%08x", key.label.c_str(), rules.size,
+                             static_cast<unsigned>(rules.hash & 0xffffffffu));
         }
 #endif
     } else {

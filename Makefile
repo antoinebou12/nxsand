@@ -45,6 +45,7 @@ UNIT_SRCS     := tests/unit_main.cpp \
                  tests/unit_tpt_import.cpp \
                  tests/unit_perf_preset_physics.cpp \
                  tests/unit_menu_repeat.cpp \
+                 tests/unit_material_wheel.cpp \
                  source/save/tpt_stamp_import.cpp \
                  source/game/game_settings.cpp \
                  source/save/settings_io.cpp \

@@ -23,7 +23,6 @@ struct InputState {
     int menuPointerX = 0;
     int menuPointerY = 0;
     bool toggleMaterialRing = false;
-    bool togglePaletteHud = false;
     bool materialRingConfirm = false;
     bool materialRingCancel = false;
     bool clearSandbox = false;
@@ -33,7 +32,7 @@ struct InputState {
     /// Normalized left stick while the material ring is open (angular highlight).
     float ringStickX = 0.f;
     float ringStickY = 0.f;
-    /// Desktop: hovered ring segment from mouse (-1 = none).
+    /// Hovered ring segment from touch/mouse (-1 = none).
     int materialWheelHoverIndex = -1;
 
     int brushDx = 0;

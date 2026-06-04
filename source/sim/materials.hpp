@@ -90,23 +90,6 @@ constexpr std::array<Material, 19> PICKER_MATERIALS{
     MAT_METAL, MAT_GUNPOWDER, MAT_COAL, MAT_SALT, MAT_BRICK,
 };
 
-struct HudSlot {
-    Material    mat;
-    const char* keyHint;
-};
-
-constexpr std::array<HudSlot, 8> HUD_PALETTE_ROW1{{
-    {MAT_SAND,  ""}, {MAT_WATER, ""}, {MAT_WALL, ""},  {MAT_PLANT, ""},
-    {MAT_FIRE,  ""}, {MAT_LAVA,  ""}, {MAT_ACID,  ""}, {MAT_SMOKE, ""},
-}};
-constexpr std::array<HudSlot, 6> HUD_PALETTE_ROW2{{
-    {MAT_STONE, ""}, {MAT_OIL, ""}, {MAT_ICE, ""},
-    {MAT_WOOD,  ""}, {MAT_GLASS, ""}, {MAT_STEAM, ""},
-}};
-constexpr std::array<HudSlot, 5> HUD_PALETTE_ROW3{{
-    {MAT_METAL, ""}, {MAT_GUNPOWDER, ""}, {MAT_COAL, ""}, {MAT_SALT, ""}, {MAT_BRICK, ""},
-}};
-
 inline int selectorMaterialCount() {
     return static_cast<int>(PICKER_MATERIALS.size());
 }

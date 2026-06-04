@@ -41,15 +41,15 @@ const char* menuNavHint(MenuScreen screen, bool hasEnteredPlay) {
 
 const char* playHudHint() {
 #if defined(__SWITCH__)
-    return "X ring · Y save · + menu · A/ZR paint · B/ZL erase · L/R size";
+    return "X ring · touch paint · Y save · + menu · A/ZR paint · B/ZL erase · L/R size";
 #else
-    return "Esc menu · H ring · P palette · F5 save · WASD move · Space/LMB paint · Shift/RMB erase · [ ]/wheel size";
+    return "Esc menu · H ring · F5 save · WASD move · Space/LMB paint · Shift/RMB erase · [ ]/wheel size";
 #endif
 }
 
 const char* materialRingHint() {
 #if defined(__SWITCH__)
-    return "Stick aim · A pick · B back";
+    return "Touch chip or stick · A pick · B back";
 #else
     return "Mouse or WASD/arrows choose · Enter/LMB select · Esc cancel";
 #endif

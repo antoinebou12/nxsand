@@ -2,6 +2,7 @@
 #include "gpu_test_gl.hpp"
 #include "gpu/sim_pipeline.hpp"
 #include "gpu/gl_loader.hpp"
+#include "gpu/shader_cache.hpp"
 #include "sim/materials.hpp"
 #include "game/game_settings.hpp"
 #include "sim/physics_params.hpp"
@@ -46,6 +47,18 @@ void run_gpu_sim_tests(TestContext& ctx) {
         }
         CHECK(ctx, false);
         return;
+    }
+
+    {
+        nx::ShaderCacheKey a{"sim.frag", "vertex", "rules A"};
+        nx::ShaderCacheKey b{"sim.frag", "vertex", "rules B"};
+        const uint64_t ha = nx::shaderCacheKeyHashForTest(a, "renderer", "version", 1u, 128u, 9u);
+        const uint64_t hb = nx::shaderCacheKeyHashForTest(b, "renderer", "version", 1u, 128u, 9u);
+        const uint64_t hc = nx::shaderCacheKeyHashForTest(a, "renderer", "version", 1u, 129u, 9u);
+        const uint64_t hd = nx::shaderCacheKeyHashForTest(a, "renderer", "version", 2u, 128u, 9u);
+        CHECK(ctx, ha != hb);
+        CHECK(ctx, ha != hc);
+        CHECK(ctx, ha != hd);
     }
 
     {

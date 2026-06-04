@@ -27,49 +27,6 @@ void drawDisk(RenderPipeline& r, float cx, float cy, float radius, float cr, flo
 
 } // namespace
 
-MaterialWheelLayout materialWheelLayout(int screenW, int screenH, float accessibilityScale,
-                                          const PlayRegion* play) {
-    const float s = theme::uiScale(screenW, screenH, accessibilityScale);
-    MaterialWheelLayout L{};
-    if (play && play->w > 8 && play->h > 8) {
-        L.cx = float(play->x) + float(play->w) * 0.5f;
-        L.cy = float(play->y) + float(play->h) * 0.5f;
-        const float maxRad = std::min(float(play->w), float(play->h)) * 0.38f;
-        L.rad = std::min(132.f * s, maxRad);
-        L.minPickDist = std::max(40.f * s, L.rad * 0.32f);
-    } else {
-        L.cx = float(screenW) * 0.5f;
-        L.cy = float(screenH) * 0.42f;
-        L.rad = 132.f * s;
-        L.minPickDist = 52.f * s;
-    }
-    return L;
-}
-
-int materialWheelIndexFromPointer(float px, float py, const MaterialWheelLayout& layout,
-                                  int segmentCount) {
-    const float dx = px - layout.cx;
-    const float dy = py - layout.cy;
-    const float len = std::hypot(dx, dy);
-    if (len < layout.minPickDist || segmentCount <= 0) return -1;
-    return materialWheelIndexFromStick(dx / len, -dy / len, segmentCount, 0.01f);
-}
-
-int materialWheelIndexFromStick(float normX, float normY, int segmentCount, float minStickLen) {
-    if (segmentCount <= 0) return -1;
-    const float len = std::hypot(normX, normY);
-    if (len < minStickLen) return -1;
-    constexpr float kTwoPi = 6.2831853f;
-    const float sector = kTwoPi / float(segmentCount);
-    float ang = std::atan2(-normY, normX);
-    float u = ang + 1.5707963f;
-    while (u < 0.f) u += kTwoPi;
-    while (u >= kTwoPi) u -= kTwoPi;
-    int i = static_cast<int>(std::floor(u / sector + 0.5f));
-    i = (i % segmentCount + segmentCount) % segmentCount;
-    return i;
-}
-
 void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app, const PlayRegion& play) {
     if (!app.menu.materialWheelOpen) return;
 
@@ -119,7 +76,7 @@ void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app, const PlayR
                           0.025f, 0.035f, 1.f, W, H);
 
     const float topBarH =
-        playHudTopBarPx(W, H, false, profilerOn, app.settings.accessibility.uiScale);
+        playHudTopBarPx(W, H, profilerOn, app.settings.accessibility.uiScale);
     const float hintScale = 0.88f * s;
     const float hintY =
         menuBaselineInBand(4.f * s, std::max(28.f * s, topBarH - 6.f * s), font, hintScale);

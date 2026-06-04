@@ -89,7 +89,6 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
     in.menuPointerActive = false;
     in.menuPointerConfirm = false;
     in.toggleMaterialRing = false;
-    in.togglePaletteHud = false;
     in.materialRingConfirm = in.materialRingCancel = false;
     in.clearSandbox = false;
     in.quickSave = false;
@@ -220,6 +219,25 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
         }
 #endif
 #if defined(__SWITCH__)
+        if (window) {
+            static bool prevMenuTouchDown = false;
+            bool touchDown = false;
+            for (int ti = 0; ti < SDL_GetNumTouchDevices(); ++ti) {
+                const SDL_TouchID tid = SDL_GetTouchDevice(ti);
+                if (!tid || SDL_GetNumTouchFingers(tid) <= 0) continue;
+                const SDL_Finger* finger = SDL_GetTouchFinger(tid, 0);
+                if (!finger) continue;
+                normalizedToDrawable(window, finger->x, finger->y, &in.menuPointerX,
+                                     &in.menuPointerY, screenOrientation);
+                in.menuPointerActive = true;
+                touchDown = true;
+                break;
+            }
+            if (edge(touchDown, prevMenuTouchDown)) in.menuPointerConfirm = true;
+            prevMenuTouchDown = touchDown;
+        }
+#endif
+#if defined(__SWITCH__)
         if (nxDown & HidNpadButton_A) in.menuConfirm = true;
         if (nxDown & HidNpadButton_B) in.menuBack = true;
         if (nxUp) in.menuUpHeld = true;
@@ -279,27 +297,45 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
 
     if (!menuActive && tab && !prevTab) in.toggleMaterialRing = true;
 
+    if (!menuActive && materialWheelOpen && window) {
+        static bool prevRingPointerDown = false;
+        int px = 0, py = 0;
+        bool pointerDown = false;
+        bool havePointer = false;
+
+        for (int ti = 0; ti < SDL_GetNumTouchDevices(); ++ti) {
+            const SDL_TouchID tid = SDL_GetTouchDevice(ti);
+            if (!tid || SDL_GetNumTouchFingers(tid) <= 0) continue;
+            const SDL_Finger* finger = SDL_GetTouchFinger(tid, 0);
+            if (!finger) continue;
+            normalizedToDrawable(window, finger->x, finger->y, &px, &py, screenOrientation);
+            havePointer = true;
+            pointerDown = true;
+            break;
+        }
 #if !defined(__SWITCH__)
-    if (!menuActive && materialWheelOpen) {
-        if (window) {
+        if (!havePointer) {
             int lx = 0, ly = 0;
             const Uint32 mbtn = SDL_GetMouseState(&lx, &ly);
-            const bool mouseL = (mbtn & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
-            int px = 0, py = 0;
+            pointerDown = (mbtn & SDL_BUTTON(SDL_BUTTON_LEFT)) != 0;
             logicalToDrawable(window, lx, ly, &px, &py, screenOrientation);
+            havePointer = true;
+        }
+#endif
+        if (havePointer) {
             int dw = 0, dh = 0;
             queryDrawableSize(window, dw, dh, screenOrientation);
             if (dw > 0 && dh > 0) {
-                const MaterialWheelLayout wl = materialWheelLayout(dw, dh, accessibilityUiScale);
+                const MaterialWheelLayout wl =
+                    materialWheelLayout(dw, dh, accessibilityUiScale, play);
                 in.materialWheelHoverIndex = materialWheelIndexFromPointer(
                     float(px), float(py), wl, selectorMaterialCount());
             }
-            if (edge(mouseL, prevMouseL) && in.materialWheelHoverIndex >= 0)
+            if (edge(pointerDown, prevRingPointerDown) && in.materialWheelHoverIndex >= 0)
                 in.materialRingConfirm = true;
-            prevMouseL = mouseL;
         }
+        prevRingPointerDown = pointerDown;
     }
-#endif
 
 #if !defined(__SWITCH__)
     if (!materialWheelOpen) {
@@ -314,8 +350,6 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
         if (kb[SDL_SCANCODE_LEFTBRACKET]) in.brushRadiusDelta = -1;
         if (kb[SDL_SCANCODE_RIGHTBRACKET]) in.brushRadiusDelta = 1;
         if (edge(hKey, prevH)) in.toggleMaterialRing = true;
-        static bool prevPaletteKey = false;
-        if (edge(kb[SDL_SCANCODE_P] != 0, prevPaletteKey)) in.togglePaletteHud = true;
         if (kb[SDL_SCANCODE_MINUS]) in.clearSandbox = true;
         const bool quickKey = kb[SDL_SCANCODE_F5] != 0;
         if (edge(quickKey, prevQuickSave)) in.quickSave = true;
@@ -378,24 +412,12 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
 
 #if defined(__SWITCH__)
     {
-        static int paletteDownHold = 0;
-        static bool paletteToggleFired = false;
         const int stickStep = std::max(1, int(std::lround(2.f * cursorSpeed)));
         const int directDead = std::max(4000, int(32767.f * deadzone));
         if (nxLeftStick.x < -directDead) in.brushDx -= stickStep;
         if (nxLeftStick.x > directDead) in.brushDx += stickStep;
         if (nxLeftStick.y > directDead) in.brushDy -= stickStep;
         if (nxLeftStick.y < -directDead) in.brushDy += stickStep;
-
-        if (!menuActive && !materialWheelOpen && nxDownBtn && !nxL && !nxR) {
-            if (++paletteDownHold >= 45 && !paletteToggleFired) {
-                in.togglePaletteHud = true;
-                paletteToggleFired = true;
-            }
-        } else {
-            paletteDownHold = 0;
-            paletteToggleFired = false;
-        }
 
         if ((nxDown & HidNpadButton_Plus) != 0) in.openMenu = true;
         if ((nxDown & HidNpadButton_Minus) != 0) in.clearSandbox = true;

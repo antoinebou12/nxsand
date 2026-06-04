@@ -10,8 +10,8 @@
 namespace nx {
 
 void drawPerfOverlay(RenderPipeline& r, FontAtlas& font, const PerfStats& perf,
-                     const DebugSettings& debug, const PlayRegion& pr, bool paletteVisible,
-                     int screenW, int screenH, float uiScale) {
+                     const DebugSettings& debug, const PlayRegion& pr, int screenW, int screenH,
+                     float uiScale) {
     if (debug.profilerHud == ProfilerHud::Off) return;
 
     char line1[160];
@@ -73,7 +73,7 @@ void drawPerfOverlay(RenderPipeline& r, FontAtlas& font, const PerfStats& perf,
     const float boxH = lineH * float(lines) + pad * 2.f;
     const float boxW = std::min(620.f * s, float(screenW) - 36.f * s);
 
-    const int topInset = playHudInsets(screenW, screenH, paletteVisible, true, uiScale).first;
+    const int topInset = playHudInsets(screenW, screenH, true, uiScale).first;
     const float gap = 6.f * s;
     float y0;
 #if defined(__SWITCH__)

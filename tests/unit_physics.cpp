@@ -1,7 +1,9 @@
 #include "test_harness.hpp"
 #include "sim/physics_settings.hpp"
+#include "sim/materials.hpp"
 #include "save/physics_params_io.hpp"
 #include "save/save_paths.hpp"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -21,6 +23,21 @@ void run_physics_tests(TestContext& ctx) {
     CHECK(ctx, nx::paramCountFor(nx::MAT_METAL) == 2);
     CHECK(ctx, nx::paramCountFor(nx::MAT_WOOD) == 2);
     CHECK(ctx, nx::paramCountFor(nx::MAT_OIL) == 3);
+    for (int i = 0; i < nx::settingsMaterialCount(); ++i) {
+        const nx::Material m = nx::settingsMaterialAt(i);
+        const auto it = std::find(nx::PICKER_MATERIALS.begin(), nx::PICKER_MATERIALS.end(), m);
+        CHECK(ctx, it != nx::PICKER_MATERIALS.end());
+        CHECK(ctx, nx::paramCountFor(m) > 0);
+    }
+    CHECK(ctx, nx::materialSelectorIndex(nx::MAT_BRICK) >= 0);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_BRICK) > 0);
+    CHECK(ctx, nx::materialSelectorIndex(nx::MAT_EMBER) == 0);
+    CHECK(ctx, nx::materialSelectorIndex(nx::MAT_FLOWER) == 0);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_EMPTY) == 0);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_EMBER) == 0);
+    CHECK(ctx, nx::paramCountFor(nx::MAT_FLOWER) == 0);
+    CHECK(ctx, nx::sanitizeGridMaterial(nx::LEGACY_MAT_TNT_ID) == nx::MAT_EMPTY);
+    CHECK(ctx, nx::sanitizeBrushMaterial(nx::LEGACY_MAT_TNT_ID) == nx::MAT_SAND);
 
     nx::PhysicsParams p{};
     CHECK(ctx, std::fabs(nx::getParam(p, nx::MAT_FIRE, "fire_speed") - 1.f) < 1e-5f);

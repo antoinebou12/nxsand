@@ -89,11 +89,9 @@ bool parallelCompileEnabled() {
     return gl::parallel_shader_compile_available();
 }
 
-#if !defined(__SWITCH__)
 static bool isSimShaderLabel(const std::string& label) {
     return label == "sim.frag" || label == "sim.comp";
 }
-#endif
 
 #if defined(__SWITCH__)
 static bool isSimShaderName(const char* name) {
@@ -101,30 +99,6 @@ static bool isSimShaderName(const char* name) {
     return std::strstr(name, "sim.frag") != nullptr || std::strstr(name, "sim.comp") != nullptr;
 }
 
-static bool compileStageIsSimShader() {
-    return g_compileStage.find("sim.frag") != std::string::npos ||
-           g_compileStage.find("sim.comp") != std::string::npos;
-}
-
-struct SimLinkUiGuard {
-    ShaderCompileProgressFn savedFn = nullptr;
-    void* savedUser = nullptr;
-
-    explicit SimLinkUiGuard(bool suppress) {
-        if (!suppress || !g_progressFn) return;
-        savedFn = g_progressFn;
-        savedUser = g_progressUser;
-        g_progressFn = nullptr;
-        g_progressUser = nullptr;
-    }
-
-    ~SimLinkUiGuard() {
-        if (savedFn) {
-            g_progressFn = savedFn;
-            g_progressUser = savedUser;
-        }
-    }
-};
 #endif
 
 } // namespace
@@ -174,7 +148,6 @@ static const char* linkLabelFromStage() {
 }
 
 void pollShaderCompile(GLuint shader) {
-    if (!parallelCompileEnabled()) return;
 #if defined(__SWITCH__)
     uint64_t lastLogMs = 0;
     const char* compileLabel =
@@ -182,7 +155,11 @@ void pollShaderCompile(GLuint shader) {
 #endif
     for (;;) {
         GLint done = GL_FALSE;
-        glGetShaderiv(shader, GL_COMPLETION_STATUS_KHR, &done);
+        if (parallelCompileEnabled()) {
+            glGetShaderiv(shader, GL_COMPLETION_STATUS_KHR, &done);
+        } else {
+            glGetShaderiv(shader, GL_COMPILE_STATUS, &done);
+        }
         if (done == GL_TRUE) break;
         if (compileTimedOut()) {
             setShaderDiagnostics(std::string("Shader compile timed out (") + g_compileStage + ")");
@@ -225,12 +202,13 @@ bool pollProgramLink(GLuint prog, const char* linkLabel) {
 #if defined(__SWITCH__)
     heartbeat.finish();
 #endif
-    if (!parallelCompileEnabled()) {
-        return true;
-    }
     for (;;) {
         GLint done = GL_FALSE;
-        glGetProgramiv(prog, GL_COMPLETION_STATUS_KHR, &done);
+        if (parallelCompileEnabled()) {
+            glGetProgramiv(prog, GL_COMPLETION_STATUS_KHR, &done);
+        } else {
+            glGetProgramiv(prog, GL_LINK_STATUS, &done);
+        }
         if (done == GL_TRUE) break;
         if (compileTimedOut()) {
             setShaderDiagnostics(std::string("Shader link timed out (") + g_compileStage + ")");
@@ -321,17 +299,12 @@ static void logBootShaderSource(const std::string& label, const std::string& res
     appendLaunchLogf("shader source: %s resolved=%zu bytes lines~%zu", label.c_str(),
                      resolved.size(), countSourceLines(resolved));
 }
-#else
-static bool isBootShaderDiagLabel(const std::string&) { return false; }
-static void logBootShaderCache(const std::string&, ShaderCacheResult) {}
-static void logBootShaderSource(const std::string&, const std::string&) {}
 #endif
 
 static bool shouldUseBinaryRetrievableHint(const std::string& label, ShaderCacheResult cacheResult) {
 #if defined(__SWITCH__)
-    (void)label;
     (void)cacheResult;
-    return false;
+    return isSimShaderLabel(label) && shaderCacheEnabled() && shaderProgramBinaryCacheSupported();
 #else
     if (!shaderCacheEnabled()) return false;
     if (isSimShaderLabel(label)) {
@@ -344,9 +317,8 @@ static bool shouldUseBinaryRetrievableHint(const std::string& label, ShaderCache
 
 static bool shouldQueueProgramBinarySave(const std::string& label, bool binaryRetrievable) {
 #if defined(__SWITCH__)
-    (void)label;
-    (void)binaryRetrievable;
-    return false;
+    return binaryRetrievable && isSimShaderLabel(label) && shaderCacheEnabled() &&
+           shaderProgramBinaryCacheSupported();
 #else
     if (binaryRetrievable) return true;
     (void)label;
@@ -544,9 +516,7 @@ static void reportLinkProgressIfNeeded() {
     char buf[96];
     const bool simShader = isSimShaderName(name);
     if (simShader) {
-        std::snprintf(buf, sizeof(buf),
-                      "Linking %.*s - first launch may take several minutes, please wait",
-                      32, name);
+        std::snprintf(buf, sizeof(buf), "Linking %s", name);
     } else {
         std::snprintf(buf, sizeof(buf), "Linking %.*s", 48, name);
     }
@@ -557,12 +527,6 @@ static void reportLinkProgressIfNeeded() {
 
 bool ShaderProgram::linkCompute(GLuint cs, bool binaryRetrievable) {
     const auto t0 = std::chrono::steady_clock::now();
-#if defined(NX_DESKTOP)
-    ShaderCompileProgressFn savedProgress = g_progressFn;
-    void* savedProgressUser = g_progressUser;
-    g_progressFn = nullptr;
-    g_progressUser = nullptr;
-#endif
     prepareGlContextForShaderLink();
     program = glCreateProgram();
     if (binaryRetrievable) {
@@ -571,22 +535,13 @@ bool ShaderProgram::linkCompute(GLuint cs, bool binaryRetrievable) {
     glAttachShader(program, cs);
 #if defined(__SWITCH__)
     reportLinkProgressIfNeeded();
+#endif
     const char* linkLabel = !g_activeLinkLabel.empty() ? g_activeLinkLabel.c_str()
                                                        : linkLabelFromStage();
-    const bool suppressLinkUi =
-        isSimShaderName(linkLabel) || compileStageIsSimShader();
-    SimLinkUiGuard uiGuard(suppressLinkUi);
-#else
-    const char* linkLabel = linkLabelFromStage();
-#endif
     bootLog("glLinkProgram (compute) …");
     if (!pollProgramLink(program, linkLabel)) {
         glDeleteProgram(program);
         program = 0;
-#if defined(NX_DESKTOP)
-        g_progressFn = savedProgress;
-        g_progressUser = savedProgressUser;
-#endif
         return false;
     }
     GLint ok = 0;
@@ -603,27 +558,13 @@ bool ShaderProgram::linkCompute(GLuint cs, bool binaryRetrievable) {
         logProgram(program);
         glDeleteProgram(program);
         program = 0;
-#if defined(NX_DESKTOP)
-        g_progressFn = savedProgress;
-        g_progressUser = savedProgressUser;
-#endif
         return false;
     }
-#if defined(NX_DESKTOP)
-    g_progressFn = savedProgress;
-    g_progressUser = savedProgressUser;
-#endif
     return true;
 }
 
 bool ShaderProgram::link(GLuint vs, GLuint fs, bool binaryRetrievable) {
     const auto t0 = std::chrono::steady_clock::now();
-#if defined(NX_DESKTOP)
-    ShaderCompileProgressFn savedProgress = g_progressFn;
-    void* savedProgressUser = g_progressUser;
-    g_progressFn = nullptr;
-    g_progressUser = nullptr;
-#endif
     prepareGlContextForShaderLink();
     program = glCreateProgram();
     if (binaryRetrievable) {
@@ -633,22 +574,13 @@ bool ShaderProgram::link(GLuint vs, GLuint fs, bool binaryRetrievable) {
     glAttachShader(program, fs);
 #if defined(__SWITCH__)
     reportLinkProgressIfNeeded();
+#endif
     const char* linkLabel = !g_activeLinkLabel.empty() ? g_activeLinkLabel.c_str()
                                                        : linkLabelFromStage();
-    const bool suppressLinkUi =
-        isSimShaderName(linkLabel) || compileStageIsSimShader();
-    SimLinkUiGuard uiGuard(suppressLinkUi);
-#else
-    const char* linkLabel = linkLabelFromStage();
-#endif
     bootLog("glLinkProgram …");
     if (!pollProgramLink(program, linkLabel)) {
         glDeleteProgram(program);
         program = 0;
-#if defined(NX_DESKTOP)
-        g_progressFn = savedProgress;
-        g_progressUser = savedProgressUser;
-#endif
         return false;
     }
     GLint ok = 0;
@@ -665,16 +597,8 @@ bool ShaderProgram::link(GLuint vs, GLuint fs, bool binaryRetrievable) {
         logProgram(program);
         glDeleteProgram(program);
         program = 0;
-#if defined(NX_DESKTOP)
-        g_progressFn = savedProgress;
-        g_progressUser = savedProgressUser;
-#endif
         return false;
     }
-#if defined(NX_DESKTOP)
-    g_progressFn = savedProgress;
-    g_progressUser = savedProgressUser;
-#endif
     return true;
 }
 
@@ -711,14 +635,24 @@ bool ShaderProgram::loadFromFiles(const std::string& vertPath, const std::string
     logBootShaderSource(cacheKey.label, fsrc);
     logBootShaderIncludes(cacheKey.label, g_lastShaderIncludes);
 #endif
-#if !defined(__SWITCH__)
-    if (GLuint cached = tryLoadShaderProgramBinary(cacheKey, &cacheResult)) {
-        program = cached;
-        return true;
+#if defined(__SWITCH__)
+    const bool allowCacheLoad = isSimShaderLabel(cacheKey.label);
+#else
+    const bool allowCacheLoad = true;
+#endif
+    if (allowCacheLoad) {
+        if (GLuint cached = tryLoadShaderProgramBinary(cacheKey, &cacheResult)) {
+            program = cached;
+            return true;
+        }
     }
+#if !defined(__SWITCH__)
     bootLog(cacheKey.label + " compiling after cache " + cacheResultName(cacheResult));
 #else
-    (void)cacheResult;
+    if (allowCacheLoad) {
+        appendLaunchLogf("%s compiling after cache %s", cacheKey.label.c_str(),
+                         cacheResultName(cacheResult));
+    }
 #endif
     const bool binaryRetrievable = shouldUseBinaryRetrievableHint(cacheKey.label, cacheResult);
     if (!binaryRetrievable && !shouldQueueProgramBinarySave(cacheKey.label, false)) {
@@ -798,14 +732,24 @@ bool ShaderProgram::loadComputeFromFile(const std::string& compPath) {
     logBootShaderSource(cacheKey.label, src);
     logBootShaderIncludes(cacheKey.label, g_lastShaderIncludes);
 #endif
-#if !defined(__SWITCH__)
-    if (GLuint cached = tryLoadShaderProgramBinary(cacheKey, &cacheResult)) {
-        program = cached;
-        return true;
+#if defined(__SWITCH__)
+    const bool allowCacheLoad = isSimShaderLabel(cacheKey.label);
+#else
+    const bool allowCacheLoad = true;
+#endif
+    if (allowCacheLoad) {
+        if (GLuint cached = tryLoadShaderProgramBinary(cacheKey, &cacheResult)) {
+            program = cached;
+            return true;
+        }
     }
+#if !defined(__SWITCH__)
     bootLog(cacheKey.label + " compiling after cache " + cacheResultName(cacheResult));
 #else
-    (void)cacheResult;
+    if (allowCacheLoad) {
+        appendLaunchLogf("%s compiling after cache %s", cacheKey.label.c_str(),
+                         cacheResultName(cacheResult));
+    }
 #endif
     const bool binaryRetrievable = shouldUseBinaryRetrievableHint(cacheKey.label, cacheResult);
     if (!binaryRetrievable && !shouldQueueProgramBinarySave(cacheKey.label, false)) {
