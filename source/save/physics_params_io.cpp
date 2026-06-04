@@ -58,7 +58,6 @@ bool loadPhysicsParams(PhysicsParams& out) {
         g("ember_igniteWood", out.ember_igniteWood);
         g("salt_dissolveRate", out.salt_dissolveRate);
         g("coal_burnRate", out.coal_burnRate);
-        g("tnt_detonateRate", out.tnt_detonateRate);
         g("brick_slideScale", out.brick_slideScale);
         g("brick_cohesionScale", out.brick_cohesionScale);
         g_dirty = false;
@@ -107,7 +106,6 @@ bool savePhysicsParams(const PhysicsParams& p) {
     j["ember_igniteWood"] = p.ember_igniteWood;
     j["salt_dissolveRate"] = p.salt_dissolveRate;
     j["coal_burnRate"] = p.coal_burnRate;
-    j["tnt_detonateRate"] = p.tnt_detonateRate;
     j["brick_slideScale"] = p.brick_slideScale;
     j["brick_cohesionScale"] = p.brick_cohesionScale;
 

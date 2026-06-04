@@ -6,6 +6,7 @@ namespace nx {
 class App;
 class RenderPipeline;
 class FontAtlas;
+struct PlayRegion;
 
 /// Map left-stick direction to a segment index (same angular layout as the wheel).
 /// Returns -1 when the stick is inside `minStickLen` (no direction selected).
@@ -19,12 +20,13 @@ struct MaterialWheelLayout {
     float minPickDist = 0.f;
 };
 
-MaterialWheelLayout materialWheelLayout(int screenW, int screenH, float accessibilityScale);
+MaterialWheelLayout materialWheelLayout(int screenW, int screenH, float accessibilityScale,
+                                          const PlayRegion* play = nullptr);
 
 /// Screen-pixel pick (drawable coords). Returns -1 when the pointer is off the ring.
 int materialWheelIndexFromPointer(float px, float py, const MaterialWheelLayout& layout,
                                   int segmentCount);
 
-void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app);
+void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app, const PlayRegion& play);
 
 } // namespace nx

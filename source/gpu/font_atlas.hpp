@@ -32,7 +32,13 @@ public:
     int bakeScale = 2;
 
     bool init();
+    /// True when GL atlas and FreeType face are ready for drawing.
+    bool isReady() const;
     void shutdown();
+    /// Drop GL atlas only; keeps FreeType / pl session for fast re-init.
+    void invalidateGlTexture();
+    /// Drop GL texture + FreeType state; next init() rebuilds a clean atlas.
+    void resetGlResources();
 
     float textWidth(const std::string& text, float scale) const;
 
@@ -42,8 +48,9 @@ public:
     void drawTextCentered(RenderPipeline& rp, float cx, float y, float scale, const std::string& text,
                           float cr, float cg, float cb, float ca, int screenW, int screenH) const;
 
-private:
     void prewarmCommonGlyphs();
+
+private:
 
     mutable std::unordered_map<uint32_t, GlyphInfo> glyphs_;
     mutable std::vector<uint8_t> atlasPixels_;

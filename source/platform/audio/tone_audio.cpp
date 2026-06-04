@@ -1,28 +1,32 @@
 #include "tone_audio.hpp"
+#include "menu_music.hpp"
 #include "tone_audio_platform.hpp"
+#include "wav_loader.hpp"
 #include <SDL2/SDL.h>
 #include <algorithm>
 #include <atomic>
-#include <cmath>
+#include <array>
 #include <cstring>
+#include <string>
 #include <vector>
 
 namespace nx {
 
 namespace {
 
-constexpr float kPi = 3.14159265358979323846f;
-constexpr int kSampleRate = 48000;
 constexpr int kChannels = 2;
-struct ToneSpec {
-    float freqHz;
-    int durationMs;
-    float ampScale;
-};
 
 static std::atomic<SoundLevel> g_level{SoundLevel::Medium};
 static uint32_t g_busyUntilMs = 0;
 static uint32_t g_explosionCooldownUntilMs = 0;
+static bool g_wavsLoaded = false;
+
+struct ToneWav {
+    WavPcm pcm;
+    bool ok = false;
+};
+
+static std::array<ToneWav, 5> g_toneWavs{};
 
 static bool audioDisabledByEnv() {
     const char* v = SDL_getenv("NXSAND_DISABLE_AUDIO");
@@ -42,67 +46,93 @@ static float volumeScale(SoundLevel level) {
     return 0.f;
 }
 
-static ToneSpec specFor(ToneId id, bool heavy) {
-    switch (id) {
-        case ToneId::UiConfirm:
-            return {660.f, 40, 1.f};
-        case ToneId::UiBack:
-            return {440.f, 35, 1.f};
-        case ToneId::UiNav:
-            return {520.f, 25, 0.85f};
-        case ToneId::MaterialPick:
-            return {880.f, 35, 1.f};
-        case ToneId::Explosion:
-            return {heavy ? 180.f : 210.f, heavy ? 110 : 85, heavy ? 1.f : 0.85f};
-    }
-    return {440.f, 30, 1.f};
+static void applyLoopVolume(SoundLevel level) {
+    const float master = volumeScale(level);
+    constexpr float kThemeAtMedium = 0.42f;
+    constexpr float kMediumScale = 0.30f;
+    const float theme = (master <= 0.f) ? 0.f : master * (kThemeAtMedium / kMediumScale);
+    tonePlatform::setLoopVolume(theme);
 }
 
-static bool isBusy() {
-    return SDL_GetTicks() < g_busyUntilMs;
-}
+static bool isBusy() { return SDL_GetTicks() < g_busyUntilMs; }
 
 static void markBusy(int durationMs) {
     const uint32_t until = SDL_GetTicks() + static_cast<uint32_t>(durationMs);
     if (until > g_busyUntilMs) g_busyUntilMs = until;
 }
 
-static int fillToneBuffer(int16_t* out, int maxFrames, const ToneSpec& spec, float masterVol) {
-    const int frames =
-        std::min(maxFrames, (spec.durationMs * kSampleRate) / 1000);
-    if (frames <= 0 || masterVol <= 0.f) return 0;
+static int toneIndex(ToneId id) { return static_cast<int>(id); }
 
-    const float amp = 0.3f * 32767.f * spec.ampScale * masterVol;
-    const int attackFrames = std::max(1, frames / 16);
-    const int releaseFrames = std::max(1, frames / 10);
-
-    for (int i = 0; i < frames; ++i) {
-        float env = 1.f;
-        if (i < attackFrames) env = float(i) / float(attackFrames);
-        else if (i >= frames - releaseFrames)
-            env = float(frames - i) / float(releaseFrames);
-
-        const float t = float(i) / float(kSampleRate);
-        const float sample = amp * env * std::sin(2.f * kPi * spec.freqHz * t);
-        const int16_t s = static_cast<int16_t>(std::clamp(sample, -32767.f, 32767.f));
-        out[i * kChannels + 0] = s;
-        out[i * kChannels + 1] = s;
+static bool loadToneWavs() {
+    if (g_wavsLoaded) return true;
+    const char* files[5] = {
+        "ui_confirm.wav",
+        "ui_back.wav",
+        "ui_nav.wav",
+        "ui_material.wav",
+        "explosion_light.wav",
+    };
+    bool any = false;
+    for (int i = 0; i < 5; ++i) {
+        std::string err;
+        g_toneWavs[static_cast<size_t>(i)].ok =
+            loadRomfsWav(files[i], g_toneWavs[static_cast<size_t>(i)].pcm, &err);
+        if (g_toneWavs[static_cast<size_t>(i)].ok) any = true;
     }
-    return frames;
+    g_wavsLoaded = any;
+    return any;
+}
+
+static const WavPcm* wavFor(ToneId id, bool heavy) {
+    if (id == ToneId::Explosion && heavy) {
+        static WavPcm heavyPcm;
+        static bool heavyLoaded = false;
+        if (!heavyLoaded) {
+            std::string err;
+            heavyLoaded = loadRomfsWav("explosion_heavy.wav", heavyPcm, &err);
+        }
+        return heavyLoaded ? &heavyPcm : nullptr;
+    }
+    const int idx = toneIndex(id);
+    if (idx < 0 || idx >= 5) return nullptr;
+    const ToneWav& tw = g_toneWavs[static_cast<size_t>(idx)];
+    return tw.ok ? &tw.pcm : nullptr;
+}
+
+static int durationMsFor(const WavPcm& pcm) {
+    const int frames = static_cast<int>(pcm.samples.size() / kChannels);
+    if (frames <= 0 || pcm.sampleRate <= 0) return 0;
+    return (frames * 1000) / pcm.sampleRate;
 }
 
 } // namespace
 
 bool toneAudioEnsureReady() {
     if (audioDisabledByEnv()) return false;
-    return tonePlatform::init();
+    if (!tonePlatform::init()) return false;
+    loadToneWavs();
+    applyLoopVolume(g_level.load(std::memory_order_relaxed));
+    return tonePlatform::deviceReady();
 }
 
 bool toneAudioInit() { return toneAudioEnsureReady(); }
 
-void toneAudioShutdown() { tonePlatform::shutdown(); }
+void toneAudioShutdown() {
+    toneAudioReleaseCachedWavs();
+    tonePlatform::shutdown();
+}
 
-void toneAudioSetLevel(SoundLevel level) { g_level.store(level, std::memory_order_relaxed); }
+void toneAudioReleaseCachedWavs() {
+    g_wavsLoaded = false;
+    for (auto& tw : g_toneWavs) {
+        tw = ToneWav{};
+    }
+}
+
+void toneAudioSetLevel(SoundLevel level) {
+    g_level.store(level, std::memory_order_relaxed);
+    applyLoopVolume(level);
+}
 
 void toneAudioSetOutputPaused(bool paused) { tonePlatform::setOutputPaused(paused); }
 
@@ -111,8 +141,6 @@ void playTone(ToneId id, bool heavy) {
     const float masterVol = volumeScale(level);
     if (masterVol <= 0.f || audioDisabledByEnv()) return;
     if (!toneAudioEnsureReady() || !tonePlatform::deviceReady()) return;
-
-    const ToneSpec spec = specFor(id, heavy);
 
     if (id == ToneId::Explosion) {
         const uint32_t now = SDL_GetTicks();
@@ -123,13 +151,18 @@ void playTone(ToneId id, bool heavy) {
         // UI tones may cut in over a short tail.
     }
 
-    const int maxFrames = (kSampleRate * 150) / 1000;
-    std::vector<int16_t> pcm(static_cast<size_t>(maxFrames * kChannels), 0);
-    const int frames = fillToneBuffer(pcm.data(), maxFrames, spec, masterVol);
+    const WavPcm* pcm = wavFor(id, heavy);
+    if (!pcm || pcm->samples.empty()) return;
+
+    const int frames = static_cast<int>(pcm->samples.size() / kChannels);
     if (frames <= 0) return;
 
-    if (!tonePlatform::playPcm(pcm.data(), frames, kSampleRate)) return;
-    markBusy(spec.durationMs);
+    if (id != ToneId::Explosion) {
+        menuMusicNotifyUiTone();
+    }
+
+    if (!tonePlatform::queueOneShot(pcm->samples.data(), frames, masterVol)) return;
+    markBusy(durationMsFor(*pcm));
 }
 
 } // namespace nx

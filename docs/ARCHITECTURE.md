@@ -17,7 +17,7 @@ Deeper references:
 |-----------|------|
 | `source/platform/` | Switch/desktop bootstrap, romfs checks, fatal screen |
 | `source/platform/input/` | SDL/libnx → `InputState`, Joy-Con face mapping |
-| `source/platform/audio/` | Procedural feedback tones (Switch `audout`, desktop SDL audio); UI edges + gunpowder/TNT detonation via `sim_fx` |
+| `source/platform/audio/` | Procedural feedback tones (Switch `audout`, desktop SDL audio); UI edges + gunpowder detonation via `sim_fx` |
 | `source/game/` | `App` scene loop, settings, sim tick, render orchestration |
 | `source/gpu/` | `SimPipeline`, `RenderPipeline`, font atlas, perf timers, active tiles |
 | `source/sim/` | Material IDs, `PhysicsParams`, CPU reference (tests only) |
@@ -72,7 +72,7 @@ Settings split:
 - `settings.json` — engine, display, performance, `visuals` (palette mode, AO, bloom, flicker, grain, upscale filter), controls, accessibility, debug (`settings_io.cpp`). On load, missing `visuals.flicker` defaults to off; enum fields are clamped; legacy `render` object is read if `visuals` is absent.
 - `physics.json` — per-element tunables (Element Settings)
 
-Playable materials (20 brush IDs + spawn-only ember/flower): sand, water, fire, smoke, wall, acid, plant, lava, stone, oil, ice, steam, glass, wood, metal, gunpowder, coal, TNT, salt, brick — see [`PHYSICS.md`](PHYSICS.md) and [`diagrams/material-reactions.svg`](diagrams/material-reactions.svg).
+Playable materials (19 ring brush IDs + spawn-only ember/flower; legacy save byte 21 → empty): sand, water, fire, smoke, wall, acid, plant, lava, stone, oil, ice, steam, glass, wood, metal, gunpowder, coal, salt, brick — see [`PHYSICS.md`](PHYSICS.md) and [`diagrams/material-reactions.svg`](diagrams/material-reactions.svg).
 
 ## Core types (simplified)
 

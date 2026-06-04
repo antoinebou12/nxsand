@@ -18,6 +18,7 @@ if (-not (Test-Path $msys2)) {
 
 # Translate Windows path to msys (/c/Users/.../NXEngine)
 $proj = Split-Path -Parent $PSScriptRoot
+& python (Join-Path $PSScriptRoot 'generate-audio.py')
 & (Join-Path $PSScriptRoot 'gen_icon.ps1')
 
 $drive = ($proj.Substring(0,1)).ToLower()

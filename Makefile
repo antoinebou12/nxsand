@@ -71,7 +71,7 @@ GPU_UNIT_SRCS     := tests/gpu_unit_main.cpp \
                      source/gpu/gl_loader.cpp \
                      source/save/save_paths.cpp
 
-.PHONY: desktop test test-gpu golden clean help dist nsp
+.PHONY: desktop test test-gpu golden clean help dist nsp regenerate-audio
 desktop:
 	@mkdir -p build
 	$(DESKTOP_CXX) $(DESKTOP_CXXFLAGS) $(DESKTOP_SRCS) $(DESKTOP_GLAD_C) -o build/NXSand $(DESKTOP_LDFLAGS) $(DESKTOP_LIBS)
@@ -82,6 +82,9 @@ test:
 	./build/unit_tests
 
 golden: test
+
+regenerate-audio:
+	python3 scripts/generate-audio.py
 
 test-gpu:
 	@mkdir -p build
@@ -103,6 +106,8 @@ help:
 	@echo "  make test      -> CPU unit tests (no GPU/SDL)"
 	@echo "  make test-gpu  -> GLES sim pipeline tests (SDL offscreen + Mesa)"
 	@echo "  make golden    -> alias for make test"
+	@echo "  python3 scripts/generate-audio.py  -> regenerate romfs/audio/*.wav (menu theme + SFX)"
+	@echo "  make regenerate-audio -> same as generate-audio.py"
 	@echo "  make           -> build/NXSand.nro for Nintendo Switch"
 	@echo "                    Requires devkitPro shell: (dkp-)pacman -S switch-dev switch-sdl2 switch-mesa switch-glm switch-freetype switch-harfbuzz"
 	@echo "                    On Windows: scripts/build-native.ps1; FTP deploy: scripts/serve-nro-ftp.ps1"
@@ -123,7 +128,7 @@ ROMFS       := romfs
 
 APP_TITLE   := NXSand
 APP_AUTHOR  := antoi
-APP_VERSION := 0.0.1
+APP_VERSION := 0.0.2
 ICON        := romfs/icon.jpg
 
 ARCH        := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
@@ -173,11 +178,18 @@ export NROFLAGS  += --romfsdir=$(ROMFS_DIR)
 .PHONY: all clean prepare_romfs
 
 prepare_romfs: $(ROMFS_SHADERS_STAMP) $(ROMFS_ICON)
-	@rm -rf $(ROMFS_DIR)/fonts
+	@mkdir -p $(ROMFS_DIR)/fonts
+	@if [ -f fonts/NotoSans-Regular.ttf ] && [ ! fonts/NotoSans-Regular.ttf -ef $(ROMFS_DIR)/fonts/NotoSans-Regular.ttf ]; then \
+		cp -f fonts/NotoSans-Regular.ttf $(ROMFS_DIR)/fonts/; \
+	elif [ -f romfs/fonts/NotoSans-Regular.ttf ] && [ ! romfs/fonts/NotoSans-Regular.ttf -ef $(ROMFS_DIR)/fonts/NotoSans-Regular.ttf ]; then \
+		cp -f romfs/fonts/NotoSans-Regular.ttf $(ROMFS_DIR)/fonts/; fi
 
 $(ROMFS_SHADERS_STAMP): shaders/*.frag shaders/*.vert shaders/*.glsl shaders/*.comp $(TOPDIR)/Makefile
-	@rm -rf $(ROMFS_DIR)/fonts
-	@mkdir -p $(dir $@) $(ROMFS_DIR)/shaders
+	@mkdir -p $(dir $@) $(ROMFS_DIR)/shaders $(ROMFS_DIR)/fonts
+	@if [ -f fonts/NotoSans-Regular.ttf ] && [ ! fonts/NotoSans-Regular.ttf -ef $(ROMFS_DIR)/fonts/NotoSans-Regular.ttf ]; then \
+		cp -f fonts/NotoSans-Regular.ttf $(ROMFS_DIR)/fonts/; \
+	elif [ -f romfs/fonts/NotoSans-Regular.ttf ] && [ ! romfs/fonts/NotoSans-Regular.ttf -ef $(ROMFS_DIR)/fonts/NotoSans-Regular.ttf ]; then \
+		cp -f romfs/fonts/NotoSans-Regular.ttf $(ROMFS_DIR)/fonts/; fi
 	@rm -f $(ROMFS_DIR)/shaders/*.frag $(ROMFS_DIR)/shaders/*.vert $(ROMFS_DIR)/shaders/*.glsl $(ROMFS_DIR)/shaders/*.comp
 	@cp -f shaders/*.frag shaders/*.vert shaders/*.glsl shaders/*.comp $(ROMFS_DIR)/shaders/
 	@touch $@
@@ -185,6 +197,7 @@ $(ROMFS_SHADERS_STAMP): shaders/*.frag shaders/*.vert shaders/*.glsl shaders/*.c
 $(ROMFS_ICON):
 	@echo "ERROR: $(ROMFS_ICON) missing."
 	@echo "       Windows: powershell -File scripts/gen_icon.ps1"
+	@echo "       Or crop romfs/icon.jpg: python scripts/crop_icon.py"
 	@echo "       Then run make again."
 	@exit 1
 

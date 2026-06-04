@@ -73,14 +73,19 @@ void drawPerfOverlay(RenderPipeline& r, FontAtlas& font, const PerfStats& perf,
     const float boxH = lineH * float(lines) + pad * 2.f;
     const float boxW = std::min(620.f * s, float(screenW) - 36.f * s);
 
-    const int topInset = playHudInsets(screenW, screenH, paletteVisible, true).first;
+    const int topInset = playHudInsets(screenW, screenH, paletteVisible, true, uiScale).first;
     const float gap = 6.f * s;
     float y0;
+#if defined(__SWITCH__)
+    (void)pr;
+    y0 = float(topInset) + gap;
+#else
     if (float(pr.y) > float(topInset) + boxH + gap) {
         y0 = float(pr.y) - boxH - gap;
     } else {
-        y0 = float(topInset) + 4.f * s;
+        y0 = float(topInset) + gap;
     }
+#endif
 
     r.drawSolidRect(x0, y0, boxW, boxH, 0.02f, 0.03f, 0.05f, 0.75f, screenW, screenH);
     font.drawText(r, x0 + 6.f * s, y0 + 4.f * s, 0.72f * s, line1, 0.75f, 0.88f, 0.95f, 1.f,

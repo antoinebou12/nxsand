@@ -48,7 +48,7 @@ Each sim step runs **four Margolus phases** on ping-pong `GL_R8UI` textures. Rul
 
 ## Materials (overview)
 
-Twenty brush materials (IDs 1–17, 20–22) plus spawn-only **Ember** (18) and **Flower** (19). ID 0 is empty. **Brick** (22) is a cohesive heavy solid with no chain explosions. Full tables and reaction notes: [Physics & materials](PHYSICS.md). Detailed reaction graph: `diagrams/material-reactions.mmd`.
+Nineteen ring brush materials (IDs 1–17, 20, 22) plus spawn-only **Ember** (18) and **Flower** (19). ID 0 is empty. Legacy save byte **21** (former TNT) loads as empty. **Brick** (22) is a cohesive heavy solid with no chain explosions. Full tables and reaction notes: [Physics & materials](PHYSICS.md). Detailed reaction graph: `diagrams/material-reactions.mmd`.
 
 ![Material reactions (overview)](diagrams/material-reactions-overview.svg)
 

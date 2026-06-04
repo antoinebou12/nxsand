@@ -17,8 +17,8 @@ const char* menuNavHint(MenuScreen screen, bool hasEnteredPlay) {
     switch (screen) {
         case MenuScreen::Main:
 #if defined(__SWITCH__)
-            return hasEnteredPlay ? "D-pad / stick choose · A confirm · B resume"
-                                  : "D-pad / stick choose · A confirm";
+            return hasEnteredPlay ? "D-pad/stick · A ok · B play"
+                                  : "D-pad/stick · A ok";
 #else
             return hasEnteredPlay ? "WASD/Up-Down choose · Enter confirm · Esc return to sandbox"
                                   : "WASD/Up-Down choose · Enter confirm";
@@ -26,13 +26,13 @@ const char* menuNavHint(MenuScreen screen, bool hasEnteredPlay) {
         case MenuScreen::SettingsEdit:
         case MenuScreen::EngineSettingsTab:
 #if defined(__SWITCH__)
-            return "D-pad / stick adjust · A confirm · B back";
+            return "D-pad adjust · A ok · B back";
 #else
             return "WASD/Up-Down row · Left/Right adjust · Enter confirm · Esc back";
 #endif
         default:
 #if defined(__SWITCH__)
-            return "D-pad / stick choose · A confirm · B back";
+            return "D-pad/stick · A ok · B back";
 #else
             return "WASD/Up-Down choose · Enter confirm · Esc back";
 #endif
@@ -43,13 +43,13 @@ const char* playHudHint() {
 #if defined(__SWITCH__)
     return "X ring · Y save · + menu · A/ZR paint · B/ZL erase · L/R size";
 #else
-    return "Esc menu · H ring · F5 save · WASD move · Space/LMB paint · Shift/RMB erase · [ ]/wheel size";
+    return "Esc menu · H ring · P palette · F5 save · WASD move · Space/LMB paint · Shift/RMB erase · [ ]/wheel size";
 #endif
 }
 
 const char* materialRingHint() {
 #if defined(__SWITCH__)
-    return "A select · B cancel · stick aim";
+    return "Stick aim · A pick · B back";
 #else
     return "Mouse or WASD/arrows choose · Enter/LMB select · Esc cancel";
 #endif

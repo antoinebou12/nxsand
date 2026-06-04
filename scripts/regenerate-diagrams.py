@@ -16,6 +16,7 @@ PAIRS = [
     ("sim-margolus-step.mmd", "sim-margolus-step.svg"),
     ("ci-release-flow.mmd", "ci-release-flow.svg"),
     ("material-reactions-overview.mmd", "material-reactions-overview.svg"),
+    ("material-reactions.mmd", "material-reactions.svg"),
 ]
 
 

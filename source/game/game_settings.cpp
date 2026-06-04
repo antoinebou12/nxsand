@@ -12,6 +12,7 @@ GameSettings defaultGameSettings() {
     s.performance.mode = PerfPreset::BatterySaver;
     s.display.orientation = ScreenOrientation::Landscape;
     applyPerfPreset(s.performance, PerfPreset::BatterySaver, true);
+    s.performance.simBackend = SimBackend::Fragment;
     applyPerfPresetVisuals(s.visuals, PerfPreset::BatterySaver);
 #else
     applyPerfPreset(s.performance, PerfPreset::Balanced, false);
@@ -113,6 +114,16 @@ const char* paletteModeLabel(int mode) {
         case 2: return "Classic";
         default: return "Pretty";
     }
+}
+
+const char* soundLevelLabel(SoundLevel level) {
+    switch (level) {
+        case SoundLevel::Off: return "Off";
+        case SoundLevel::Low: return "Low";
+        case SoundLevel::Medium: return "Medium";
+        case SoundLevel::High: return "High";
+    }
+    return "Medium";
 }
 
 void applyPerfPreset(PerformanceSettings& perf, PerfPreset preset, bool onSwitch) {

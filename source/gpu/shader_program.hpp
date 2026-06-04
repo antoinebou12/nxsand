@@ -14,6 +14,9 @@ using ShaderCompileProgressFn = void (*)(const char* stage, uint64_t elapsedMs, 
 void setShaderCompileProgress(ShaderCompileProgressFn fn, void* user);
 void setShaderCompileStage(const char* stage);
 
+/// Reset GL bindings before glLinkProgram (ANGLE/Switch: avoid link stalls with UI state).
+void prepareGlContextForShaderLink();
+
 class ShaderProgram {
 public:
     GLuint program = 0;

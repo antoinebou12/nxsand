@@ -35,13 +35,57 @@ void MenuSim::shutdown() {
 
 void MenuSim::seed() {
     std::fill(std::begin(grid_), std::end(grid_), MAT_EMPTY);
-    for (int x = 12; x < kMenuSimW - 12; ++x) {
+    for (int x = 0; x < kMenuSimW; ++x) {
+        grid_[idx(x, kMenuSimH - 1)] = MAT_WALL;
+    }
+    for (int x = 10; x < kMenuSimW - 10; ++x) {
         grid_[idx(x, kMenuSimH - 6)] = MAT_LAVA;
         if (x % 5 == 0) grid_[idx(x, kMenuSimH - 7)] = MAT_LAVA;
     }
-    grid_[idx(10, kMenuSimH - 14)] = MAT_PLANT;
-    grid_[idx(kMenuSimW - 12, kMenuSimH - 12)] = MAT_FIRE;
+    for (int x = 22; x < 42; x += 3) {
+        grid_[idx(x, 3 + (x & 1))] = MAT_SAND;
+    }
+    grid_[idx(10, kMenuSimH - 13)] = MAT_PLANT;
+    grid_[idx(kMenuSimW - 12, kMenuSimH - 11)] = MAT_FIRE;
     seeded_ = true;
+}
+
+void MenuSim::step() {
+    for (int y = kMenuSimH - 2; y >= 0; --y) {
+        for (int x = 1; x < kMenuSimW - 1; ++x) {
+            const int i = idx(x, y);
+            const unsigned char m = grid_[i];
+            if (m != MAT_SAND && m != MAT_WATER && m != MAT_SMOKE && m != MAT_FIRE) continue;
+
+            if ((m == MAT_SAND || m == MAT_WATER) && grid_[idx(x, y + 1)] == MAT_EMPTY) {
+                std::swap(grid_[i], grid_[idx(x, y + 1)]);
+                continue;
+            }
+            if (m == MAT_SAND) {
+                const int dir = ((frameAccum_ + x + y) & 1) ? 1 : -1;
+                if (grid_[idx(x + dir, y + 1)] == MAT_EMPTY) {
+                    std::swap(grid_[i], grid_[idx(x + dir, y + 1)]);
+                }
+                continue;
+            }
+            if (m == MAT_WATER) {
+                const int dir = ((frameAccum_ + x) & 1) ? 1 : -1;
+                if (grid_[idx(x + dir, y)] == MAT_EMPTY) {
+                    std::swap(grid_[i], grid_[idx(x + dir, y)]);
+                }
+                continue;
+            }
+            if ((m == MAT_SMOKE || m == MAT_FIRE) && y > 1 && grid_[idx(x, y - 1)] == MAT_EMPTY) {
+                std::swap(grid_[i], grid_[idx(x, y - 1)]);
+            }
+        }
+    }
+
+    const int dropX = 12 + ((frameAccum_ * 7) % (kMenuSimW - 24));
+    if (grid_[idx(dropX, 2)] == MAT_EMPTY) grid_[idx(dropX, 2)] = MAT_SAND;
+    if ((frameAccum_ & 7) == 0 && grid_[idx(kMenuSimW - 14, kMenuSimH - 13)] == MAT_EMPTY) {
+        grid_[idx(kMenuSimW - 14, kMenuSimH - 13)] = MAT_SMOKE;
+    }
 }
 
 void MenuSim::uploadTexture(int animTick, bool flickerEnabled) {
@@ -80,9 +124,9 @@ void MenuSim::uploadTexture(int animTick, bool flickerEnabled) {
 
 void MenuSim::tick(int animTick, bool flickerEnabled) {
     if (!seeded_) seed();
-    // Static decorative grid: only refresh RGBA for lava shimmer (no CPU sand stepping).
-    if (++frameAccum_ < 3) return;
-    frameAccum_ = 0;
+    ++frameAccum_;
+    if ((frameAccum_ % 2) == 0) step();
+    if ((frameAccum_ % 3) != 0) return;
     uploadTexture(animTick, flickerEnabled);
 }
 

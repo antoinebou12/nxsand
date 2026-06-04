@@ -5,8 +5,8 @@ namespace nx {
 
 namespace {
 
-constexpr float kInitialDelaySec = 0.40f;
-constexpr float kStartIntervalSec = 0.12f;
+constexpr float kInitialDelaySec = 0.22f;
+constexpr float kStartIntervalSec = 0.10f;
 constexpr float kMinIntervalSec = 0.04f;
 constexpr float kAccelPerSec = 0.02f;
 

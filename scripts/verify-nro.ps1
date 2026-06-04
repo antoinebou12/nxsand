@@ -42,38 +42,40 @@ function Test-BinaryContainsAscii {
     return $false
 }
 
+$requiredRomfsShaders = @(
+    'sim.frag',
+    'sim.comp',
+    'sim_rules_body.glsl',
+    'sim_common.glsl',
+    'sim_ids.glsl',
+    'paint.frag',
+    'palette_lookup.frag',
+    'upscale.frag',
+    'fullscreen.vert',
+    'bloom_bright.frag',
+    'bloom_blur.frag',
+    'bloom_composite.frag',
+    'ui_quad.vert',
+    'ui_quad.frag'
+)
+foreach ($name in $requiredRomfsShaders) {
+    $path = Join-Path $proj "romfs\shaders\$name"
+    if (-not (Test-Path $path)) {
+        Write-Error "romfs\shaders\$name missing - run: make (prepare_romfs)"
+    }
+}
+
 $icon = Join-Path $proj 'romfs\icon.jpg'
-$simFrag = Join-Path $proj 'romfs\shaders\sim.frag'
-$paintFrag = Join-Path $proj 'romfs\shaders\paint.frag'
-$paletteFrag = Join-Path $proj 'romfs\shaders\palette_lookup.frag'
-$simCommon = Join-Path $proj 'romfs\shaders\sim_common.glsl'
-$simIds = Join-Path $proj 'romfs\shaders\sim_ids.glsl'
 if (-not (Test-Path $icon)) {
     Write-Error "romfs\icon.jpg missing - run: powershell -File scripts\gen_icon.ps1"
 }
-if (-not (Test-Path $simFrag)) {
-    Write-Error "romfs\shaders\sim.frag missing - run: make (prepare_romfs)"
-}
-if (-not (Test-Path $paintFrag)) {
-    Write-Error "romfs\shaders\paint.frag missing - run: make (prepare_romfs)"
-}
-if (-not (Test-Path $paletteFrag)) {
-    Write-Error "romfs\shaders\palette_lookup.frag missing - run: make (prepare_romfs)"
-}
-if (-not (Test-Path $simCommon)) {
-    Write-Error "romfs\shaders\sim_common.glsl missing - run: make (prepare_romfs)"
-}
-if (-not (Test-Path $simIds)) {
-    Write-Error "romfs\shaders\sim_ids.glsl missing - run: make (prepare_romfs)"
-}
-
 $iconInfo = Get-Item $icon
 if ($iconInfo.Length -lt 500) {
     Write-Error "romfs\icon.jpg looks corrupt ($($iconInfo.Length) bytes)."
 }
 
 # Embedded romfs (shader sources) and NACP title must be inside the NRO.
-if (-not (Test-BinaryContainsAscii $bytes 'GLES 3.0 fragment Margolus pass')) {
+if (-not (Test-BinaryContainsAscii $bytes 'fragment Margolus pass')) {
     Write-Error @"
 NRO is missing the GPU sim shader in romfs (sim.frag).
 Rebuild so elf2nro gets: --romfsdir=<project>/romfs
@@ -85,8 +87,47 @@ if (-not (Test-BinaryContainsAscii $bytes 'Shared Margolus CA rules')) {
     Write-Error "NRO is missing romfs shader include sim_common.glsl. Rebuild prepare_romfs."
 }
 
+if (-not (Test-BinaryContainsAscii $bytes 'GLES 3.1+ compute Margolus pass')) {
+    Write-Error "NRO is missing romfs shader sim.comp. Rebuild prepare_romfs."
+}
+
+if (-not (Test-BinaryContainsAscii $bytes 'uniform int        uPaletteMode')) {
+    Write-Error "NRO is missing romfs shader palette_lookup.frag. Rebuild prepare_romfs."
+}
+
 if (-not (Test-BinaryContainsAscii $bytes 'NXSand')) {
     Write-Error "NRO is missing embedded NACP title (NXSand). Rebuild with --nacp=build/NXSand.nacp."
+}
+
+if (-not (Test-BinaryContainsAscii $bytes 'switch-sim-log-v11')) {
+    Write-Error @"
+NRO is missing the current Switch diagnostic marker: switch-sim-log-v11.
+This usually means build\NXSand.nro is stale. Rebuild with make, then verify launch.log shows:
+  build: switch-sim-log-v11 ...
+"@
+}
+Write-Host "    Sim compile diagnostics: found 'switch-sim-log-v11' in binary"
+
+if (-not (Test-BinaryContainsAscii $bytes 'sim shader path:')) {
+    Write-Error "NRO is missing Switch sim shader path diagnostics. Rebuild from current source."
+}
+if (-not (Test-BinaryContainsAscii $bytes 'boot sim deferred')) {
+    Write-Error "NRO is missing Switch boot sim defer diagnostics. Rebuild from current source."
+}
+
+if (-not (Test-BinaryContainsAscii $bytes 'switch: saved sim backend=')) {
+    Write-Error "NRO is missing Switch saved-backend boot marker. Rebuild from current source."
+}
+
+if (Test-BinaryContainsAscii $bytes 'preferring compute sim') {
+    Write-Error "NRO contains stale 'preferring compute sim' string. Rebuild from current source."
+}
+if (Test-BinaryContainsAscii $bytes 'fragment fallback skipped on Switch') {
+    Write-Error "NRO contains stale 'fragment fallback skipped' string. Rebuild from current source."
+}
+
+if (-not (Test-BinaryContainsAscii $bytes 'ensureSimPipeline')) {
+    Write-Error "NRO is missing ensureSimPipeline diagnostics. Rebuild with the current source."
 }
 
 # JPEG SOI 0xFF 0xD8 (icon embedded via --icon)

@@ -41,6 +41,7 @@ static int readInt(const nlohmann::json& j, const char* k, int def) {
 static void migrateSettings(GameSettings& s) {
 #if defined(__SWITCH__)
     s.display.orientation = ScreenOrientation::Landscape;
+    s.audio.menuMusic = false;
 #endif
     if (s.version < CURRENT_SETTINGS_VERSION) {
         s.version = CURRENT_SETTINGS_VERSION;
@@ -106,8 +107,16 @@ bool loadGameSettings(GameSettings& out) {
             out.controls.invertY = readBool(c, "invertY", false);
             out.controls.rumble = static_cast<RumbleLevel>(
                 readEnumInt(c, "rumble", static_cast<int>(RumbleLevel::Medium)));
-            out.controls.sound = static_cast<SoundLevel>(
-                readEnumInt(c, "sound", static_cast<int>(SoundLevel::Medium)));
+        }
+
+        if (j.contains("audio") && j["audio"].is_object()) {
+            const auto& au = j["audio"];
+            out.audio.sound = static_cast<SoundLevel>(
+                readEnumInt(au, "sound", static_cast<int>(SoundLevel::Medium)));
+            out.audio.menuMusic = readBool(au, "menuMusic", true);
+        } else if (j.contains("controls") && j["controls"].is_object()) {
+            out.audio.sound = static_cast<SoundLevel>(
+                readEnumInt(j["controls"], "sound", static_cast<int>(SoundLevel::Medium)));
         }
 
         if (j.contains("accessibility") && j["accessibility"].is_object()) {
@@ -136,6 +145,11 @@ bool loadGameSettings(GameSettings& out) {
         }
 
         migrateSettings(out);
+        float minUiScale = 0.9f;
+#if defined(__SWITCH__)
+        minUiScale = 1.0f;
+#endif
+        out.accessibility.uiScale = std::clamp(out.accessibility.uiScale, minUiScale, 1.5f);
         g_dirty = false;
         return true;
     } catch (const std::exception&) {
@@ -170,7 +184,9 @@ bool saveGameSettings(const GameSettings& s) {
     j["controls"]["deadzone"] = s.controls.deadzone;
     j["controls"]["invertY"] = s.controls.invertY;
     j["controls"]["rumble"] = static_cast<int>(s.controls.rumble);
-    j["controls"]["sound"] = static_cast<int>(s.controls.sound);
+
+    j["audio"]["sound"] = static_cast<int>(s.audio.sound);
+    j["audio"]["menuMusic"] = s.audio.menuMusic;
 
     j["accessibility"]["uiScale"] = s.accessibility.uiScale;
     j["accessibility"]["reduceFlashing"] = s.accessibility.reduceFlashing;

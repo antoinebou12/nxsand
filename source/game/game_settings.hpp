@@ -72,7 +72,15 @@ struct ControlSettings {
     float deadzone = 0.18f;
     bool invertY = false;
     RumbleLevel rumble = RumbleLevel::Medium;
+};
+
+struct AudioSettings {
     SoundLevel sound = SoundLevel::Medium;
+#if defined(__SWITCH__)
+    bool menuMusic = false;
+#else
+    bool menuMusic = true;
+#endif
 };
 
 struct AccessibilitySettings {
@@ -102,6 +110,7 @@ struct GameSettings {
     PerformanceSettings performance{};
     VisualSettings visuals{};
     ControlSettings controls{};
+    AudioSettings audio{};
     AccessibilitySettings accessibility{};
     DisplaySettings display{};
     DebugSettings debug{};
@@ -114,6 +123,7 @@ const char* menuChromeLabel(MenuChrome m);
 const char* screenOrientationLabel(ScreenOrientation o);
 const char* upscaleFilterName(UpscaleFilter f);
 const char* paletteModeLabel(int mode);
+const char* soundLevelLabel(SoundLevel level);
 
 void applyPerfPreset(PerformanceSettings& perf, PerfPreset preset, bool onSwitch);
 void applyPerfPresetVisuals(VisualSettings& vis, PerfPreset preset);

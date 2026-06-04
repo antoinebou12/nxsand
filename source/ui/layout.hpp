@@ -64,9 +64,12 @@ inline float playHudTopBarPx(int screenW, int screenH, bool paletteVisible, bool
 
 // HUD bands reserved above/below the sand (matches hud.cpp top bar + optional palette).
 inline std::pair<int, int> playHudInsets(int screenW, int screenH, bool paletteVisible,
-                                         bool profilerVisible = false) {
-    const int top = int(playHudTopBarPx(screenW, screenH, paletteVisible, profilerVisible));
-    const int bottom = paletteVisible ? theme::getPaletteH(screenH) : 0;
+                                         bool profilerVisible = false, float uiScale = 1.f) {
+    const bool topBar = paletteVisible;
+    const bool bottomPalette = paletteVisible;
+    const int top =
+        int(playHudTopBarPx(screenW, screenH, topBar, profilerVisible, uiScale));
+    const int bottom = bottomPalette ? theme::getPaletteH(screenH) : 0;
     return {top, bottom};
 }
 
@@ -110,11 +113,13 @@ inline PlayRegion getPlayRegion(int screenW, int screenH, int gridW, int gridH,
 
 inline PlayRegion getPlayRegionForScene(int screenW, int screenH, int gridW, int gridH,
                                         bool fullscreenSim, bool paletteVisible,
-                                        bool withChrome = false, bool profilerVisible = false) {
+                                        bool withChrome = false, bool profilerVisible = false,
+                                        float uiScale = 1.f) {
     int top = 0;
     int bottom = 0;
     if (fullscreenSim && !withChrome) {
-        const auto insets = playHudInsets(screenW, screenH, paletteVisible, profilerVisible);
+        const auto insets =
+            playHudInsets(screenW, screenH, paletteVisible, profilerVisible, uiScale);
         top = insets.first;
         bottom = insets.second;
     }

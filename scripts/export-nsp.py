@@ -13,7 +13,7 @@ from pathlib import Path
 
 APP_NAME = "NXSand"
 APP_AUTHOR = "antoi"
-APP_VERSION_DEFAULT = "0.0.1"
+APP_VERSION_DEFAULT = "0.0.2"
 SDMC_NRO_PATH = "/switch/NXSand.nro"
 # Unofficial homebrew range; stable across rebuilds so forwarder updates replace in place.
 TITLE_ID = "0100f2c0115b6000"

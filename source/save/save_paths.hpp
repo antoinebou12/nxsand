@@ -10,6 +10,10 @@ bool ensureDirectoryExists(const std::string& path);
 /// Ensures `saveDirectory()` exists once per process (cached after first success).
 bool ensureSaveDirectoryReady();
 
+/// Mount SD (Switch), create `saveDirectory()` if missing, migrate legacy `nxengine` data.
+/// Call once at process start before reading or writing saves.
+bool ensureSaveStorageAtLaunch();
+
 /// Write `data` to `finalPath` atomically: write to `finalPath.tmp`, flush, then rename.
 /// Prevents truncated/corrupt save files when the Switch loses power or is sleep-yanked
 /// mid-write (a real risk on handheld with unbuffered SD writes).

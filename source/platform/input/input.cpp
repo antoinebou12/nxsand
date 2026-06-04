@@ -89,6 +89,7 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
     in.menuPointerActive = false;
     in.menuPointerConfirm = false;
     in.toggleMaterialRing = false;
+    in.togglePaletteHud = false;
     in.materialRingConfirm = in.materialRingCancel = false;
     in.clearSandbox = false;
     in.quickSave = false;
@@ -313,6 +314,8 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
         if (kb[SDL_SCANCODE_LEFTBRACKET]) in.brushRadiusDelta = -1;
         if (kb[SDL_SCANCODE_RIGHTBRACKET]) in.brushRadiusDelta = 1;
         if (edge(hKey, prevH)) in.toggleMaterialRing = true;
+        static bool prevPaletteKey = false;
+        if (edge(kb[SDL_SCANCODE_P] != 0, prevPaletteKey)) in.togglePaletteHud = true;
         if (kb[SDL_SCANCODE_MINUS]) in.clearSandbox = true;
         const bool quickKey = kb[SDL_SCANCODE_F5] != 0;
         if (edge(quickKey, prevQuickSave)) in.quickSave = true;
@@ -375,12 +378,24 @@ void pollInput(InputState& in, bool materialWheelOpen, bool menuActive, SDL_Wind
 
 #if defined(__SWITCH__)
     {
+        static int paletteDownHold = 0;
+        static bool paletteToggleFired = false;
         const int stickStep = std::max(1, int(std::lround(2.f * cursorSpeed)));
         const int directDead = std::max(4000, int(32767.f * deadzone));
         if (nxLeftStick.x < -directDead) in.brushDx -= stickStep;
         if (nxLeftStick.x > directDead) in.brushDx += stickStep;
         if (nxLeftStick.y > directDead) in.brushDy -= stickStep;
         if (nxLeftStick.y < -directDead) in.brushDy += stickStep;
+
+        if (!menuActive && !materialWheelOpen && nxDownBtn && !nxL && !nxR) {
+            if (++paletteDownHold >= 45 && !paletteToggleFired) {
+                in.togglePaletteHud = true;
+                paletteToggleFired = true;
+            }
+        } else {
+            paletteDownHold = 0;
+            paletteToggleFired = false;
+        }
 
         if ((nxDown & HidNpadButton_Plus) != 0) in.openMenu = true;
         if ((nxDown & HidNpadButton_Minus) != 0) in.clearSandbox = true;

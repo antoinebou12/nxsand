@@ -37,7 +37,7 @@ const uint M_SALT      = 17u;
 const uint M_EMBER     = 18u;
 const uint M_FLOWER    = 19u;
 const uint M_COAL      = 20u;
-const uint M_TNT       = 21u;
+const uint M_LEGACY_TNT = 21u;
 const uint M_BRICK     = 22u;
 
 uint cellAt(ivec2 c) {
@@ -84,7 +84,7 @@ vec3 materialColor(uint m, float n) {
     if (m == M_METAL) return mix(vec3(0.42, 0.44, 0.48), vec3(0.72, 0.76, 0.82), n);
     if (m == M_GUNPOWDER) return mix(vec3(0.22, 0.20, 0.14), vec3(0.58, 0.52, 0.34), n);
     if (m == M_COAL)      return mix(vec3(0.08, 0.08, 0.09), vec3(0.22, 0.20, 0.18), n);
-    if (m == M_TNT)       return mix(vec3(0.55, 0.12, 0.10), vec3(0.92, 0.32, 0.24), n);
+    if (m == M_LEGACY_TNT) return vec3(0.0);
     if (m == M_BRICK)     return mix(vec3(0.38, 0.22, 0.14), vec3(0.62, 0.38, 0.26), n);
     if (m == M_SALT)      return mix(vec3(0.88, 0.90, 0.94), vec3(0.98, 0.99, 1.00), n);
     if (m == M_EMBER)     return mix(vec3(0.72, 0.38, 0.06), vec3(1.00, 0.68, 0.14), n);
@@ -233,19 +233,6 @@ void main() {
                            float(cellAt(c + ivec2(0, -1)) == M_BRICK);
             if (brickN >= 2.0)
                 col += vec3(0.03, 0.02, 0.01) * 0.18;
-        }
-        if (m == M_TNT) {
-            col += vec3(0.06, 0.02, 0.02) * n * 0.30;
-            if (openTop > 0.0)
-                col += vec3(0.12, 0.04, 0.03) * 0.45;
-            if (openTop + openLeft + openRight + openBottom > 0.0)
-                col += vec3(0.08, 0.03, 0.02) * 0.28;
-            if (uFlicker != 0) {
-                float sh = sin(float(uFrame) * 0.38 + float(c.x) * 0.27 + n * 5.0) * 0.5 + 0.5;
-                if (cellAt(c + ivec2(1, 0)) == M_FIRE || cellAt(c + ivec2(-1, 0)) == M_FIRE ||
-                    cellAt(c + ivec2(0, 1)) == M_FIRE || cellAt(c + ivec2(0, -1)) == M_FIRE)
-                    col += vec3(0.20, 0.08, 0.03) * sh * 0.65;
-            }
         }
         if (m == M_SALT) {
             col += vec3(0.04, 0.05, 0.06) * n * 0.30;

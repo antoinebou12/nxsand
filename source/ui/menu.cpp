@@ -8,6 +8,9 @@
 #include "../save/physics_params_io.hpp"
 #include "../sim/physics_params.hpp"
 #include "../sim/physics_settings.hpp"
+#if defined(__SWITCH__)
+#include "../platform/launch_log.hpp"
+#endif
 #include "../ui/menu_fx.hpp"
 #include "../ui/theme.hpp"
 #include "menu_sim.hpp"
@@ -79,7 +82,12 @@ void MenuState::resetMain() {
     materialWheelOpen = false;
 }
 
+static void resetMenuRepeatOnNav(App& app) {
+    app.resetMenuRepeat();
+}
+
 void MenuState::goBack(App& app) {
+    resetMenuRepeatOnNav(app);
     if (screen == MenuScreen::SettingsEdit) {
         screen = MenuScreen::Settings;
         index = 0;
@@ -108,6 +116,7 @@ void MenuState::goBack(App& app) {
 
 void MenuState::handleConfirm(App& app) {
     if (menuIsBackItem(*this, index)) {
+        resetMenuRepeatOnNav(app);
         if (screen == MenuScreen::SettingsEdit) app.requestFlushPhysicsSettings();
         if (screen == MenuScreen::EngineSettingsTab) {
             app.schedulePendingHeavySettingsFlush();
@@ -120,13 +129,15 @@ void MenuState::handleConfirm(App& app) {
     if (screen == MenuScreen::Main) {
         switch (index) {
             case 0:
+                resetMenuRepeatOnNav(app);
+                app.flushPendingHeavySettings();
                 if (!app.ensureSimPipelineReady()) {
                     app.toast.show("Simulation failed to start", 2.5f);
                     break;
                 }
                 app.simPipeline->clearAll(MAT_EMPTY);
                 app.sim.gridHasMatter = false;
-                app.sim.sleeping = false;
+                app.sim.sleeping = true;
                 app.hasEnteredPlay = true;
                 app.scene = Scene::Play;
                 app.sim.tick = 0;
@@ -134,6 +145,8 @@ void MenuState::handleConfirm(App& app) {
                 app.toast.show("New empty sandbox", 1.0f);
                 break;
             case 1:
+                resetMenuRepeatOnNav(app);
+                app.flushPendingHeavySettings();
                 if (!app.ensureSimPipelineReady()) {
                     app.toast.show("Simulation failed to start", 2.5f);
                     break;
@@ -145,18 +158,22 @@ void MenuState::handleConfirm(App& app) {
                 app.onEnterPlayFromMenu();
                 break;
             case 2:
+                resetMenuRepeatOnNav(app);
                 screen = MenuScreen::Load;
                 index = 0;
                 break;
             case 3:
+                resetMenuRepeatOnNav(app);
                 screen = MenuScreen::Save;
                 index = 0;
                 break;
             case 4:
+                resetMenuRepeatOnNav(app);
                 screen = MenuScreen::Settings;
                 index = 0;
                 break;
             case 5:
+                resetMenuRepeatOnNav(app);
                 screen = MenuScreen::EngineSettings;
                 index = 0;
                 break;
@@ -167,7 +184,7 @@ void MenuState::handleConfirm(App& app) {
                 }
                 app.simPipeline->clearAll(MAT_EMPTY);
                 app.sim.gridHasMatter = false;
-                app.sim.sleeping = false;
+                app.sim.sleeping = true;
                 app.toast.show("Cleared", 1.0f);
                 break;
             case 7:
@@ -179,19 +196,23 @@ void MenuState::handleConfirm(App& app) {
         const SlotMeta meta = getSlotMeta(index + 1);
         if (meta.empty) {
             app.toast.show("Slot is empty", 1.5f);
-        } else if (!app.ensureSimPipelineReady()) {
-            app.toast.show("Simulation failed to start", 2.5f);
-        } else if (loadGame(app, index + 1)) {
-            app.hasEnteredPlay = true;
-            app.scene = Scene::Play;
-            app.onEnterPlayFromMenu();
-            app.toast.show("Loaded", 1.2f);
         } else {
-            app.toast.show("Load failed", 1.5f);
+            app.flushPendingHeavySettings();
+            if (!app.ensureSimPipelineReady()) {
+                app.toast.show("Simulation failed to start", 2.5f);
+            } else if (loadGame(app, index + 1)) {
+                app.hasEnteredPlay = true;
+                app.scene = Scene::Play;
+                app.onEnterPlayFromMenu();
+                app.toast.show("Loaded", 1.2f);
+            } else {
+                app.toast.show("Load failed", 1.5f);
+            }
         }
     } else if (screen == MenuScreen::Save) {
         app.requestSlotSave(index + 1);
     } else if (screen == MenuScreen::Settings) {
+        resetMenuRepeatOnNav(app);
         settingsMat = settingsMaterialAt(index);
         settingsParamRow = 0;
         screen = MenuScreen::SettingsEdit;
@@ -204,6 +225,7 @@ void MenuState::handleConfirm(App& app) {
             app.toast.show("Defaults reset", 1.0f);
         }
     } else if (screen == MenuScreen::EngineSettings) {
+        resetMenuRepeatOnNav(app);
         engineTab = static_cast<EngineTab>(index);
         screen = MenuScreen::EngineSettingsTab;
         index = 1;
@@ -283,16 +305,10 @@ static MenuLayout computeLayout(int W, int H, int itemCount, int selectedIndex,
     MenuLayout L{};
     L.s = theme::uiScale(W, H, accessibilityScale);
     const bool portrait = W < H;
-#if defined(__SWITCH__)
-    const float sideMargin = portrait ? 92.f * L.s : 156.f * L.s;
-    const float safeBottom = 132.f * L.s;
-    const float safeTop = 34.f * L.s;
-#else
     (void)portrait;
     const float sideMargin = 42.f * L.s;
     const float safeBottom = 64.f * L.s;
     const float safeTop = 22.f * L.s;
-#endif
     L.panelW = std::min(590.f * L.s, std::max(220.f * L.s, float(W) - sideMargin * 2.f));
     const float panelInset = 4.f * L.s;
     const float headerGap = 12.f * L.s;
@@ -413,6 +429,15 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
         !hasBreadcrumb && app.menu.screen == MenuScreen::Main;
     const MenuLayout L = computeLayout(W, H, items, app.menu.index, hasBreadcrumb, mainMarkHeader,
                                        font, app.settings.accessibility.uiScale);
+#if defined(__SWITCH__)
+    static bool menuLayoutLogged = false;
+    if (!menuLayoutLogged) {
+        menuLayoutLogged = true;
+        appendLaunchLogf("menu draw: screen=%dx%d items=%d index=%d scale=%.2f rowH=%.1f visible=%d first=%d lineH=%d",
+                         W, H, items, app.menu.index, L.s, L.rowH, L.visibleRows, L.firstRow,
+                         font.lineH);
+    }
+#endif
     const int tick = app.menu.tick;
     const bool mainMenuFlow = app.menu.screen == MenuScreen::Main || app.menu.screen == MenuScreen::Load ||
                               app.menu.screen == MenuScreen::Save;
@@ -511,8 +536,7 @@ void drawMenuSolid(RenderPipeline& r, FontAtlas& font, App& app) {
         char rowBuf[96];
         drawVisibleRows(r, font, W, H, L, rows + 1, app.menu.index, [&](int i) {
             if (i == 0) return static_cast<const char*>("< Back");
-            engineTabRowLabel(app.menu.engineTab, i - 1, app.settings, app.computeSimSupported(),
-                              rowBuf, sizeof(rowBuf));
+            engineTabRowLabel(app.menu.engineTab, i - 1, app.settings, rowBuf, sizeof(rowBuf));
             return static_cast<const char*>(rowBuf);
         });
     }

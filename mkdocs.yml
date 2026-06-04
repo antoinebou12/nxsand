@@ -96,6 +96,7 @@ nav:
       - Diagram assets: diagrams/README.md
       - Native build: NATIVE.md
       - Development: DEVELOPMENT.md
+      - Agent plans & Context7: AGENT_PLANS.md
   - Advanced:
       - TPT stamp import: TPT_IMPORT.md
       - Switch performance: SWITCH_PERF_MATRIX.md

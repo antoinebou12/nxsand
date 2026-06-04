@@ -1,6 +1,7 @@
 // Ping-pong integer grid: fragment uses GL_R8UI; compute uses GL_R32UI for GLES imageStore.
 #pragma once
 #include <cstdint>
+#include <string>
 #include <vector>
 #include "gl_loader.hpp"
 #include "shader_program.hpp"
@@ -60,6 +61,7 @@ public:
     bool readGridTo(std::vector<uint8_t>& out);
     bool readRegionTopDown(int x0, int y0, int w, int h, std::vector<uint8_t>& out);
     void uploadGridTopDown(const std::vector<uint8_t>& data, int w, int h);
+    bool runMovementSelfTest(std::string* outError = nullptr);
 
     void syncSimForSampling();
 

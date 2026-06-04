@@ -47,7 +47,7 @@ struct alignas(16) PhysicsParamsGPU {
     float ember_fadeRate;
     float ember_igniteWood;
     float coal_burnRate;
-    float tnt_detonateRate;
+    float physics_reserved0;
     float brick_slideScale;
     float brick_cohesionScale;
 };
@@ -91,7 +91,7 @@ inline PhysicsParamsGPU to_gpu(const PhysicsParams& p, int /*simW*/ = SIM_W) {
     g.ember_fadeRate = p.ember_fadeRate;
     g.ember_igniteWood = p.ember_igniteWood;
     g.coal_burnRate = p.coal_burnRate;
-    g.tnt_detonateRate = p.tnt_detonateRate;
+    g.physics_reserved0 = 0.f;
     g.brick_slideScale = p.brick_slideScale;
     g.brick_cohesionScale = p.brick_cohesionScale;
     return g;

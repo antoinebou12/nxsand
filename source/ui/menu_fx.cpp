@@ -5,8 +5,13 @@
 
 namespace nx {
 
+#if defined(__SWITCH__)
+static constexpr int kStarCount = 48;
+static constexpr int kParticleCap = 1;
+#else
 static constexpr int kStarCount = 130;
 static constexpr int kParticleCap = 80;
+#endif
 
 static struct {
     bool ready = false;
@@ -77,6 +82,10 @@ static void removeParticle(int i) {
 
 void tickMenuBackgroundFx(int tick, int screenW, int screenH) {
     ensureStars(screenW, screenH);
+#if defined(__SWITCH__)
+    (void)tick;
+    return;
+#endif
     if (particles.count < kParticleCap && tick % 3 == 0) spawnParticle(screenW, screenH);
     for (int i = particles.count - 1; i >= 0; --i) {
         particles.x[i] += particles.vx[i] + std::sin(tick * 0.02f + float(i)) * 0.15f;
@@ -95,7 +104,11 @@ static void drawDot(RenderPipeline& r, float cx, float cy, float radius, float c
 void drawMenuBackgroundFx(RenderPipeline& r, int screenW, int screenH, int tick) {
     ensureStars(screenW, screenH);
     for (int i = 0; i < kStarCount; ++i) {
+#if defined(__SWITCH__)
+        const float tw = 0.18f + stars.b[i] * 0.20f;
+#else
         const float tw = 0.15f + stars.b[i] * 0.5f * (0.6f + 0.4f * std::sin(tick * 0.018f + stars.b[i] * 9.f));
+#endif
         const float sz = stars.r[i] * 2.f;
         drawDot(r, stars.x[i], stars.y[i], sz, 0.78f, 0.82f, 1.f, tw, screenW, screenH);
     }

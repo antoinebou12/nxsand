@@ -18,7 +18,6 @@ flowchart TB
     Metal
     Gunpowder
     Coal
-    TNT
     Salt
     Brick
   end
@@ -36,7 +35,8 @@ flowchart TB
   Acid -->|"35% dissolve"| Plant
   Acid -->|"25% dissolve"| Wood
   Acid -->|"12% dissolve"| Sand
-  Sand -->|"sand_lithifyRate"| Stone
+  Sand -->|"sand_lithifyRate (boosted in water)"| Stone
+  Sand -->|"lava+water quench"| Stone
   Water -->|"wet drag sand_wetSlideScale"| Sand
   Acid -->|"20% weaken"| Ice
   Acid -->|"25% neutralize"| Water
@@ -58,7 +58,7 @@ flowchart TB
 
   Wall -->|"corrode"| Empty
   Glass -->|"slow etch"| Empty
-  Plant -->|"spread x6/x9 water x3 wall x5 climb"| Empty
+  Plant -->|"spread x6/x9 water x3 wall x5 climb x4.5/x7 wood"| Empty
   Empty -->|"fire/lava + water 20%"| Steam
   Ice -->|"ice_freezeRate"| Water
   Ice -->|"0.2% slow thaw"| Water
@@ -80,19 +80,9 @@ flowchart TB
   Acid -->|"acid_wallCorrode x0.25"| Metal
   Acid -->|"18% dissolve"| Gunpowder
   Acid -->|"12% dissolve"| Coal
-  Acid -->|"8% dissolve"| TNT
   Fire -->|"coal_burnRate slow"| Coal
   Lava -->|"coal_burnRate x3.5"| Coal
   Coal -->|"slow burn fire/smoke"| Fire
-  Sand -->|"contact fuse"| TNT
-  Water -->|"contact fuse"| TNT
-  Fire -->|"tnt_detonateRate chain"| TNT
-  Lava -->|"detonate"| TNT
-  TNT -->|"contact or heat detonate"| Fire
-  TNT -->|"blast radius 5"| Fire
-  Empty -->|"blast near fused TNT"| Fire
-  Empty -->|"blast near TNT + heat"| Fire
-  Ember -->|"tnt_detonateRate chain"| TNT
   Sand -->|"blast victim"| Fire
   Water -->|"blast victim"| Empty
   Water -->|"metal_rustRate"| Metal

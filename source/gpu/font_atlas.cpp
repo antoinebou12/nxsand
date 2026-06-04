@@ -28,12 +28,26 @@ struct FtLibrary {
 
 static bool readableFontFile(const std::string& path) {
     if (path.empty()) return false;
+#if defined(__SWITCH__)
+    FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) return false;
+    std::fclose(f);
+    return true;
+#else
     std::ifstream f(path, std::ios::binary);
     return f.good();
+#endif
 }
 
 static std::string resolveFontPath() {
 #if defined(__SWITCH__)
+    const char* candidates[] = {
+        "romfs:/fonts/NotoSans-Regular.ttf",
+        "fonts/NotoSans-Regular.ttf",
+    };
+    for (const char* p : candidates) {
+        if (readableFontFile(p)) return p;
+    }
     return {};
 #else
     const char* overridePath = std::getenv("NXSAND_FONT_PATH");
@@ -140,7 +154,11 @@ void FontAtlas::prewarmCommonGlyphs() {
         "New Sandbox Demo Load Save Game Element Engine Settings Clear Quit "
         "Main Menu defaults Reset Visuals Performance Compute Shader Battery "
         "Balanced Quality fullscreen orientation portrait landscape nearest "
-        "conservative sleeping substeps fragment upscale bloom grain flicker";
+        "conservative sleeping substeps fragment upscale bloom grain flicker "
+        "Preparing simulation shaders Linking first launch may take several minutes please wait "
+        "Compiling sim.frag sim.comp paint.frag Starting "
+        "fps frame other accounted sim paint world ui present grid substeps passes preset tiles "
+        "fallback sleep idle stable fast off on erase mat dirty cmds";
     for (const char* p = kWarm; *p; ++p) {
         ensureGlyph(static_cast<unsigned char>(*p));
     }
@@ -253,8 +271,33 @@ const FontAtlas::GlyphInfo& FontAtlas::ensureGlyph(uint32_t codepoint) const {
     }
 }
 
+bool FontAtlas::isReady() const {
+    return tex != 0 && g_ft.face != nullptr;
+}
+
 bool FontAtlas::init() {
-    if (tex) return true;
+    if (tex != 0 && g_ft.face) return true;
+    if (tex != 0) invalidateGlTexture();
+
+    if (g_ft.face) {
+        atlasW = 1024;
+        atlasH = 1024;
+        atlasPixels_.assign(static_cast<size_t>(atlasW * atlasH), 0);
+        penX_ = 2;
+        penY_ = 2;
+        rowH_ = 0;
+        glyphs_.clear();
+        glGenTextures(1, &tex);
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, atlasW, atlasH, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        prewarmCommonGlyphs();
+        return tex != 0;
+    }
 
     FT_Error err = FT_Init_FreeType(&g_ft.lib);
     if (err) {
@@ -264,25 +307,29 @@ bool FontAtlas::init() {
 
     std::string path = resolveFontPath();
 #if defined(__SWITCH__)
-    Result rc = plInitialize(PlServiceType_User);
-    if (R_FAILED(rc)) {
-        std::cerr << "plInitialize failed: 0x" << std::hex << rc << std::dec << "\n";
-        releaseFontResources();
-        return false;
-    }
-    g_plInitialized = true;
+    if (!path.empty()) {
+        err = FT_New_Face(g_ft.lib, path.c_str(), 0, &g_ft.face);
+    } else {
+        Result rc = plInitialize(PlServiceType_User);
+        if (R_FAILED(rc)) {
+            std::cerr << "plInitialize failed: 0x" << std::hex << rc << std::dec << "\n";
+            releaseFontResources();
+            return false;
+        }
+        g_plInitialized = true;
 
-    PlFontData font{};
-    rc = plGetSharedFontByType(&font, PlSharedFontType_Standard);
-    if (R_FAILED(rc)) {
-        std::cerr << "plGetSharedFontByType failed: 0x" << std::hex << rc << std::dec << "\n";
-        releaseFontResources();
-        return false;
-    }
+        PlFontData shared{};
+        rc = plGetSharedFontByType(&shared, PlSharedFontType_Standard);
+        if (R_FAILED(rc)) {
+            std::cerr << "plGetSharedFontByType failed: 0x" << std::hex << rc << std::dec << "\n";
+            releaseFontResources();
+            return false;
+        }
 
-    err = FT_New_Memory_Face(g_ft.lib, static_cast<const FT_Byte*>(font.address),
-                             static_cast<FT_Long>(font.size), 0, &g_ft.face);
-    path = "Switch shared font";
+        err = FT_New_Memory_Face(g_ft.lib, static_cast<const FT_Byte*>(shared.address),
+                                 static_cast<FT_Long>(shared.size), 0, &g_ft.face);
+        path = "Switch shared font";
+    }
 #else
     if (path.empty()) {
         std::cerr << "No usable desktop font found. Set NXSAND_FONT_PATH to a .ttf/.otf file.\n";
@@ -297,8 +344,13 @@ bool FontAtlas::init() {
         return false;
     }
 
+#if defined(__SWITCH__)
+    pixelSize = 26;
+    bakeScale = 2;
+#else
     pixelSize = 22;
     bakeScale = 2;
+#endif
     const int rasterPx = pixelSize * bakeScale;
     err = FT_Set_Pixel_Sizes(g_ft.face, 0, rasterPx);
     if (err) {
@@ -339,12 +391,23 @@ bool FontAtlas::init() {
     return tex != 0;
 }
 
-void FontAtlas::shutdown() {
-    releaseFontResources();
+void FontAtlas::invalidateGlTexture() {
     glyphs_.clear();
     atlasPixels_.clear();
     if (tex) glDeleteTextures(1, &tex);
     tex = 0;
+    penX_ = 2;
+    penY_ = 2;
+    rowH_ = 0;
+}
+
+void FontAtlas::shutdown() {
+    resetGlResources();
+}
+
+void FontAtlas::resetGlResources() {
+    releaseFontResources();
+    invalidateGlTexture();
 }
 
 float FontAtlas::textWidth(const std::string& text, float scale) const {
@@ -363,7 +426,7 @@ float FontAtlas::textWidth(const std::string& text, float scale) const {
 
 void FontAtlas::drawText(RenderPipeline& rp, float x, float y, float scale, const std::string& text,
                          float cr, float cg, float cb, float ca, int screenW, int screenH) const {
-    if (!tex) return;
+    if (!tex || !g_ft.face) return;
     float penX = x;
     size_t i = 0;
     const size_t len = text.size();

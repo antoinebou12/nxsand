@@ -1,6 +1,9 @@
 #include "sim_pipeline.hpp"
 #include "shader_program.hpp"
 #include "../sim/physics_gpu.hpp"
+#if defined(__SWITCH__)
+#include "../platform/launch_log.hpp"
+#endif
 #include <algorithm>
 #include <iostream>
 #include <string>
@@ -31,6 +34,17 @@ void barrierTextureToCompute() {
                     GL_TEXTURE_UPDATE_BARRIER_BIT);
 }
 
+const char* fragmentSimShaderLabel() { return "sim.frag"; }
+const char* computeSimShaderLabel() { return "sim.comp"; }
+
+std::string fragmentSimShaderPath(const std::string& shaderDir) {
+    return shaderDir + "/sim.frag";
+}
+
+std::string computeSimShaderPath(const std::string& shaderDir) {
+    return shaderDir + "/sim.comp";
+}
+
 } // namespace
 
 SimPipeline::~SimPipeline() {
@@ -55,6 +69,10 @@ void SimPipeline::shutdown() {
 }
 
 bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend backend) {
+#if defined(__SWITCH__)
+    appendLaunchLogf("SimPipeline::init begin %dx%d backend=%s", w, h,
+                     backend == SimBackend::Compute ? "compute" : "fragment");
+#endif
     gw = w;
     gh = h;
     backend_ = backend;
@@ -64,18 +82,29 @@ bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend ba
     gridPixelType_ = backend_ == SimBackend::Compute ? GL_UNSIGNED_INT : GL_UNSIGNED_BYTE;
 
     const std::string vertPath = shaderDir + "/fullscreen.vert";
-    const std::string simPath = shaderDir + "/sim.frag";
-    const std::string compPath = shaderDir + "/sim.comp";
+    const std::string simPath = fragmentSimShaderPath(shaderDir);
+    const std::string compPath = computeSimShaderPath(shaderDir);
+    const char* fragLabel = fragmentSimShaderLabel();
+    const char* compLabel = computeSimShaderLabel();
     const std::string paintPath = shaderDir + "/paint.frag";
 
+#if defined(__SWITCH__)
+    appendLaunchLogf("sim shader path: %s",
+                     backend_ == SimBackend::Compute ? compPath.c_str() : simPath.c_str());
+#endif
+
     if (backend_ == SimBackend::Compute) {
-        setShaderCompileStage("Compiling sim.comp…");
+        const std::string compStage = std::string("Compiling ") + compLabel + "...";
+        setShaderCompileStage(compStage.c_str());
         if (!computeShader.loadComputeFromFile(compPath)) {
             const char* diag = lastShaderDiagnostics();
-            setShaderDiagnostics(diag && diag[0] ? std::string("sim.comp: ") + diag
-                                                   : "sim.comp load failed");
+            setShaderDiagnostics(diag && diag[0] ? std::string(compLabel) + ": " + diag
+                                                   : std::string(compLabel) + " load failed");
             return false;
         }
+#if defined(__SWITCH__)
+        appendLaunchLogf("SimPipeline::init compute shader ready: %s", compLabel);
+#endif
         computeShader.use();
         comp_uGridLoc = computeShader.uniformLocation("uGridSize");
         comp_uPhaseLoc = computeShader.uniformLocation("uPhase");
@@ -85,16 +114,17 @@ bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend ba
         physicsBlockIndex = glGetUniformBlockIndex(computeShader.program, "PhysicsBlock");
         if (physicsBlockIndex == GL_INVALID_INDEX) {
             std::cerr << "compute shader missing PhysicsBlock UBO\n";
-            setShaderDiagnostics("sim.comp missing PhysicsBlock UBO");
+            setShaderDiagnostics(std::string(compLabel) + " missing PhysicsBlock UBO");
             return false;
         }
         glUniformBlockBinding(computeShader.program, physicsBlockIndex, kPhysicsUboBinding);
     } else {
-        setShaderCompileStage("Compiling sim.frag…");
+        const std::string fragStage = std::string("Compiling ") + fragLabel + "...";
+        setShaderCompileStage(fragStage.c_str());
         if (!simShader.loadFromFiles(vertPath, simPath)) {
             const char* diag = lastShaderDiagnostics();
-            setShaderDiagnostics(diag && diag[0] ? std::string("sim.frag: ") + diag
-                                                 : "sim.frag load failed");
+            setShaderDiagnostics(diag && diag[0] ? std::string(fragLabel) + ": " + diag
+                                                 : std::string(fragLabel) + " load failed");
             return false;
         }
         simShader.use();
@@ -105,18 +135,24 @@ bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend ba
         physicsBlockIndex = glGetUniformBlockIndex(simShader.program, "PhysicsBlock");
         if (physicsBlockIndex == GL_INVALID_INDEX) {
             std::cerr << "sim shader missing PhysicsBlock UBO\n";
-            setShaderDiagnostics("sim.frag missing PhysicsBlock UBO");
+            setShaderDiagnostics(std::string(fragLabel) + " missing PhysicsBlock UBO");
             return false;
         }
         glUniformBlockBinding(simShader.program, physicsBlockIndex, kPhysicsUboBinding);
+#if defined(__SWITCH__)
+        appendLaunchLogf("SimPipeline::init sim shader ready: %s", fragLabel);
+#endif
     }
 
-    setShaderCompileStage("Compiling paint.frag…");
+    setShaderCompileStage("Compiling paint.frag...");
     if (!paintShader.loadFromFiles(vertPath, paintPath)) {
         const char* diag = lastShaderDiagnostics();
         setShaderDiagnostics(diag && diag[0] ? std::string("paint.frag: ") + diag : "paint.frag load failed");
         return false;
     }
+#if defined(__SWITCH__)
+    appendLaunchLog("SimPipeline::init paint shader ready");
+#endif
 
     paintShader.use();
     paint_uSimLoc = paintShader.uniformLocation("uSim");
@@ -130,6 +166,9 @@ bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend ba
     glBufferData(GL_UNIFORM_BUFFER, sizeof(PhysicsParamsGPU), nullptr, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_UNIFORM_BUFFER, kPhysicsUboBinding, physicsUbo);
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
+#if defined(__SWITCH__)
+    appendLaunchLog("SimPipeline::init physics UBO ready");
+#endif
 
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
@@ -141,6 +180,9 @@ bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend ba
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glBindVertexArray(0);
+#if defined(__SWITCH__)
+    appendLaunchLog("SimPipeline::init geometry ready");
+#endif
 
     for (int i = 0; i < 2; ++i) {
         glGenTextures(1, &tex[i]);
@@ -171,9 +213,15 @@ bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend ba
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
+#if defined(__SWITCH__)
+    appendLaunchLog("SimPipeline::init textures/FBO ready");
+#endif
 
     activeTiles.reset(gw, gh);
     clearAll(MAT_EMPTY);
+#if defined(__SWITCH__)
+    appendLaunchLog("SimPipeline::init clear ready");
+#endif
 
     if (backend_ == SimBackend::Compute) {
         while (glGetError() != GL_NO_ERROR) {
@@ -186,10 +234,17 @@ bool SimPipeline::init(int w, int h, const std::string& shaderDir, SimBackend ba
         attachSimFboAttachments();
         if (imgErr != GL_NO_ERROR) {
             std::cerr << "compute sim: glBindImageTexture failed err=" << imgErr << "\n";
-            setShaderDiagnostics("Compute grid image bind failed (GL_R32UI image)");
+            setShaderDiagnostics("Compute grid image bind failed");
             return false;
         }
+#if defined(__SWITCH__)
+        appendLaunchLogf("SimPipeline::init image bind check ready format=0x%x",
+                         static_cast<unsigned>(gridImageFormat_));
+#endif
     }
+#if defined(__SWITCH__)
+    appendLaunchLog("SimPipeline::init done");
+#endif
     return true;
 }
 
@@ -604,7 +659,8 @@ void SimPipeline::uploadGridTopDown(const std::vector<uint8_t>& data, int w, int
         for (int x = 0; x < gw; ++x) {
             int sx = (x * w) / gw;
             if (sx >= w) sx = w - 1;
-            top[static_cast<size_t>(y * gw + x)] = data[static_cast<size_t>(sy * w + sx)];
+            top[static_cast<size_t>(y * gw + x)] =
+                sanitizeGridMaterial(data[static_cast<size_t>(sy * w + sx)]);
         }
     }
     std::vector<uint8_t> gl8(static_cast<size_t>(gw * gh), 0);
@@ -634,6 +690,57 @@ void SimPipeline::uploadGridTopDown(const std::vector<uint8_t>& data, int w, int
     if (backend_ == SimBackend::Compute) {
         barrierTextureToCompute();
     }
+}
+
+bool SimPipeline::runMovementSelfTest(std::string* outError) {
+    if (!ready()) {
+        if (outError) *outError = "sim pipeline is not ready";
+        return false;
+    }
+    if (gw < 8 || gh < 8) {
+        if (outError) *outError = "sim grid too small for movement self-test";
+        return false;
+    }
+
+    std::vector<uint8_t> in(static_cast<size_t>(gw * gh), static_cast<uint8_t>(MAT_EMPTY));
+    const int sx = gw / 2;
+    const int sy = std::clamp(4, 1, gh - 3);
+    in[static_cast<size_t>(sy * gw + sx)] = static_cast<uint8_t>(MAT_SAND);
+    uploadGridTopDown(in, gw, gh);
+
+    PhysicsParams physics{};
+    for (uint32_t f = 0; f < 6u; ++f) {
+        step(f, physics, ActiveTileMode::Off);
+    }
+
+    std::vector<uint8_t> out;
+    if (!readGridTo(out) || static_cast<int>(out.size()) != gw * gh) {
+        if (outError) *outError = "sim readback failed";
+        clearAll(MAT_EMPTY);
+        return false;
+    }
+
+    bool sawSand = false;
+    bool moved = false;
+    for (int y = 0; y < gh; ++y) {
+        for (int x = 0; x < gw; ++x) {
+            if (out[static_cast<size_t>(y * gw + x)] != static_cast<uint8_t>(MAT_SAND)) {
+                continue;
+            }
+            sawSand = true;
+            if (x != sx || y != sy) moved = true;
+        }
+    }
+    clearAll(MAT_EMPTY);
+    if (!sawSand) {
+        if (outError) *outError = "self-test sand disappeared";
+        return false;
+    }
+    if (!moved) {
+        if (outError) *outError = "self-test sand did not move";
+        return false;
+    }
+    return true;
 }
 
 } // namespace nx

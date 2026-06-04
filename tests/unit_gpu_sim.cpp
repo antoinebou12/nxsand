@@ -6,6 +6,7 @@
 #include "game/game_settings.hpp"
 #include "sim/physics_params.hpp"
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 namespace {
@@ -485,6 +486,24 @@ void run_gpu_sim_tests(TestContext& ctx) {
     {
         pipe.clearAll(nx::MAT_EMPTY);
         std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
+        const int py = 16;
+        const int plantX0 = 8;
+        setTop(in, w, plantX0 - 1, py, nx::MAT_PLANT);
+        setTop(in, w, plantX0, py - 1, nx::MAT_WOOD);
+        pipe.uploadGridTopDown(in, w, h);
+        pipe.activeTiles.wakeAll();
+        nx::PhysicsParams physics{};
+        physics.plant_growthRate = 0.15f;
+        physics.plant_wallSupport = 1.0f;
+        pipe.step(0u, physics);
+        std::vector<uint8_t> out;
+        CHECK(ctx, readTopDown(pipe, w, h, out));
+        CHECK(ctx, atTop(out, w, plantX0, py) == static_cast<uint8_t>(nx::MAT_PLANT));
+    }
+
+    {
+        pipe.clearAll(nx::MAT_EMPTY);
+        std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
         constexpr int poolW = 5;
         constexpr int poolH = 5;
         const int ox = (w - poolW) / 2;
@@ -515,6 +534,8 @@ void run_gpu_sim_tests(TestContext& ctx) {
             nx::SimPipeline comp;
             CHECK(ctx, comp.init(w, h, gl.shaderDir, nx::SimBackend::Compute));
             CHECK(ctx, comp.backend() == nx::SimBackend::Compute);
+            std::string selfTestErr;
+            CHECK(ctx, comp.runMovementSelfTest(&selfTestErr));
             comp.clearAll(nx::MAT_EMPTY);
             std::vector<uint8_t> in(static_cast<size_t>(w * h), static_cast<uint8_t>(nx::MAT_EMPTY));
             const int sx = w / 2;

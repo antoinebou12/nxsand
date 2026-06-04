@@ -7,12 +7,16 @@
 namespace nx {
 
 void drawActiveTilesOverlay(RenderPipeline& r, const App& app, const PlayRegion& pr) {
-    if (!app.settings.debug.showActiveTiles || !app.simPipeline) return;
+    if (!app.settings.debug.showActiveTiles) return;
+    if (app.settings.performance.activeTiles == ActiveTileMode::Off) return;
+    if (!app.simPipeline || !app.simPipeline->ready()) return;
 
     const auto& map = app.simPipeline->activeTiles;
+    const int gw = map.gridW();
+    const int gh = map.gridH();
     const int tw = map.tileW();
     const int th = map.tileH();
-    if (tw <= 0 || th <= 0 || pr.w <= 0 || pr.h <= 0) return;
+    if (gw <= 0 || gh <= 0 || tw <= 0 || th <= 0 || pr.w <= 0 || pr.h <= 0) return;
 
     const float tilePxW = float(pr.w) / float(map.gridW()) * float(ActiveTileMap::kTileSize);
     const float tilePxH = float(pr.h) / float(map.gridH()) * float(ActiveTileMap::kTileSize);

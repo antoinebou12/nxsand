@@ -1,5 +1,8 @@
 #include "shader_cache.hpp"
 #include "../save/save_paths.hpp"
+#if defined(__SWITCH__)
+#include "../platform/launch_log.hpp"
+#endif
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -42,6 +45,7 @@ uint64_t fnv1a64(uint64_t h, uint32_t v) {
     return h;
 }
 
+#if !defined(__SWITCH__)
 bool envEnabledDefaultOn(const char* name) {
     const char* v = std::getenv(name);
     if (!v || !v[0]) return true;
@@ -51,6 +55,7 @@ bool envEnabledDefaultOn(const char* name) {
     if (std::strcmp(v, "no") == 0 || std::strcmp(v, "NO") == 0) return false;
     return true;
 }
+#endif
 
 bool bootLogEnabled() {
     const char* v = std::getenv("NXSAND_BOOT_LOG");
@@ -82,7 +87,9 @@ GpuFingerprint queryGpuFingerprint() {
     fp.renderer = renderer ? renderer : "?";
     fp.version = version ? version : "?";
 
+#if !defined(__SWITCH__)
     if (!glProgramBinary || !glGetProgramBinary) return fp;
+#endif
 
     GLint numFormats = 0;
     glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &numFormats);
@@ -95,6 +102,41 @@ GpuFingerprint queryGpuFingerprint() {
     return fp;
 }
 
+#if defined(__SWITCH__)
+bool isSimCacheLabel(const std::string& label) {
+    return label == "sim.frag" || label == "sim.comp";
+}
+
+long romfsRulesBodySizeBytes() {
+    static const char* kPaths[] = {"shaders/sim_rules_body.glsl", "romfs:/shaders/sim_rules_body.glsl"};
+    for (const char* path : kPaths) {
+        FILE* f = std::fopen(path, "rb");
+        if (!f) continue;
+        if (std::fseek(f, 0, SEEK_END) != 0) {
+            std::fclose(f);
+            continue;
+        }
+        const long sz = std::ftell(f);
+        std::fclose(f);
+        if (sz >= 0) return sz;
+    }
+    return -1;
+}
+
+uint32_t simRulesBodyRevision() {
+    const long sz = romfsRulesBodySizeBytes();
+    if (sz < 0) return 0;
+    return static_cast<uint32_t>(sz);
+}
+
+void logShaderCacheOffOnce(const char* reason) {
+    static bool logged = false;
+    if (logged || !reason) return;
+    logged = true;
+    appendLaunchLogf("shader cache: off (%s)", reason);
+}
+#endif
+
 uint64_t makeKeyHash(const ShaderCacheKey& key, const GpuFingerprint& fp) {
     uint64_t h = kFnvOffset;
     h = fnv1a64(h, key.label);
@@ -103,6 +145,11 @@ uint64_t makeKeyHash(const ShaderCacheKey& key, const GpuFingerprint& fp) {
     h = fnv1a64(h, fp.renderer);
     h = fnv1a64(h, fp.version);
     h = fnv1a64(h, fp.binaryFormat);
+#if defined(__SWITCH__)
+    if (isSimCacheLabel(key.label)) {
+        h = fnv1a64(h, simRulesBodyRevision());
+    }
+#endif
     return h;
 }
 
@@ -142,7 +189,11 @@ bool readCacheFile(const std::string& path, ShaderCacheHeader& hdr, std::vector<
 }
 
 bool ensureCacheDirReady() {
+#if defined(__SWITCH__)
+    return false;
+#else
     return ensureSaveDirectoryReady() && ensureDirectoryExists(cacheDirectory());
+#endif
 }
 
 std::vector<std::pair<ShaderCacheKey, GLuint>>& pendingSaves() {
@@ -150,17 +201,37 @@ std::vector<std::pair<ShaderCacheKey, GLuint>>& pendingSaves() {
     return queue;
 }
 
+#if !defined(__SWITCH__)
+bool gpuProgramBinaryCacheSupported() {
+    return queryGpuFingerprint().supported;
+}
+#endif
+
 } // namespace
 
+bool shaderProgramBinaryCacheSupported() {
+#if defined(__SWITCH__)
+    return false;
+#else
+    return gpuProgramBinaryCacheSupported();
+#endif
+}
+
 bool shaderCacheEnabled() {
+#if defined(__SWITCH__)
+    return false;
+#else
     return envEnabledDefaultOn("NXSAND_SHADER_CACHE");
+#endif
 }
 
 GLuint tryLoadShaderProgramBinary(const ShaderCacheKey& key, ShaderCacheResult* outResult) {
     if (outResult) *outResult = ShaderCacheResult::Miss;
 
     if (!shaderCacheEnabled()) {
+#if !defined(__SWITCH__)
         cacheLog((key.label + " cache disabled").c_str());
+#endif
         if (outResult) *outResult = ShaderCacheResult::Disabled;
         return 0;
     }
@@ -168,6 +239,11 @@ GLuint tryLoadShaderProgramBinary(const ShaderCacheKey& key, ShaderCacheResult* 
     const GpuFingerprint fp = queryGpuFingerprint();
     if (!fp.supported) {
         cacheLog("binary programs unsupported on this GL context");
+#if defined(__SWITCH__)
+        if (isSimCacheLabel(key.label)) {
+            logShaderCacheOffOnce("program binaries unsupported on this GL context");
+        }
+#endif
         if (outResult) *outResult = ShaderCacheResult::Disabled;
         return 0;
     }
@@ -179,11 +255,21 @@ GLuint tryLoadShaderProgramBinary(const ShaderCacheKey& key, ShaderCacheResult* 
     std::vector<uint8_t> payload;
     if (!readCacheFile(path, hdr, payload)) {
         cacheLog((key.label + " miss").c_str());
+#if defined(__SWITCH__)
+        if (isSimCacheLabel(key.label)) {
+            appendLaunchLogf("sim cache miss: %s", key.label.c_str());
+        }
+#endif
         if (outResult) *outResult = ShaderCacheResult::Miss;
         return 0;
     }
     if (hdr.keyHash != keyHash || hdr.binaryFormat != fp.binaryFormat) {
         cacheLog((key.label + " stale header").c_str());
+#if defined(__SWITCH__)
+        if (isSimCacheLabel(key.label)) {
+            appendLaunchLogf("sim cache load failed: %s (stale header)", key.label.c_str());
+        }
+#endif
         if (outResult) *outResult = ShaderCacheResult::Failed;
         return 0;
     }
@@ -196,6 +282,11 @@ GLuint tryLoadShaderProgramBinary(const ShaderCacheKey& key, ShaderCacheResult* 
     glGetProgramiv(program, GL_LINK_STATUS, &linked);
     if (linked != GL_TRUE) {
         cacheLog((key.label + " binary load failed, recompiling").c_str());
+#if defined(__SWITCH__)
+        if (isSimCacheLabel(key.label)) {
+            appendLaunchLogf("sim cache load failed: %s (recompiling)", key.label.c_str());
+        }
+#endif
         glDeleteProgram(program);
         std::remove(path.c_str());
         if (outResult) *outResult = ShaderCacheResult::Failed;
@@ -203,6 +294,11 @@ GLuint tryLoadShaderProgramBinary(const ShaderCacheKey& key, ShaderCacheResult* 
     }
 
     cacheLog((key.label + " hit").c_str());
+#if defined(__SWITCH__)
+    if (isSimCacheLabel(key.label)) {
+        appendLaunchLogf("sim cache hit: %s rev=%u", key.label.c_str(), simRulesBodyRevision());
+    }
+#endif
     if (outResult) *outResult = ShaderCacheResult::Hit;
     return program;
 }
@@ -227,6 +323,11 @@ void saveShaderProgramBinary(const ShaderCacheKey& key, GLuint program) {
     glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &binLen);
     if (binLen <= 0) {
         cacheLog((key.label + " not saved: empty program binary").c_str());
+#if defined(__SWITCH__)
+        if (isSimCacheLabel(key.label)) {
+            appendLaunchLogf("sim cache save failed: %s (empty binary)", key.label.c_str());
+        }
+#endif
         return;
     }
 
@@ -243,6 +344,11 @@ void saveShaderProgramBinary(const ShaderCacheKey& key, GLuint program) {
     }
     if (written <= 0) {
         cacheLog((key.label + " not saved: glGetProgramBinary returned no data").c_str());
+#if defined(__SWITCH__)
+        if (isSimCacheLabel(key.label)) {
+            appendLaunchLogf("sim cache save failed: %s (empty binary)", key.label.c_str());
+        }
+#endif
         return;
     }
     payload.resize(static_cast<size_t>(written));
@@ -268,8 +374,18 @@ void saveShaderProgramBinary(const ShaderCacheKey& key, GLuint program) {
     const std::string path = cacheFilePath(keyHash);
     if (atomicWriteFile(path, fileData)) {
         cacheLog((key.label + " saved").c_str());
+#if defined(__SWITCH__)
+        if (isSimCacheLabel(key.label)) {
+            appendLaunchLogf("sim cache saved: %s rev=%u", key.label.c_str(), simRulesBodyRevision());
+        }
+#endif
     } else {
         cacheLog((key.label + " not saved: write failed").c_str());
+#if defined(__SWITCH__)
+        if (isSimCacheLabel(key.label)) {
+            appendLaunchLogf("sim cache save failed: %s (write failed)", key.label.c_str());
+        }
+#endif
     }
 }
 

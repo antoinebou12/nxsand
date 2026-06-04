@@ -1,6 +1,6 @@
 // Material IDs and palette (GPU sim, saves, HUD).
 //
-// IDs 0–22; slot JSON stores raw bytes — do not renumber existing IDs.
+// IDs 0–22; slot JSON stores raw bytes — do not renumber existing IDs. ID 21 (legacy TNT) loads as empty.
 // IDs 18–19 (Ember, Flower) are spawn-only — not in PICKER_MATERIALS.
 // GPU rules live in shaders/sim.frag (`M_*` constants must stay in sync).
 //
@@ -36,9 +36,10 @@ enum Material : uint8_t {
     MAT_EMBER     = 18,
     MAT_FLOWER    = 19,  // spawn-only bloom from wet plant; not in material ring
     MAT_COAL      = 20,
-    MAT_TNT       = 21,
     MAT_BRICK     = 22,
 };
+
+constexpr uint8_t LEGACY_MAT_TNT_ID = 21;
 
 // Highest material ID in saves (includes spawn-only Ember and Flower).
 constexpr int MATERIAL_COUNT = 22;
@@ -73,21 +74,20 @@ inline std::array<uint32_t, PALETTE_SIZE> build_palette() {
     p[MAT_EMBER]     = pack_rgb(200, 120, 20);
     p[MAT_FLOWER]    = pack_rgb(255, 130, 200);
     p[MAT_COAL]      = pack_rgb(35, 32, 28);
-    p[MAT_TNT]       = pack_rgb(180, 50, 45);
     p[MAT_BRICK]     = pack_rgb(140, 75, 55);
     return p;
 }
 
-constexpr std::array<Material, 20> PLAYABLE_MATERIALS{
+constexpr std::array<Material, 19> PLAYABLE_MATERIALS{
     MAT_SAND, MAT_WATER, MAT_WALL, MAT_PLANT, MAT_FIRE, MAT_LAVA,
     MAT_ACID, MAT_SMOKE, MAT_STONE, MAT_OIL, MAT_ICE, MAT_WOOD, MAT_GLASS, MAT_STEAM,
-    MAT_METAL, MAT_GUNPOWDER, MAT_COAL, MAT_TNT, MAT_SALT, MAT_BRICK,
+    MAT_METAL, MAT_GUNPOWDER, MAT_COAL, MAT_SALT, MAT_BRICK,
 };
 
-constexpr std::array<Material, 20> PICKER_MATERIALS{
+constexpr std::array<Material, 19> PICKER_MATERIALS{
     MAT_SAND, MAT_WATER, MAT_WALL, MAT_PLANT, MAT_FIRE, MAT_LAVA,
     MAT_ACID, MAT_SMOKE, MAT_STONE, MAT_OIL, MAT_ICE, MAT_WOOD, MAT_GLASS, MAT_STEAM,
-    MAT_METAL, MAT_GUNPOWDER, MAT_COAL, MAT_TNT, MAT_SALT, MAT_BRICK,
+    MAT_METAL, MAT_GUNPOWDER, MAT_COAL, MAT_SALT, MAT_BRICK,
 };
 
 struct HudSlot {
@@ -103,9 +103,8 @@ constexpr std::array<HudSlot, 6> HUD_PALETTE_ROW2{{
     {MAT_STONE, ""}, {MAT_OIL, ""}, {MAT_ICE, ""},
     {MAT_WOOD,  ""}, {MAT_GLASS, ""}, {MAT_STEAM, ""},
 }};
-constexpr std::array<HudSlot, 6> HUD_PALETTE_ROW3{{
-    {MAT_METAL, ""}, {MAT_GUNPOWDER, ""}, {MAT_COAL, ""}, {MAT_TNT, ""}, {MAT_SALT, ""},
-    {MAT_BRICK, ""},
+constexpr std::array<HudSlot, 5> HUD_PALETTE_ROW3{{
+    {MAT_METAL, ""}, {MAT_GUNPOWDER, ""}, {MAT_COAL, ""}, {MAT_SALT, ""}, {MAT_BRICK, ""},
 }};
 
 inline int selectorMaterialCount() {
@@ -141,7 +140,6 @@ inline const char* material_short_name(Material m) {
         case MAT_EMBER:     return "EMB";
         case MAT_FLOWER:    return "FLW";
         case MAT_COAL:      return "COL";
-        case MAT_TNT:       return "TNT";
         case MAT_BRICK:     return "BRK";
         default:            return "---";
     }
@@ -170,7 +168,6 @@ inline const char* material_name(Material m) {
         case MAT_EMBER:     return "Ember";
         case MAT_FLOWER:    return "Flower";
         case MAT_COAL:      return "Coal";
-        case MAT_TNT:       return "TNT";
         case MAT_BRICK:     return "Brick";
     }
     return "?";
@@ -181,7 +178,13 @@ inline bool material_is_solid(Material m) {
            m != MAT_EMBER && m != MAT_GUNPOWDER && m != MAT_COAL;
 }
 
+inline uint8_t sanitizeGridMaterial(uint8_t id) {
+    if (id == LEGACY_MAT_TNT_ID || id > static_cast<uint8_t>(MATERIAL_COUNT)) return MAT_EMPTY;
+    return id;
+}
+
 inline Material sanitizeBrushMaterial(int id) {
+    if (id == static_cast<int>(LEGACY_MAT_TNT_ID)) return MAT_SAND;
     const auto m = static_cast<Material>(id);
     for (Material p : PICKER_MATERIALS) {
         if (p == m) return m;

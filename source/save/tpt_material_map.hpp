@@ -56,7 +56,7 @@ inline Material mapTptType(int tptType) {
         case PT_GUNP:
             return MAT_GUNPOWDER;
         case PT_TNT:
-            return MAT_TNT;
+            return MAT_EMPTY;
         case PT_COAL:
             return MAT_COAL;
         case PT_SALT:

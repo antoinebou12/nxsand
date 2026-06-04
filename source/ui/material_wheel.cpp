@@ -3,6 +3,8 @@
 #include "../gpu/font_atlas.hpp"
 #include "../gpu/render_pipeline.hpp"
 #include "../sim/materials.hpp"
+#include "layout.hpp"
+#include "menu_chrome.hpp"
 #include "ui_copy.hpp"
 #include "theme.hpp"
 #include <algorithm>
@@ -25,13 +27,22 @@ void drawDisk(RenderPipeline& r, float cx, float cy, float radius, float cr, flo
 
 } // namespace
 
-MaterialWheelLayout materialWheelLayout(int screenW, int screenH, float accessibilityScale) {
+MaterialWheelLayout materialWheelLayout(int screenW, int screenH, float accessibilityScale,
+                                          const PlayRegion* play) {
     const float s = theme::uiScale(screenW, screenH, accessibilityScale);
     MaterialWheelLayout L{};
-    L.cx = float(screenW) * 0.5f;
-    L.cy = float(screenH) * 0.42f;
-    L.rad = 132.f * s;
-    L.minPickDist = 52.f * s;
+    if (play && play->w > 8 && play->h > 8) {
+        L.cx = float(play->x) + float(play->w) * 0.5f;
+        L.cy = float(play->y) + float(play->h) * 0.5f;
+        const float maxRad = std::min(float(play->w), float(play->h)) * 0.38f;
+        L.rad = std::min(132.f * s, maxRad);
+        L.minPickDist = std::max(40.f * s, L.rad * 0.32f);
+    } else {
+        L.cx = float(screenW) * 0.5f;
+        L.cy = float(screenH) * 0.42f;
+        L.rad = 132.f * s;
+        L.minPickDist = 52.f * s;
+    }
     return L;
 }
 
@@ -59,13 +70,15 @@ int materialWheelIndexFromStick(float normX, float normY, int segmentCount, floa
     return i;
 }
 
-void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app) {
+void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app, const PlayRegion& play) {
     if (!app.menu.materialWheelOpen) return;
 
     const int W = app.screenW;
     const int H = app.screenH;
     const float s = theme::uiScale(W, H, app.settings.accessibility.uiScale);
-    const MaterialWheelLayout wl = materialWheelLayout(W, H, app.settings.accessibility.uiScale);
+    const bool profilerOn = app.settings.debug.profilerHud != ProfilerHud::Off;
+    const MaterialWheelLayout wl =
+        materialWheelLayout(W, H, app.settings.accessibility.uiScale, &play);
     const float cx = wl.cx;
     const float cy = wl.cy;
     const float rad = wl.rad;
@@ -104,8 +117,13 @@ void drawMaterialWheel(RenderPipeline& r, FontAtlas& font, App& app) {
              W, H);
     font.drawTextCentered(r, cx, cy + 5.f * s, 0.76f * s, material_name(selected), 0.02f,
                           0.025f, 0.035f, 1.f, W, H);
-    font.drawTextCentered(r, cx, cy + rad + 28.f * s, 1.0f * s, ui_copy::materialRingHint(),
-                          0.85f, 0.9f, 0.95f, 1.f, W, H);
+
+    const float topBarH =
+        playHudTopBarPx(W, H, false, profilerOn, app.settings.accessibility.uiScale);
+    const float hintScale = 0.88f * s;
+    const float hintY =
+        menuBaselineInBand(4.f * s, std::max(28.f * s, topBarH - 6.f * s), font, hintScale);
+    drawHintPill(r, font, float(W) * 0.5f, hintY, s, ui_copy::materialRingHint(), W, H);
 }
 
 } // namespace nx

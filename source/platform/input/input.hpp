@@ -23,6 +23,7 @@ struct InputState {
     int menuPointerX = 0;
     int menuPointerY = 0;
     bool toggleMaterialRing = false;
+    bool togglePaletteHud = false;
     bool materialRingConfirm = false;
     bool materialRingCancel = false;
     bool clearSandbox = false;

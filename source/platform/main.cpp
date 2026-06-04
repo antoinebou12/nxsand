@@ -1,4 +1,6 @@
 #include "game/app.hpp"
+#include "platform/launch_log.hpp"
+#include "save/save_paths.hpp"
 #include <chrono>
 #include <cstdarg>
 #include <cstdio>
@@ -9,32 +11,12 @@
 #if defined(__SWITCH__)
 #include <SDL2/SDL.h>
 #include <switch.h>
-#include <sys/stat.h>
 #endif
 
 #if defined(__SWITCH__)
 namespace {
 
-// Append a line to sdmc:/switch/nxsand/launch.log. Safe to call at any stage:
-// if SDMC isn't mounted yet we try once, and if anything fails we silently no-op.
-// This is the only diagnostic the user has when the NRO instant-bounces back to
-// hbmenu without ever showing the fatal console screen.
-void logStage(const char* msg) {
-    static bool s_tried_mount = false;
-    if (!s_tried_mount) {
-        s_tried_mount = true;
-        struct stat st{};
-        if (stat("sdmc:/switch", &st) != 0) {
-            fsdevMountSdmc();
-        }
-        mkdir("sdmc:/switch", 0777);
-        mkdir("sdmc:/switch/nxsand", 0777);
-    }
-    FILE* f = std::fopen("sdmc:/switch/nxsand/launch.log", "a");
-    if (!f) return;
-    std::fprintf(f, "%s\n", msg ? msg : "(null)");
-    std::fclose(f);
-}
+void logStage(const char* msg) { appendLaunchLog(msg); }
 
 void logStagef(const char* fmt, ...) {
     char buf[512];
@@ -47,6 +29,7 @@ void logStagef(const char* fmt, ...) {
 
 void switchShowFatal(const char* title, const char* detail) {
     logStagef("FATAL: %s | %s", title ? title : "", detail ? detail : "");
+    closeLaunchLog();
     // consoleInit grabs the framebuffer; it crashes silently (returns to hbmenu)
     // if SDL_INIT_VIDEO is still active. Tear SDL down first as a safety net for
     // callers that didn't already shut down (e.g. the uncaught-exception path).
@@ -82,9 +65,45 @@ bool romfsFilePresent(const char* rel) {
     return true;
 }
 
+long romfsFileSizeBytes(const char* rel) {
+    const std::string romfsPath = std::string("romfs:/") + rel;
+    for (const char* path : {rel, romfsPath.c_str()}) {
+        FILE* f = std::fopen(path, "rb");
+        if (!f) continue;
+        if (std::fseek(f, 0, SEEK_END) != 0) {
+            std::fclose(f);
+            continue;
+        }
+        const long sz = std::ftell(f);
+        std::fclose(f);
+        if (sz >= 0) return sz;
+    }
+    return -1;
+}
+
 bool romfsShaderBundlePresent() {
-    return romfsFilePresent("shaders/sim.frag") && romfsFilePresent("shaders/sim.comp") &&
-           romfsFilePresent("shaders/paint.frag");
+    static const char* kRequired[] = {
+        "shaders/sim.frag",
+        "shaders/sim.comp",
+#if defined(__SWITCH__)
+        "shaders/sim_rules_body.glsl",
+#endif
+        "shaders/sim_common.glsl",
+        "shaders/sim_ids.glsl",
+        "shaders/paint.frag",
+        "shaders/palette_lookup.frag",
+        "shaders/upscale.frag",
+        "shaders/fullscreen.vert",
+        "shaders/bloom_bright.frag",
+        "shaders/bloom_blur.frag",
+        "shaders/bloom_composite.frag",
+        "shaders/ui_quad.vert",
+        "shaders/ui_quad.frag",
+    };
+    for (const char* path : kRequired) {
+        if (!romfsFilePresent(path)) return false;
+    }
+    return true;
 }
 
 } // namespace
@@ -92,7 +111,10 @@ bool romfsShaderBundlePresent() {
 
 static int run_app() {
 #if defined(__SWITCH__)
+    resetLaunchLogTimer();
     logStage("---- NXSand launch ----");
+    logStagef("build: switch-sim-log-v11 %s %s", __DATE__, __TIME__);
+    logStage("switch: default sim backend=fragment");
     logStage("stage: romfsInit");
     if (R_FAILED(romfsInit())) {
         switchShowFatal("NXSand: romfsInit failed",
@@ -106,13 +128,21 @@ static int run_app() {
                         "Embedded files missing from the NRO.");
         return 1;
     }
+    logStagef("romfs: sim.frag=%ld sim_rules_body.glsl=%ld sim_common.glsl=%ld",
+              romfsFileSizeBytes("shaders/sim.frag"),
+              romfsFileSizeBytes("shaders/sim_rules_body.glsl"),
+              romfsFileSizeBytes("shaders/sim_common.glsl"));
     logStage("stage: shader bundle present?");
     if (!romfsShaderBundlePresent()) {
         romfsExit();
         switchShowFatal("NXSand: shaders missing from romfs",
                         "Run: make (copies shaders/ into the NRO).\n"
-                        "Expected shaders/sim.frag, sim.comp, and paint.frag inside the NRO.");
+                        "Expected the full desktop shader bundle (sim, paint, palette, bloom, UI).");
         return 1;
+    }
+    logStage("stage: save directory");
+    if (!nx::ensureSaveStorageAtLaunch()) {
+        logStage("save dir: sdmc:/switch/nxsand/ unavailable (check microSD)");
     }
     logStage("stage: app.init()");
 #endif
@@ -159,8 +189,9 @@ static int run_app() {
     app.shutdown();
 
 #if defined(__SWITCH__)
-    romfsExit();
     logStage("stage: clean exit");
+    closeLaunchLog();
+    romfsExit();
 #endif
     return 0;
 }

@@ -9,19 +9,11 @@
 namespace nx {
 
 float menuMarkTextScale(float uiScale) {
-#if defined(__SWITCH__)
-    return 1.35f * uiScale;
-#else
     return 1.86f * uiScale;
-#endif
 }
 
 float menuCrumbTextScale(float uiScale) {
-#if defined(__SWITCH__)
-    return 0.62f * uiScale;
-#else
     return 1.0f * uiScale;
-#endif
 }
 
 float menuMarkBoxHeight(const FontAtlas& font, float uiScale) {
@@ -140,16 +132,8 @@ void drawMenuRow(RenderPipeline& r, FontAtlas& font, int W, int H, const MenuLay
         r.drawSolidRect(x, rowY, barW, rowH, 0.30f, 0.79f, 0.77f, 1.f, W, H);
     }
     char fitted[96];
-#if defined(__SWITCH__)
-    const float textScale = 1.24f * L.s;
-#else
     const float textScale = 1.38f * L.s;
-#endif
-#if defined(__SWITCH__)
-    const float labelPad = 12.f * L.s;
-#else
     const float labelPad = 14.f * L.s;
-#endif
     const float textX = x + barW + labelPad;
     const float textY = uiTextLineTopInBox(rowY, rowH, font, textScale);
     fitMenuLabel(fitted, sizeof(fitted), label, rowW - barW - labelPad - 8.f * L.s, textScale);
@@ -162,11 +146,7 @@ void drawHintPill(RenderPipeline& r, FontAtlas& font, float cx, float y, float s
                   int W, int H, float strength) {
     if (!hint || !hint[0]) return;
     const float a = std::clamp(strength, 0.f, 1.f);
-#if defined(__SWITCH__)
-    const float scale = 0.88f * s;
-#else
     const float scale = 0.90f * s;
-#endif
     const float tw = font.textWidth(hint, scale);
     const float padX = 14.f * s;
     const float padY = 6.f * s;

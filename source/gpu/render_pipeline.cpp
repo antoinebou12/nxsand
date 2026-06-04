@@ -1,4 +1,9 @@
 #include "render_pipeline.hpp"
+#include "../platform/screen_size.hpp"
+#include "shader_program.hpp"
+#if defined(__SWITCH__)
+#include "../platform/launch_log.hpp"
+#endif
 #include "upscale_filters.hpp"
 #include <array>
 #include <algorithm>
@@ -99,15 +104,38 @@ bool RenderPipeline::init(const std::string& shaderDir) {
     return true;
 }
 
+bool RenderPipeline::warmupWorldShaders() {
+#if defined(__SWITCH__)
+    appendLaunchLog("world shaders: begin");
+#endif
+    const bool ok = initWorldShaders();
+#if defined(__SWITCH__)
+    appendLaunchLog(ok ? "world shaders: done" : "world shaders: failed");
+#endif
+    return ok;
+}
+
 bool RenderPipeline::initWorldShaders() {
     if (palShader.program != 0 && upscaleShader.program != 0) return true;
     if (shaderDir_.empty()) return false;
 
+#if defined(__SWITCH__)
+    if (palShader.program == 0 && upscaleShader.program == 0) {
+        appendLaunchLog("render world shaders: begin");
+    }
+#endif
     buildPaletteTexture();
 
     std::string vfull = shaderDir_ + "/fullscreen.vert";
     std::string fpal  = shaderDir_ + "/palette_lookup.frag";
+#if defined(__SWITCH__)
+    appendLaunchLog("render world shaders: palette");
+    setShaderCompileStage("Compiling palette_lookup.frag...");
+#endif
     if (!palShader.loadFromFiles(vfull, fpal)) return false;
+#if defined(__SWITCH__)
+    appendLaunchLog("world shaders: palette ok");
+#endif
 
     palShader.use();
     pal_uSim   = palShader.uniformLocation("uSim");
@@ -120,9 +148,41 @@ bool RenderPipeline::initWorldShaders() {
     pal_uBlob = palShader.uniformLocation("uBlob");
     pal_uAo = palShader.uniformLocation("uAoStrength");
 
-    std::string fbright = shaderDir_ + "/bloom_bright.frag";
-    std::string fblur = shaderDir_ + "/bloom_blur.frag";
-    std::string fcomp = shaderDir_ + "/bloom_composite.frag";
+    std::string fup = shaderDir_ + "/upscale.frag";
+#if defined(__SWITCH__)
+    appendLaunchLog("render world shaders: upscale");
+    setShaderCompileStage("Compiling upscale.frag...");
+#endif
+    if (!upscaleShader.loadFromFiles(vfull, fup)) return false;
+#if defined(__SWITCH__)
+    appendLaunchLog("world shaders: upscale ok");
+#endif
+    upscaleShader.use();
+    up_uSrc = upscaleShader.uniformLocation("uSrc");
+    up_uSrcSize = upscaleShader.uniformLocation("uSrcSize");
+    up_uDstSize = upscaleShader.uniformLocation("uDstSize");
+    up_uFilter = upscaleShader.uniformLocation("uFilter");
+
+    ensureQuadVbo();
+#if defined(__SWITCH__)
+    appendLaunchLog("render world shaders: done");
+#endif
+    return true;
+}
+
+bool RenderPipeline::initBloomShaders() {
+    if (bloomBrightShader.program != 0 && bloomBlurShader.program != 0 &&
+        bloomCompositeShader.program != 0) {
+        return true;
+    }
+    if (shaderDir_.empty()) return false;
+#if defined(__SWITCH__)
+    appendLaunchLog("render bloom shaders: begin");
+#endif
+    const std::string vfull = shaderDir_ + "/fullscreen.vert";
+    const std::string fbright = shaderDir_ + "/bloom_bright.frag";
+    const std::string fblur = shaderDir_ + "/bloom_blur.frag";
+    const std::string fcomp = shaderDir_ + "/bloom_composite.frag";
     if (!bloomBrightShader.loadFromFiles(vfull, fbright)) return false;
     if (!bloomBlurShader.loadFromFiles(vfull, fblur)) return false;
     if (!bloomCompositeShader.loadFromFiles(vfull, fcomp)) return false;
@@ -142,16 +202,9 @@ bool RenderPipeline::initWorldShaders() {
     comp_uExposure = bloomCompositeShader.uniformLocation("uExposure");
     comp_uGamma = bloomCompositeShader.uniformLocation("uGamma");
     comp_uSaturation = bloomCompositeShader.uniformLocation("uSaturation");
-
-    std::string fup = shaderDir_ + "/upscale.frag";
-    if (!upscaleShader.loadFromFiles(vfull, fup)) return false;
-    upscaleShader.use();
-    up_uSrc = upscaleShader.uniformLocation("uSrc");
-    up_uSrcSize = upscaleShader.uniformLocation("uSrcSize");
-    up_uDstSize = upscaleShader.uniformLocation("uDstSize");
-    up_uFilter = upscaleShader.uniformLocation("uFilter");
-
-    ensureQuadVbo();
+#if defined(__SWITCH__)
+    appendLaunchLog("render bloom shaders: done");
+#endif
     return true;
 }
 
@@ -186,6 +239,38 @@ void RenderPipeline::ensureUiQuadVbo() {
     glBindVertexArray(0);
 }
 
+void RenderPipeline::layoutToFramebuffer(float lx, float ly, float& fx, float& fy) const {
+#if defined(__SWITCH__)
+    if (rotateLayoutToFb_) {
+        fx = float(fbW_) - ly;
+        fy = lx;
+        return;
+    }
+#else
+    (void)fbW_;
+    (void)fbH_;
+    (void)rotateLayoutToFb_;
+#endif
+    fx = lx;
+    fy = ly;
+}
+
+void RenderPipeline::layoutRectToGlViewport(int lx, int ly, int lw, int lh, int& vx, int& vy,
+                                            int& vw, int& vh) const {
+#if defined(__SWITCH__)
+    nx::layoutRectToGlViewport(lx, ly, lw, lh, fbW_, fbH_, rotateLayoutToFb_, vx, vy, vw, vh);
+#else
+    if (lw <= 0 || lh <= 0) {
+        vx = vy = vw = vh = 0;
+        return;
+    }
+    vx = lx;
+    vy = layoutScreenH_ - ly - lh;
+    vw = lw;
+    vh = lh;
+#endif
+}
+
 void RenderPipeline::flushUiBatch() {
     if (uiBatch_.empty()) return;
 
@@ -195,12 +280,12 @@ void RenderPipeline::flushUiBatch() {
     glBufferSubData(GL_ARRAY_BUFFER, 0, uiBatch_.size() * sizeof(UiVertex), uiBatch_.data());
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, uiBatchScreenW_, uiBatchScreenH_);
+    glViewport(0, 0, uiBatchFbW_, uiBatchFbH_);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     uiShader.use();
-    glUniform2f(ui_uScreen, float(uiBatchScreenW_), float(uiBatchScreenH_));
+    glUniform2f(ui_uScreen, float(uiBatchFbW_), float(uiBatchFbH_));
     glUniform1i(ui_uTex, 0);
     glUniform1i(ui_uMode, uiBatchMode_);
     glActiveTexture(GL_TEXTURE0);
@@ -223,10 +308,21 @@ void RenderPipeline::endUiFrame() {
     flushUiBatch();
 }
 
-void RenderPipeline::prepareUiDraw(int screenW, int screenH) {
+void RenderPipeline::prepareUiDraw(int layoutW, int layoutH, int fbW, int fbH) {
     flushUiBatch();
+    layoutScreenW_ = layoutW;
+    layoutScreenH_ = layoutH;
+    fbW_ = fbW > 0 ? fbW : layoutW;
+    fbH_ = fbH > 0 ? fbH : layoutH;
+#if defined(__SWITCH__)
+    // switch-sdl2 presents the display in panel orientation already. The previous manual
+    // layout->framebuffer rotation made boot/menu text appear sideways on hardware.
+    rotateLayoutToFb_ = false;
+#else
+    rotateLayoutToFb_ = false;
+#endif
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, screenW, screenH);
+    glViewport(0, 0, fbW_, fbH_);
     glDisable(GL_SCISSOR_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -243,23 +339,48 @@ void RenderPipeline::drawUiQuad(float x, float y, float w, float h, float u0, fl
                                 int screenH, GLuint texture, int mode) {
     const bool batchBreak =
         !uiBatch_.empty() &&
-        (texture != uiBatchTex_ || mode != uiBatchMode_ || screenW != uiBatchScreenW_ ||
-         screenH != uiBatchScreenH_);
+        (texture != uiBatchTex_ || mode != uiBatchMode_ || screenW != uiBatchLayoutW_ ||
+         screenH != uiBatchLayoutH_ || rotateLayoutToFb_ != uiBatchRotate_);
     if (batchBreak || uiBatch_.size() + 6 > kUiBatchMaxVerts) {
         flushUiBatch();
     }
 
     uiBatchTex_ = texture;
     uiBatchMode_ = mode;
-    uiBatchScreenW_ = screenW;
-    uiBatchScreenH_ = screenH;
+    uiBatchLayoutW_ = screenW;
+    uiBatchLayoutH_ = screenH;
+    uiBatchFbW_ = fbW_ > 0 ? fbW_ : screenW;
+    uiBatchFbH_ = fbH_ > 0 ? fbH_ : screenH;
+    uiBatchRotate_ = rotateLayoutToFb_;
 
-    uiBatch_.push_back({x, y, u0, v0, r, g, b, a});
-    uiBatch_.push_back({x + w, y, u1, v0, r, g, b, a});
-    uiBatch_.push_back({x, y + h, u0, v1, r, g, b, a});
-    uiBatch_.push_back({x + w, y, u1, v0, r, g, b, a});
-    uiBatch_.push_back({x + w, y + h, u1, v1, r, g, b, a});
-    uiBatch_.push_back({x, y + h, u0, v1, r, g, b, a});
+    const float corners[4][2] = {{x, y},
+                                   {x + w, y},
+                                   {x, y + h},
+                                   {x + w, y + h}};
+
+    if (!rotateLayoutToFb_) {
+        uiBatch_.push_back({x, y, u0, v0, r, g, b, a});
+        uiBatch_.push_back({x + w, y, u1, v0, r, g, b, a});
+        uiBatch_.push_back({x, y + h, u0, v1, r, g, b, a});
+        uiBatch_.push_back({x + w, y, u1, v0, r, g, b, a});
+        uiBatch_.push_back({x + w, y + h, u1, v1, r, g, b, a});
+        uiBatch_.push_back({x, y + h, u0, v1, r, g, b, a});
+        return;
+    }
+
+    auto pushMapped = [&](int i0, int i1, int i2, float u0m, float v0m, float u1m, float v1m,
+                          float u2m, float v2m) {
+        float fx, fy;
+        layoutToFramebuffer(corners[i0][0], corners[i0][1], fx, fy);
+        uiBatch_.push_back({fx, fy, u0m, v0m, r, g, b, a});
+        layoutToFramebuffer(corners[i1][0], corners[i1][1], fx, fy);
+        uiBatch_.push_back({fx, fy, u1m, v1m, r, g, b, a});
+        layoutToFramebuffer(corners[i2][0], corners[i2][1], fx, fy);
+        uiBatch_.push_back({fx, fy, u2m, v2m, r, g, b, a});
+    };
+
+    pushMapped(0, 1, 3, u0, v0, u1, v0, u1, v1);
+    pushMapped(0, 3, 2, u0, v0, u1, v1, u0, v1);
 }
 
 void RenderPipeline::setPaletteMode(int mode) {
@@ -414,6 +535,7 @@ void RenderPipeline::ensureBloomTargets(int simW, int simH) {
 
 void RenderPipeline::runBloomPipeline() {
     if (!bloomEnabled() || bloomBlurPasses_ <= 0 || lookTex == 0) return;
+    if (!initBloomShaders()) return;
     ensureBloomTargets(bloomSimW > 0 ? bloomSimW : lookW, bloomSimH > 0 ? bloomSimH : lookH);
 
     glDisable(GL_BLEND);
@@ -480,8 +602,13 @@ void RenderPipeline::runBloomPipeline() {
 
 void RenderPipeline::blitPostToPlayRegion(const PlayRegion& pr, int screenH, int simW, int simH,
                                           bool filtered) {
+    (void)screenH;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(pr.x, screenH - pr.y - pr.h, pr.w, pr.h);
+    {
+        int vx = 0, vy = 0, vw = 0, vh = 0;
+        layoutRectToGlViewport(pr.x, pr.y, pr.w, pr.h, vx, vy, vw, vh);
+        glViewport(vx, vy, vw, vh);
+    }
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -521,7 +648,11 @@ void RenderPipeline::drawSimulation(GLuint simR8UI, int simW, int simH, const Pl
 
     if (!needsLook) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(pr.x, screenH - pr.y - pr.h, pr.w, pr.h);
+        {
+            int vx = 0, vy = 0, vw = 0, vh = 0;
+            layoutRectToGlViewport(pr.x, pr.y, pr.w, pr.h, vx, vy, vw, vh);
+            glViewport(vx, vy, vw, vh);
+        }
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         drawPalettePass(simR8UI, simW, simH, frame, mode);
@@ -546,7 +677,11 @@ void RenderPipeline::drawSimulation(GLuint simR8UI, int simW, int simH, const Pl
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(pr.x, screenH - pr.y - pr.h, pr.w, pr.h);
+    {
+        int vx = 0, vy = 0, vw = 0, vh = 0;
+        layoutRectToGlViewport(pr.x, pr.y, pr.w, pr.h, vx, vy, vw, vh);
+        glViewport(vx, vy, vw, vh);
+    }
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 

@@ -1,5 +1,6 @@
 #include "engine_settings.hpp"
 #include "app.hpp"
+#include "../platform/audio/menu_music.hpp"
 #include "../platform/audio/tone_audio.hpp"
 #include "../gpu/sim_backend.hpp"
 #include "benchmark_scene.hpp"
@@ -16,6 +17,7 @@ const char* engineTabLabel(EngineTab tab) {
         case EngineTab::Performance: return "Performance";
         case EngineTab::Visuals: return "Visuals";
         case EngineTab::Controls: return "Controls";
+        case EngineTab::Audio: return "Audio";
         case EngineTab::Accessibility: return "Accessibility";
         case EngineTab::Display: return "Display";
         case EngineTab::Debug: return "Debug";
@@ -27,7 +29,8 @@ int engineTabRowCount(EngineTab tab) {
     switch (tab) {
         case EngineTab::Performance: return 7;
         case EngineTab::Visuals: return 6;
-        case EngineTab::Controls: return 5;
+        case EngineTab::Controls: return 4;
+        case EngineTab::Audio: return 2;
         case EngineTab::Accessibility: return 3;
         case EngineTab::Display: return 3;
         case EngineTab::Debug: return 4;
@@ -43,10 +46,11 @@ static void fmtSimSize(char* buf, size_t n, int w, int h) {
 }
 
 const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settings,
-                              bool computeSimSupported, char* buf, size_t bufSize) {
+                              char* buf, size_t bufSize) {
     const auto& p = settings.performance;
     const auto& v = settings.visuals;
     const auto& c = settings.controls;
+    const auto& au = settings.audio;
     const auto& a = settings.accessibility;
     const auto& di = settings.display;
     const auto& d = settings.debug;
@@ -135,12 +139,15 @@ const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settin
                                   : c.rumble == RumbleLevel::Medium ? "Medium"
                                                                     : "High");
                     break;
-                case 4:
-                    std::snprintf(buf, bufSize, "Sound: %s",
-                                  c.sound == SoundLevel::Off     ? "Off"
-                                  : c.sound == SoundLevel::Low   ? "Low"
-                                  : c.sound == SoundLevel::Medium ? "Medium"
-                                                                    : "High");
+            }
+            break;
+        case EngineTab::Audio:
+            switch (row) {
+                case 0:
+                    std::snprintf(buf, bufSize, "Volume: %s", soundLevelLabel(au.sound));
+                    break;
+                case 1:
+                    std::snprintf(buf, bufSize, "Menu music: %s", au.menuMusic ? "On" : "Off");
                     break;
             }
             break;
@@ -215,6 +222,8 @@ bool engineTabRowIsToggle(EngineTab tab, int row) {
             return row == 5;
         case EngineTab::Visuals:
             return row == 3 || row == 4;
+        case EngineTab::Audio:
+            return row == 1;
         case EngineTab::Accessibility:
             return row == 1 || row == 2;
         case EngineTab::Display:
@@ -252,9 +261,20 @@ void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir) {
                         s.performance.simBackend = SimBackend::Fragment;
                         break;
                     }
+#if defined(__SWITCH__)
+                    const SimBackend prev = s.performance.simBackend;
+#endif
                     int b = static_cast<int>(s.performance.simBackend) + dir;
                     b = std::clamp(b, 0, static_cast<int>(SimBackend::Compute));
                     s.performance.simBackend = static_cast<SimBackend>(b);
+#if defined(__SWITCH__)
+                    if (prev != SimBackend::Compute &&
+                        s.performance.simBackend == SimBackend::Compute) {
+                        app.toast.show(
+                            "Compute may freeze sand on this GPU; use Fragment if needed",
+                            3.f);
+                    }
+#endif
                     break;
                 }
                 case 2:
@@ -342,13 +362,24 @@ void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir) {
                     s.controls.rumble = static_cast<RumbleLevel>(m);
                     break;
                 }
-                case 4: {
-                    int m = static_cast<int>(s.controls.sound) + dir;
+            }
+            break;
+        case EngineTab::Audio:
+            switch (row) {
+                case 0: {
+                    int m = static_cast<int>(s.audio.sound) + dir;
                     m = std::clamp(m, 0, static_cast<int>(SoundLevel::High));
-                    s.controls.sound = static_cast<SoundLevel>(m);
-                    toneAudioSetLevel(s.controls.sound);
+                    s.audio.sound = static_cast<SoundLevel>(m);
+                    toneAudioSetLevel(s.audio.sound);
+                    if (dir != 0 && s.audio.sound != SoundLevel::Off) playTone(ToneId::UiNav);
                     break;
                 }
+                case 1:
+                    s.audio.menuMusic = !s.audio.menuMusic;
+                    if (app.scene == Scene::Menu) {
+                        menuMusicSetActive(s.audio.menuMusic);
+                    }
+                    break;
             }
             break;
         case EngineTab::Accessibility:

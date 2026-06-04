@@ -7,12 +7,11 @@
 #include <filesystem>
 
 void run_physics_tests(TestContext& ctx) {
-    CHECK(ctx, nx::settingsMaterialCount() == 16);
+    CHECK(ctx, nx::settingsMaterialCount() == 15);
     CHECK(ctx, nx::settingsMaterialAt(0) == nx::MAT_FIRE);
     CHECK(ctx, nx::paramCountFor(nx::MAT_FIRE) == 7);
     CHECK(ctx, nx::paramCountFor(nx::MAT_PLANT) == 3);
     CHECK(ctx, nx::paramCountFor(nx::MAT_COAL) == 1);
-    CHECK(ctx, nx::paramCountFor(nx::MAT_TNT) == 1);
     CHECK(ctx, nx::paramCountFor(nx::MAT_BRICK) == 2);
     CHECK(ctx, nx::paramSpecAt(nx::MAT_FIRE, 0) != nullptr);
     CHECK(ctx, nx::paramSpecAt(nx::MAT_SAND, 0) != nullptr);
@@ -35,7 +34,7 @@ void run_physics_tests(TestContext& ctx) {
     CHECK(ctx, std::fabs(p.smoke_driftRate - 0.12f) < 1e-5f);
     CHECK(ctx, std::fabs(p.smoke_fadeRate - 0.010f) < 1e-5f);
     CHECK(ctx, std::fabs(p.sand_wetSlideScale - 0.40f) < 1e-5f);
-    CHECK(ctx, std::fabs(p.sand_lithifyRate - 0.005f) < 1e-5f);
+    CHECK(ctx, std::fabs(p.sand_lithifyRate - 0.025f) < 1e-5f);
     CHECK(ctx, std::fabs(p.gunpowder_wetIgniteScale - 0.20f) < 1e-5f);
     CHECK(ctx, std::fabs(p.gunpowder_packBoost - 0.12f) < 1e-5f);
     CHECK(ctx, std::fabs(p.metal_rustRate - 0.003f) < 1e-5f);

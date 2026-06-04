@@ -2,6 +2,7 @@
 #include <SDL2/SDL.h>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include "gpu/render_pipeline.hpp"
@@ -37,6 +38,8 @@ public:
     SDL_GLContext glCtx = nullptr;
     int screenW = 1280;
     int screenH = 720;
+    int framebufferW = 1280;
+    int framebufferH = 720;
 
     Scene scene = Scene::Menu;
     /// True after the first transition to Play (New/Load/resume). Main-menu B/Esc only resumes when set.
@@ -69,6 +72,7 @@ public:
     void markSettingsHeavyApplyPending() { settingsHeavyApplyPending_ = true; }
 
     bool computeSimSupported() const { return computeSimSupported_; }
+    bool forceComputeBackend() const { return forceComputeBackend_; }
 
     void onEnterPlayFromMenu();
     bool ensureSimPipelineReady();
@@ -77,6 +81,13 @@ public:
     void requestFlushPhysicsSettings();
 
     void presentBootProgress(float progress, const char* status);
+    void presentCompileOverlay(float progress);
+    void syncScreenMetrics();
+    void ensureUiFontReady();
+    void resetMenuRepeat() { menuRepeat_.reset(); }
+    void releaseMemoryBeforeSimCompile();
+    void reloadAudioAfterSimCompile();
+    void ensureAudioReady();
 
 private:
     bool computeSimSupported_ = false;
@@ -84,6 +95,9 @@ private:
     SimBackend resolveSimBackend() const;
     bool initSimPipeline(int w, int h);
     bool resetGlContextForSimCompile();
+#if defined(__SWITCH__)
+    bool prepareLightSimCompileOnSwitch();
+#endif
     bool restoreUiPipelinesAfterSimCompile();
     void tickMenu(double dtSec);
     void tickPlay(double dtSec);
@@ -107,6 +121,14 @@ private:
     bool settingsHeavyApplyPending_ = false;
     bool heavyFlushScheduled_ = false;
     bool simWarmupTriggered_ = false;
+    bool audioReady_ = false;
+    bool screenMetricsLogged_ = false;
+    bool playEntryLogged_ = false;
+    bool playTickLogged_ = false;
+    bool playRenderLogged_ = false;
+    bool simStartupFailed_ = false;
+
+    bool playStepLogged_ = false;
 
     PerfStats perf_{};
     MenuRepeatState menuRepeat_{};

@@ -92,10 +92,25 @@ public:
     void endUiFrame();
 
     /// Reset FBO/viewport/blend after world passes so HUD font quads draw correctly.
-    void prepareUiDraw(int screenW, int screenH);
+    /// layoutW/H: landscape UI coordinates; fbW/H: native GL framebuffer (may differ on Switch).
+    void prepareUiDraw(int layoutW, int layoutH, int fbW, int fbH);
+
+    /// Link palette + upscale world shaders before first play frame (idempotent).
+    bool warmupWorldShaders();
 
 private:
+    void layoutToFramebuffer(float lx, float ly, float& fx, float& fy) const;
+    void layoutRectToGlViewport(int lx, int ly, int lw, int lh, int& vx, int& vy, int& vw,
+                                int& vh) const;
+
+    int layoutScreenW_ = 0;
+    int layoutScreenH_ = 0;
+    int fbW_ = 0;
+    int fbH_ = 0;
+    bool rotateLayoutToFb_ = false;
+
     bool initWorldShaders();
+    bool initBloomShaders();
     void ensureQuadVbo();
     void ensureUiQuadVbo();
     void drawUiQuad(float x, float y, float w, float h, float u0, float v0, float u1, float v1,
@@ -117,8 +132,11 @@ private:
     std::vector<UiVertex> uiBatch_;
     GLuint uiBatchTex_ = 0;
     int uiBatchMode_ = -1;
-    int uiBatchScreenW_ = 0;
-    int uiBatchScreenH_ = 0;
+    int uiBatchLayoutW_ = 0;
+    int uiBatchLayoutH_ = 0;
+    int uiBatchFbW_ = 0;
+    int uiBatchFbH_ = 0;
+    bool uiBatchRotate_ = false;
 
     ShaderProgram bloomBrightShader;
     ShaderProgram bloomBlurShader;

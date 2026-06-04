@@ -21,7 +21,7 @@ constexpr Color ERASE_RED    = rgba(0xe0, 0x52, 0x52);
 
 constexpr const char* APP_TITLE   = "NXSand";
 constexpr const char* APP_MARK    = "NXSand";
-constexpr const char* APP_VERSION = "0.0.1";
+constexpr const char* APP_VERSION = "0.0.2";
 
 constexpr int BASE_SCREEN_W = 1280;
 constexpr int BASE_SCREEN_H = 720;
@@ -40,6 +40,10 @@ inline float uiScale(int screenW, int screenH, float accessibilityScale = 1.f) {
     float s  = sx < sy ? sx : sy;
     if (s < 0.5f) s = 0.5f;
     if (s > 2.0f) s = 2.0f;
+#if defined(__SWITCH__)
+    // Handheld GL is often 720×1280; do not shrink HUD/menu below design scale.
+    if (s < 1.0f) s = 1.0f;
+#endif
     const float a = accessibilityScale < 0.75f ? 0.75f : (accessibilityScale > 1.5f ? 1.5f : accessibilityScale);
     return s * a;
 }

@@ -118,6 +118,13 @@ void migrateLegacySaveData() {
     const std::string src = legacySaveDirectory();
     if (dst == src) return;
 
+#if defined(__SWITCH__)
+    struct stat st{};
+    if (stat("sdmc:/switch", &st) != 0) {
+        fsdevMountSdmc();
+    }
+#endif
+
     ensureDirectoryExists(dst);
 
 #if defined(__SWITCH__)
@@ -174,10 +181,20 @@ bool ensureSwitchStorageReady() {
         }
     }
 
-    if (!ensureDirectoryExists(saveDirectory())) return false;
+    if (!ensureSaveDirectoryReady()) return false;
     migrateLegacySaveData();
     return true;
 }
 #endif
+
+bool ensureSaveStorageAtLaunch() {
+#if defined(__SWITCH__)
+    return ensureSwitchStorageReady();
+#else
+    if (!ensureSaveDirectoryReady()) return false;
+    migrateLegacySaveData();
+    return true;
+#endif
+}
 
 } // namespace nx

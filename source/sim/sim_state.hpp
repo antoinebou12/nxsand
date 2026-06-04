@@ -40,7 +40,11 @@ struct SimState {
     // True when the grid may contain non-empty cells (paint, load, starter scene).
     // Used so active-tile idle sleep does not freeze a populated sandbox.
     bool  gridHasMatter = false;
+#if defined(__SWITCH__)
+    bool  paletteHidden = false;
+#else
     bool  paletteHidden = true;
+#endif
 
     // Brush
     int      brush_x = RENDER_W / 2;

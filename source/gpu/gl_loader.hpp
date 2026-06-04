@@ -9,11 +9,17 @@
 #else
 #include <GLES3/gl3.h>
 #include <GLES3/gl31.h>
+#ifndef GL_COMPLETION_STATUS_KHR
+#define GL_COMPLETION_STATUS_KHR 0x91B1
+#endif
 #endif
 
 namespace nx::gl {
 
 bool load_gl_functions();
+
+// GL_KHR_parallel_shader_compile (desktop GLAD or Switch extension probe).
+bool parallel_shader_compile_available();
 
 inline bool parse_es_version(int& major, int& minor) {
     major = 0;

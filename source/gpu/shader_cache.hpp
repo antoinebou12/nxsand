@@ -18,7 +18,11 @@ enum class ShaderCacheResult {
     Hit,
 };
 
+/// Desktop: honors NXSAND_SHADER_CACHE (default on). Switch: always false (no SD shader_cache/).
 bool shaderCacheEnabled();
+
+/// GLES program-binary cache supported on this platform (false on Switch).
+bool shaderProgramBinaryCacheSupported();
 
 /// Load a linked program from disk cache. Returns program id on hit, 0 otherwise.
 GLuint tryLoadShaderProgramBinary(const ShaderCacheKey& key, ShaderCacheResult* outResult);

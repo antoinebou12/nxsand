@@ -52,7 +52,7 @@ struct alignas(16) PhysicsParams {
 
     // Sand (hydrology: wet drag, sandstone lithify)
     float sand_wetSlideScale = 0.40f;
-    float sand_lithifyRate   = 0.005f;
+    float sand_lithifyRate   = 0.025f;
 
     // Gunpowder (damp when touching water; pack ignite boost)
     float gunpowder_wetIgniteScale = 0.20f;
@@ -74,9 +74,6 @@ struct alignas(16) PhysicsParams {
 
     // Coal (slow burn; no chain detonation)
     float coal_burnRate = 0.025f;
-
-    // TNT (static explosive; chain detonation)
-    float tnt_detonateRate = 0.92f;
 
     // Brick (cohesive heavy powder; no ignition)
     float brick_slideScale    = 0.30f;

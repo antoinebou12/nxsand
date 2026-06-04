@@ -10,16 +10,17 @@ enum class EngineTab {
     Performance = 0,
     Visuals = 1,
     Controls = 2,
-    Accessibility = 3,
-    Display = 4,
-    Debug = 5,
-    Count = 6,
+    Audio = 3,
+    Accessibility = 4,
+    Display = 5,
+    Debug = 6,
+    Count = 7,
 };
 
 const char* engineTabLabel(EngineTab tab);
 int engineTabRowCount(EngineTab tab);
 const char* engineTabRowLabel(EngineTab tab, int row, const GameSettings& settings,
-                              bool computeSimSupported, char* buf, size_t bufSize);
+                              char* buf, size_t bufSize);
 void adjustEngineTabRow(App& app, EngineTab tab, int row, int dir);
 bool engineTabRowIsToggle(EngineTab tab, int row);
 

@@ -150,14 +150,9 @@ void tickSimExplosionFx(SimPipeline& pipe, const PlayRegion& pr, int gridW, int 
             const size_t i = static_cast<size_t>(y * w + x);
             const uint8_t prev = watchPrev[i];
             const uint8_t now = cur[i];
-            const bool fromGunpowder = prev == MAT_GUNPOWDER;
-            const bool fromTnt = prev == MAT_TNT;
-            if (!fromGunpowder && !fromTnt) continue;
-            const bool gunpowderBurst =
-                fromGunpowder && (now == MAT_FIRE || now == MAT_SMOKE);
-            const bool tntBurst =
-                fromTnt && (now == MAT_FIRE || now == MAT_EMPTY || now == MAT_SMOKE);
-            if (!gunpowderBurst && !tntBurst) continue;
+            if (prev != MAT_GUNPOWDER) continue;
+            const bool gunpowderBurst = now == MAT_FIRE || now == MAT_SMOKE;
+            if (!gunpowderBurst) continue;
             detonated = true;
             if (now == MAT_FIRE) heavyDetonation = true;
             float sx = 0.f;

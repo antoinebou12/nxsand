@@ -26,7 +26,9 @@
 #include "ui/theme.hpp"
 #include "sim/sim_state.hpp"
 #include "platform/input/haptics.hpp"
+#include "platform/audio/menu_music.hpp"
 #include "platform/audio/tone_audio.hpp"
+#include "platform/launch_log.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -36,29 +38,12 @@
 #include <cstdlib>
 #include <cstdio>
 #include <iostream>
+#include <string>
 #include <vector>
 
 namespace nx {
 
 namespace {
-
-#if defined(__SWITCH__)
-void appendLaunchLog(const char* msg) {
-    FILE* f = std::fopen("sdmc:/switch/nxsand/launch.log", "a");
-    if (!f) return;
-    std::fprintf(f, "%s\n", msg ? msg : "(null)");
-    std::fclose(f);
-}
-
-void appendLaunchLogf(const char* fmt, ...) {
-    char buf[768];
-    va_list ap;
-    va_start(ap, fmt);
-    std::vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-    appendLaunchLog(buf);
-}
-#endif
 
 void applySdlOrientationHint(ScreenOrientation o) {
 #if !defined(__SWITCH__)
@@ -96,10 +81,23 @@ static bool getenvEnabled(const char* k) {
 }
 
 static void bootLogStage(const char* stage) {
+#if defined(__SWITCH__)
+    appendLaunchLog(stage);
+#endif
     if (!getenvEnabled("NXSAND_BOOT_LOG") && !getenvEnabled("NXENGINE_BOOT_LOG")) return;
     static uint32_t t0 = SDL_GetTicks();
     std::cerr << "[boot +" << (SDL_GetTicks() - t0) << "ms] " << stage << "\n";
 }
+
+#if defined(__SWITCH__)
+static const char* simBackendName(SimBackend b) {
+    switch (b) {
+        case SimBackend::Compute: return "compute";
+        case SimBackend::Fragment: return "fragment";
+    }
+    return "?";
+}
+#endif
 
 std::string App::resolveShaderDir() const {
     std::string e = getenvStr("NXSAND_SHADER_DIR");
@@ -116,14 +114,24 @@ std::string App::resolveShaderDir() const {
 
 bool App::init() {
     initError.clear();
+    bootLogStage("init: begin");
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_TIMER) != 0) {
         initError = std::string("SDL_Init: ") + SDL_GetError();
         std::cerr << initError << "\n";
         return false;
     }
+    bootLogStage("init: SDL ok");
+
+    if (!ensureSaveStorageAtLaunch()) {
+#if defined(__SWITCH__)
+        appendLaunchLog("save dir: sdmc:/switch/nxsand/ unavailable (check microSD)");
+#endif
+    }
+    bootLogStage("init: save directory");
 
     loadGameSettings(settings);
+    bootLogStage("init: settings loaded");
     forceComputeBackend_ =
 #if defined(NXSAND_ENABLE_COMPUTE_DEFAULT) && NXSAND_ENABLE_COMPUTE_DEFAULT
         true ||
@@ -163,6 +171,7 @@ bool App::init() {
         std::cerr << initError << "\n";
         return false;
     }
+    bootLogStage("init: window ok");
 
     glCtx = SDL_GL_CreateContext(window);
     if (!glCtx) {
@@ -188,6 +197,7 @@ bool App::init() {
         std::cerr << initError << "\n";
         return false;
     }
+    bootLogStage("init: GL context ok");
     if (SDL_GL_MakeCurrent(window, glCtx) != 0) {
         initError = std::string("SDL_GL_MakeCurrent: ") + SDL_GetError();
         std::cerr << initError << "\n";
@@ -196,6 +206,7 @@ bool App::init() {
     SDL_GL_SetSwapInterval(1);
 
     queryDrawableSize(window, screenW, screenH, settings.display.orientation);
+    queryGlFramebufferSize(window, framebufferW, framebufferH);
     {
         const auto simSz = resolveSimGridSize(screenW, screenH, settings.performance);
         sim.grid_w = simSz.first;
@@ -214,9 +225,14 @@ bool App::init() {
         std::cerr << initError << "\n";
         return false;
     }
+    bootLogStage("init: GLAD ok");
+#if defined(__SWITCH__)
+    appendLaunchLogf("parallel_shader_compile: %s",
+                     gl::parallel_shader_compile_available() ? "yes" : "no");
+#endif
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, screenW, screenH);
+    glViewport(0, 0, framebufferW, framebufferH);
     glClearColor(0.03f, 0.04f, 0.06f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
     SDL_GL_SwapWindow(window);
@@ -245,6 +261,17 @@ bool App::init() {
         }
 #if defined(__SWITCH__)
         appendLaunchLogf("Compute sim: %s", computeSimSupported_ ? "yes" : computeErr.c_str());
+        appendLaunchLogf("switch: saved sim backend=%s supported=%s",
+                         simBackendName(settings.performance.simBackend),
+                         computeSimSupported_ ? "yes" : "no");
+        appendLaunchLog("switch: boot sim deferred (first play compile)");
+        const bool forceFragment =
+            getenvEnabled("NXSAND_FORCE_FRAGMENT") || getenvEnabled("NXENGINE_FORCE_FRAGMENT");
+        if (forceFragment) {
+            settings.performance.simBackend = SimBackend::Fragment;
+            markGameSettingsDirty();
+            appendLaunchLog("switch: NXSAND_FORCE_FRAGMENT set");
+        }
 #endif
 #if !defined(NDEBUG)
         if (!computeSimSupported_ && !computeErr.empty()) {
@@ -267,7 +294,10 @@ bool App::init() {
 #endif
         return false;
     }
+#if !defined(__SWITCH__)
     flushPendingShaderCacheSaves();
+#endif
+    presentBootProgress(0.05f, "Loading shaders...");
     {
         const char* palMode = SDL_getenv("NXSAND_PALETTE_MODE");
         if (!palMode) palMode = SDL_getenv("NXENGINE_PALETTE_MODE");
@@ -285,6 +315,9 @@ bool App::init() {
 #endif
         return false;
     }
+#if defined(__SWITCH__)
+    appendLaunchLogf("font ready: tex=%u lineH=%d", static_cast<unsigned>(font.tex), font.lineH);
+#endif
     presentBootProgress(0.12f, "Loading fonts...");
 
     bootLogStage("menu backdrop");
@@ -305,34 +338,128 @@ bool App::init() {
     SDL_GL_SetSwapInterval(settings.performance.targetFps == 60 ? 1 : 2);
 
 #if defined(__SWITCH__)
-    if (!ensureSwitchStorageReady()) {
+    if (!ensureSaveStorageAtLaunch()) {
         toast.show("SD saves unavailable (check microSD)", 4.0f);
     }
     presentBootProgress(0.92f, "Almost ready...");
+#else
+    if (!ensureSaveStorageAtLaunch()) {
+        std::cerr << "Warning: could not create save folder " << saveDirectory() << "\n";
+    }
 #endif
 
     openFirstController(input);
     menu.resetMain();
-    toneAudioSetLevel(settings.controls.sound);
+    resetMenuRepeat();
+    syncScreenMetrics();
     presentBootProgress(1.f, "Ready");
     bootLogStage("init complete");
     return true;
 }
 
+void App::ensureUiFontReady() {
+    if (font.isReady()) return;
+    font.invalidateGlTexture();
+    if (!font.init()) {
+#if defined(__SWITCH__)
+        appendLaunchLog("font ensureUiFontReady: init failed");
+#endif
+    }
+}
+
+void App::syncScreenMetrics() {
+    if (!window) return;
+    queryDrawableSize(window, screenW, screenH, settings.display.orientation);
+    queryGlFramebufferSize(window, framebufferW, framebufferH);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, framebufferW, framebufferH);
+    if (render) render->prepareUiDraw(screenW, screenH, framebufferW, framebufferH);
+#if defined(__SWITCH__)
+    if (!screenMetricsLogged_) {
+        screenMetricsLogged_ = true;
+        int winW = 0, winH = 0;
+        SDL_GetWindowSize(window, &winW, &winH);
+        appendLaunchLogf("layout %dx%d GL FB %dx%d window %dx%d uiScale=%.2f rawPortrait=%d uiRotate=0", screenW,
+                         screenH, framebufferW, framebufferH, winW, winH,
+                         theme::uiScale(screenW, screenH, settings.accessibility.uiScale),
+                         switchPortraitFramebuffer(framebufferW, framebufferH, screenW, screenH)
+                             ? 1
+                             : 0);
+    }
+#endif
+}
+
 void App::presentBootProgress(float progress, const char* status) {
     if (!window || !glCtx || !render) return;
+    syncScreenMetrics();
     render->beginUiFrame();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, screenW, screenH);
     glDisable(GL_SCISSOR_TEST);
     glClearColor(0.03f, 0.04f, 0.06f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
-    if (font.tex != 0) {
+    ensureUiFontReady();
+    if (font.isReady()) {
         drawBootScreen(*render, font, screenW, screenH, progress, status);
+    } else {
+        drawCompileOverlay(*render, screenW, screenH, progress);
     }
     render->endUiFrame();
     SDL_GL_SwapWindow(window);
 }
+
+void App::presentCompileOverlay(float progress) {
+    if (!window || !glCtx || !render) return;
+    syncScreenMetrics();
+    render->beginUiFrame();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDisable(GL_SCISSOR_TEST);
+    glClearColor(0.03f, 0.04f, 0.06f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    drawCompileOverlay(*render, screenW, screenH, progress);
+    render->endUiFrame();
+    SDL_GL_SwapWindow(window);
+}
+
+void App::releaseMemoryBeforeSimCompile() {
+#if defined(__SWITCH__)
+    menuMusicReleaseTheme();
+    toneAudioReleaseCachedWavs();
+#endif
+}
+
+void App::reloadAudioAfterSimCompile() {
+    if (!audioReady_) return;
+    if (menuMusicInit()) {
+        menuMusicSetActive(scene == Scene::Menu && settings.audio.menuMusic);
+    }
+}
+
+#if defined(__SWITCH__)
+static void compileStatusText(const char* stage, uint64_t elapsedMs, char* out, size_t outSize) {
+    if (!out || outSize == 0) return;
+    const unsigned long long sec = static_cast<unsigned long long>(elapsedMs / 1000u);
+    const char* line = "Compiling sim...";
+    if (stage) {
+        if (std::strstr(stage, "Linking sim.frag") || std::strstr(stage, "Linking sim.comp")) {
+            line = "Linking sim...";
+        } else if (std::strstr(stage, "Compiling sim.frag") ||
+                   std::strstr(stage, "Compiling sim.comp")) {
+            line = "Compiling sim...";
+        } else if (std::strstr(stage, "Compiling paint")) {
+            line = "Paint shader...";
+        } else if (std::strstr(stage, "palette_lookup")) {
+            line = "Palette shader...";
+        } else if (std::strstr(stage, "upscale")) {
+            line = "Upscale shader...";
+        } else if (std::strstr(stage, "ui_quad")) {
+            line = "UI shaders...";
+        } else if (std::strstr(stage, "Preparing")) {
+            line = "Preparing sim...";
+        }
+    }
+    std::snprintf(out, outSize, "%s %llus", line, sec);
+}
+#endif
 
 struct SimCompileAudioGuard {
     SimCompileAudioGuard() { toneAudioSetOutputPaused(true); }
@@ -342,20 +469,72 @@ struct SimCompileAudioGuard {
 static void shaderCompileProgress(const char* stage, uint64_t elapsedMs, void* user) {
     auto* app = static_cast<App*>(user);
     if (!app || !stage) return;
+#if defined(__SWITCH__)
+    static std::string s_lastShaderStageLog;
+    if (s_lastShaderStageLog != stage) {
+        s_lastShaderStageLog = stage;
+        appendLaunchLogf("shader stage: %s", stage);
+    }
+#endif
     char buf[160];
     const unsigned long long sec = static_cast<unsigned long long>(elapsedMs / 1000u);
     std::snprintf(buf, sizeof(buf), "%s (%llus)", stage, sec);
-    const float t = std::min(1.f, static_cast<float>(elapsedMs) / 90000.f);
+    float linkBudgetMs = 90000.f;
+#if defined(__SWITCH__)
+    if (stage && (std::strstr(stage, "Linking sim.frag") || std::strstr(stage, "Linking sim.comp") ||
+                  std::strstr(stage, "Compiling sim.frag") ||
+                  std::strstr(stage, "Compiling sim.comp"))) {
+        linkBudgetMs = 300000.f;
+    }
+#endif
+    const float t = std::min(1.f, static_cast<float>(elapsedMs) / linkBudgetMs);
     SDL_PumpEvents();
+#if defined(__SWITCH__)
+    char status[96];
+    compileStatusText(stage, elapsedMs, status, sizeof(status));
+    app->ensureUiFontReady();
+    if (app->font.isReady()) {
+        app->presentBootProgress(0.5f + 0.2f * t, status);
+    } else {
+        app->presentCompileOverlay(0.5f + 0.2f * t);
+    }
+#else
     app->presentBootProgress(0.5f + 0.2f * t, buf);
+#endif
 }
+
+#if defined(__SWITCH__)
+bool App::prepareLightSimCompileOnSwitch() {
+    bootLogStage("sim compile prep (switch)");
+    appendLaunchLog("sim compile start");
+    prepareGlContextForShaderLink();
+    if (simPipeline) simPipeline->shutdown();
+    return true;
+}
+#endif
 
 bool App::ensureSimPipelineReady() {
     if (!simPipeline) simPipeline = std::make_unique<SimPipeline>();
     if (simPipeline->ready()) return true;
+#if defined(__SWITCH__)
+    if (simStartupFailed_) {
+        appendLaunchLog("ensureSimPipeline: previous failure, skipping retry");
+        return false;
+    }
+#endif
 
+#if defined(__SWITCH__)
+    appendLaunchLogTimed("boot phase: ensureSimPipeline begin");
+    appendLaunchLogf("ensureSimPipeline: begin %dx%d backend=%s",
+                     sim.grid_w, sim.grid_h, simBackendName(resolveSimBackend()));
+#endif
     const SimCompileAudioGuard audioGuard;
-    presentBootProgress(0.5f, "Compiling simulation...");
+#if defined(__SWITCH__)
+    releaseMemoryBeforeSimCompile();
+    presentBootProgress(0.35f, "Preparing simulation shaders...");
+#else
+    presentBootProgress(0.5f, "Preparing simulation shaders...");
+#endif
     glFinish();
     glUseProgram(0);
     glBindVertexArray(0);
@@ -363,31 +542,99 @@ bool App::ensureSimPipelineReady() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+#if defined(__SWITCH__)
+    if (!prepareLightSimCompileOnSwitch()) {
+        toast.show("Simulation failed to start", 2.5f);
+        return false;
+    }
+#else
     if (!resetGlContextForSimCompile()) {
         toast.show("Simulation failed to start", 2.5f);
         return false;
     }
+#endif
     bootLogStage("sim pipeline compile");
+#if defined(__SWITCH__)
+    appendLaunchLogTimed("boot phase: sim compile begin");
+#endif
     const auto compileStart = std::chrono::steady_clock::now();
+#if defined(__SWITCH__)
+    const bool showCompileProgress = true;
+#else
     const bool showCompileProgress =
         getenvEnabled("NXSAND_SHADER_PROGRESS") || getenvEnabled("NXENGINE_SHADER_PROGRESS");
+#endif
     if (showCompileProgress) setShaderCompileProgress(shaderCompileProgress, this);
     bool ok = initSimPipeline(sim.grid_w, sim.grid_h);
+#if !defined(__SWITCH__)
     flushPendingShaderCacheSaves();
+#endif
+#if defined(__SWITCH__)
+    if (ok) {
+        appendLaunchLogTimed("boot phase: sim compile end");
+        appendLaunchLog("sim compile ok");
+    } else {
+        const char* diag = lastShaderDiagnostics();
+        appendLaunchLogf("sim compile failed: %s", (diag && diag[0]) ? diag : "?");
+    }
+#endif
     if (showCompileProgress) setShaderCompileProgress(nullptr, nullptr);
-    if (!restoreUiPipelinesAfterSimCompile()) ok = false;
+    if (!restoreUiPipelinesAfterSimCompile()) {
+#if defined(__SWITCH__)
+        appendLaunchLogf("ensureSimPipeline: ui restore failed: %s",
+                         initError.empty() ? "?" : initError.c_str());
+#endif
+        ok = false;
+    }
+    if (ok && render) {
+#if defined(__SWITCH__)
+        appendLaunchLogTimed("boot phase: world warmup begin");
+#endif
+        presentBootProgress(0.85f, "Loading render shaders...");
+        if (!render->warmupWorldShaders()) {
+            initError = "World shader warmup failed";
+#if defined(__SWITCH__)
+            appendLaunchLog("world shaders: warmup failed");
+#endif
+            ok = false;
+        } else {
+            glFinish();
+#if defined(__SWITCH__)
+            appendLaunchLogTimed("boot phase: world warmup end");
+            for (GLenum err = glGetError(); err != GL_NO_ERROR; err = glGetError()) {
+                appendLaunchLogf("gl error: 0x%x after world warmup", static_cast<unsigned>(err));
+            }
+#endif
+        }
+    }
+    reloadAudioAfterSimCompile();
     if (!ok) {
+#if defined(__SWITCH__)
+        simStartupFailed_ = true;
+#endif
         clearPendingShaderCacheSaves();
         const char* diag = lastShaderDiagnostics();
         if (diag && std::strstr(diag, "timed out")) {
+#if defined(__SWITCH__)
+            toast.show("Shader compile timed out. Wait for compile to finish; do not force power off.",
+                       4.f);
+#else
             toast.show(
                 "Shader compile timed out. Delete nxsand_save/shader_cache/ or set "
                 "NXSAND_SHADER_CACHE=0.",
                 4.f);
+#endif
         } else {
+#if defined(__SWITCH__)
+            toast.show(
+                "Simulation failed to start. Wait for compile to finish; do not force power off.",
+                4.f);
+#else
             toast.show("Simulation failed to start", 2.5f);
+#endif
         }
         if (scene == Scene::Menu) {
+            syncScreenMetrics();
             presentBootProgress(1.f, "Ready");
         }
         return false;
@@ -407,6 +654,13 @@ bool App::ensureSimPipelineReady() {
     }
     presentBootProgress(0.75f, "Starting simulation...");
     bootLogStage("sim pipeline ready");
+#if defined(__SWITCH__)
+    appendLaunchLog("ensureSimPipeline: done");
+#endif
+    syncScreenMetrics();
+    if (scene == Scene::Menu) {
+        presentBootProgress(1.f, "Ready");
+    }
     return true;
 }
 
@@ -472,27 +726,67 @@ bool App::resetGlContextForSimCompile() {
 
 bool App::restoreUiPipelinesAfterSimCompile() {
     bootLogStage("render pipeline restore after sim compile");
-    if (!render || render->uiShader.program == 0) {
-        if (!render) render = std::make_unique<RenderPipeline>();
-        if (!render->init(shaderDir)) {
+#if defined(__SWITCH__)
+    appendLaunchLogTimed("boot phase: ui restore begin");
+#endif
+    if (window) {
+        queryDrawableSize(window, screenW, screenH, settings.display.orientation);
+        lastScreenW_ = screenW;
+        lastScreenH_ = screenH;
+    }
+    const std::string& shaderPath = shaderDir.empty() ? resolveShaderDir() : shaderDir;
+    if (!render) render = std::make_unique<RenderPipeline>();
+#if defined(__SWITCH__)
+    // Heavy sim link can leave UI programs / blend state inconsistent on Switch GLES.
+    setShaderCompileStage("Compiling ui_quad.frag...");
+    render->shutdown();
+    if (!render->init(shaderPath)) {
+        initError = "Render pipeline restore failed";
+        return false;
+    }
+#else
+    if (render->uiShader.program == 0) {
+        if (!render->init(shaderPath)) {
             initError = "Render pipeline restore failed";
             return false;
         }
     }
-    if (font.tex == 0 && !font.init()) {
+#endif
+    font.invalidateGlTexture();
+    if (!font.init()) {
         initError = "Font atlas restore failed";
+#if defined(__SWITCH__)
+        appendLaunchLog(initError.c_str());
+#endif
         return false;
     }
+#if defined(__SWITCH__)
+    appendLaunchLogf("font restored: tex=%u lineH=%d", static_cast<unsigned>(font.tex), font.lineH);
+#endif
+    font.prewarmCommonGlyphs();
     flushPendingShaderCacheSaves();
     if (!menuSim.init()) {
         initError = "Menu backdrop restore failed";
+#if defined(__SWITCH__)
+        appendLaunchLog(initError.c_str());
+#endif
         return false;
     }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glUseProgram(0);
+    glBindVertexArray(0);
+    syncScreenMetrics();
     applyRuntimeSettingsLight();
+#if defined(__SWITCH__)
+    appendLaunchLogTimed("boot phase: ui restore end");
+#endif
     return true;
 }
 
 SimBackend App::resolveSimBackend() const {
+    if (getenvEnabled("NXSAND_FORCE_FRAGMENT") || getenvEnabled("NXENGINE_FORCE_FRAGMENT")) {
+        return SimBackend::Fragment;
+    }
     if (!computeSimSupported_) return SimBackend::Fragment;
     if (forceComputeBackend_) return SimBackend::Compute;
     return settings.performance.simBackend;
@@ -500,12 +794,40 @@ SimBackend App::resolveSimBackend() const {
 
 bool App::initSimPipeline(int w, int h) {
     const SimBackend backend = resolveSimBackend();
-    if (simPipeline->init(w, h, shaderDir, backend)) return true;
+#if defined(__SWITCH__)
+    appendLaunchLogf("initSimPipeline: trying %s", simBackendName(backend));
+#endif
+    if (simPipeline->init(w, h, shaderDir, backend)) {
+        if (backend != SimBackend::Compute) return true;
+        std::string selfTestErr;
+        if (simPipeline->runMovementSelfTest(&selfTestErr)) {
+#if defined(__SWITCH__)
+            appendLaunchLog("compute self-test: pass");
+#endif
+            return true;
+        }
+#if defined(__SWITCH__)
+        appendLaunchLogf("compute self-test: failed: %s",
+                         selfTestErr.empty() ? "?" : selfTestErr.c_str());
+#endif
+        setShaderDiagnostics(selfTestErr.empty() ? "Compute self-test failed"
+                                                 : "Compute self-test failed: " + selfTestErr);
+        simPipeline->shutdown();
+    }
     if (backend != SimBackend::Compute) return false;
+#if defined(__SWITCH__)
+    appendLaunchLog("initSimPipeline: compute failed, trying fragment");
+#endif
     computeSimSupported_ = false;
     if (!forceComputeBackend_ && settings.performance.simBackend == SimBackend::Compute) {
         settings.performance.simBackend = SimBackend::Fragment;
         markGameSettingsDirty();
+    }
+    if (forceComputeBackend_) {
+#if defined(__SWITCH__)
+        appendLaunchLog("initSimPipeline: compute forced, refusing fragment fallback");
+#endif
+        return false;
     }
     setShaderDiagnostics("");
     if (simPipeline->init(w, h, shaderDir, SimBackend::Fragment)) {
@@ -526,7 +848,10 @@ void App::applyRuntimeSettingsLight() {
     }
     applySdlOrientationHint(settings.display.orientation);
     sim.brush_radius = std::clamp(settings.controls.brushRadius, 1, 64);
-    toneAudioSetLevel(settings.controls.sound);
+    toneAudioSetLevel(settings.audio.sound);
+    if (scene == Scene::Menu) {
+        menuMusicSetActive(settings.audio.menuMusic);
+    }
     SDL_GL_SetSwapInterval(settings.performance.targetFps == 60 ? 1 : 2);
     if (render) {
         render->setPaletteMode(settings.debug.showMaterialIds ? 3 : settings.visuals.paletteMode);
@@ -587,8 +912,23 @@ void App::applyRuntimeSettings() {
 
 void App::flushPendingHeavySettings() {
     if (!settingsHeavyApplyPending_) return;
+#if defined(__SWITCH__)
+    if (!simPipeline || !simPipeline->ready()) {
+        const auto sz = resolveSimGridSize(screenW, screenH, settings.performance);
+        sim.grid_w = sz.first;
+        sim.grid_h = sz.second;
+        sim.brush_x = std::clamp(sim.brush_x, 0, std::max(0, sim.grid_w - 1));
+        sim.brush_y = std::clamp(sim.brush_y, 0, std::max(0, sim.grid_h - 1));
+        settingsHeavyApplyPending_ = false;
+        heavyFlushScheduled_ = false;
+        appendLaunchLogf("heavy settings: staged before sim init %dx%d backend=%s",
+                         sim.grid_w, sim.grid_h, simBackendName(resolveSimBackend()));
+        return;
+    }
+#endif
     applyRuntimeSettingsHeavy();
     settingsHeavyApplyPending_ = false;
+    heavyFlushScheduled_ = false;
 }
 
 bool App::setSimGridSize(int w, int h, bool preserveContent) {
@@ -645,7 +985,34 @@ bool App::setSimGridSize(int w, int h, bool preserveContent) {
     return true;
 }
 
+void App::ensureAudioReady() {
+    if (audioReady_) return;
+    audioReady_ = true;
+    toneAudioSetLevel(settings.audio.sound);
+    if (!toneAudioEnsureReady()) {
+#if defined(__SWITCH__)
+        appendLaunchLog("audio: output init failed (continuing without audio)");
+#endif
+        return;
+    }
+    if (menuMusicInit()) {
+        menuMusicSetActive(scene == Scene::Menu && settings.audio.menuMusic);
+#if defined(__SWITCH__)
+        appendLaunchLog("audio: menu theme loaded");
+#endif
+    } else {
+#if defined(__SWITCH__)
+        appendLaunchLog("audio: menu theme missing (continuing without music)");
+#endif
+    }
+}
+
 void App::shutdown() {
+#if defined(__SWITCH__)
+    appendLaunchLog("stage: shutdown begin");
+#endif
+    toneAudioSetOutputPaused(true);
+    menuMusicShutdown();
     toneAudioShutdown();
     closeController(input);
     flushPhysicsParamsIfDirty(physics);
@@ -656,18 +1023,40 @@ void App::shutdown() {
     render.reset();
     if (simPipeline) simPipeline->shutdown();
     simPipeline.reset();
-    if (glCtx) SDL_GL_DeleteContext(glCtx);
+    if (glCtx) {
+        glFinish();
+        SDL_GL_DeleteContext(glCtx);
+    }
     glCtx = nullptr;
     if (window) SDL_DestroyWindow(window);
     window = nullptr;
     SDL_Quit();
+#if defined(__SWITCH__)
+    appendLaunchLog("stage: shutdown end");
+#endif
 }
 
 void App::onEnterPlayFromMenu() {
+#if defined(__SWITCH__)
+    simStartupFailed_ = false;
+#endif
+    menuMusicSetActive(false);
     if (!ensureSimPipelineReady()) {
         scene = Scene::Menu;
+        menuMusicSetActive(settings.audio.menuMusic);
         return;
     }
+#if defined(__SWITCH__)
+    if (!playEntryLogged_) {
+        playEntryLogged_ = true;
+        appendLaunchLogf(
+            "play entry: grid %dx%d sleeping=%d matter=%d profiler=%d activeTiles=%d",
+            sim.grid_w, sim.grid_h, sim.sleeping ? 1 : 0, sim.gridHasMatter ? 1 : 0,
+            static_cast<int>(settings.debug.profilerHud),
+            static_cast<int>(settings.performance.activeTiles));
+        appendLaunchLog("enter play: sim ready");
+    }
+#endif
     flushPendingHeavySettings();
     playSaveSuppressFrames_ = kPlaySaveSuppressFrames;
     resetSimExplosionFx();
@@ -696,15 +1085,26 @@ void App::enqueuePendingSave(PendingSaveKind kind) {
 }
 
 void App::schedulePendingHeavySettingsFlush() {
-    if (settingsHeavyApplyPending_) heavyFlushScheduled_ = true;
+    if (!settingsHeavyApplyPending_) return;
+#if defined(__SWITCH__)
+    appendLaunchLog("heavy settings: deferred until play");
+    toast.show("Sim changes apply on play", 1.3f);
+#else
+    heavyFlushScheduled_ = true;
+#endif
 }
 
 void App::tickPendingHeavySettings() {
+#if defined(__SWITCH__)
+    if (scene == Scene::Play && settingsHeavyApplyPending_) {
+        toast.show("Applying sim changes...", 1.2f);
+        flushPendingHeavySettings();
+    }
+    return;
+#endif
     if (!heavyFlushScheduled_) return;
     heavyFlushScheduled_ = false;
-#if !defined(__SWITCH__)
     if (settingsHeavyApplyPending_) toast.show("Applying sim changes...", 1.2f);
-#endif
     flushPendingHeavySettings();
 }
 
@@ -782,13 +1182,17 @@ void App::requestFlushPhysicsSettings() {
 
 void App::tickMenu(double dtSec) {
     menu.tick++;
-    menuSim.tick(menu.tick,
-                 settings.visuals.flicker && !settings.accessibility.reduceFlashing);
-    tickMenuBackgroundFx(menu.tick, screenW, screenH);
     pollInput(input, false, true, window, nullptr, 0, 0, settings.controls.cursorSpeed,
               settings.controls.deadzone, settings.controls.invertY, settings.display.orientation,
               settings.accessibility.uiScale);
     if (input.quitRequested) return;
+#if defined(__SWITCH__)
+    menuSim.tick(menu.tick, false);
+#else
+    menuSim.tick(menu.tick,
+                 settings.visuals.flicker && !settings.accessibility.reduceFlashing);
+#endif
+    tickMenuBackgroundFx(menu.tick, screenW, screenH);
 
     if (input.menuPointerActive) {
         menu.handlePointer(*this, input.menuPointerX, input.menuPointerY,
@@ -839,11 +1243,14 @@ void App::tickMenu(double dtSec) {
         if (edgeRight) menu.adjustHorizontal(*this, 1);
     }
 
+    menuMusicTick();
+
 #if !defined(__SWITCH__)
-    if (!simWarmupTriggered_ &&
+    const bool warmSimEnabled =
         (getenvEnabled("NXSAND_WARM_SIM") || getenvEnabled("NXENGINE_WARM_SIM")) &&
-        menu.tick >= 2 && menu.screen == MenuScreen::Main &&
-        (!simPipeline || !simPipeline->ready())) {
+        !getenvEnabled("NXSAND_NO_WARM_SIM");
+    if (!simWarmupTriggered_ && warmSimEnabled && menu.tick >= 2 &&
+        menu.screen == MenuScreen::Main && (!simPipeline || !simPipeline->ready())) {
         simWarmupTriggered_ = true;
         ensureSimPipelineReady();
     }
@@ -852,11 +1259,17 @@ void App::tickMenu(double dtSec) {
 
 void App::tickPlay(double dtSec) {
     if (!ensureSimPipelineReady()) return;
+#if defined(__SWITCH__)
+    if (!playTickLogged_) {
+        playTickLogged_ = true;
+        appendLaunchLog("play tick: begin");
+    }
+#endif
 
     const bool profilerOn = settings.debug.profilerHud != ProfilerHud::Off;
     PlayRegion pr = getPlayRegionForScene(screenW, screenH, sim.grid_w, sim.grid_h,
                                           settings.display.fullscreenSim, !sim.paletteHidden,
-                                          false, profilerOn);
+                                          false, profilerOn, settings.accessibility.uiScale);
 
     pollInput(input, menu.materialWheelOpen, false, window, &pr, sim.grid_w, sim.grid_h,
               settings.controls.cursorSpeed, settings.controls.deadzone,
@@ -873,6 +1286,8 @@ void App::tickPlay(double dtSec) {
         menu.materialWheelOpen = false;
         scene = Scene::Menu;
         menu.resetMain();
+        resetMenuRepeat();
+        menuMusicSetActive(settings.audio.menuMusic);
         hasEnteredPlay = true;
         input.openMenu = false;
         return;
@@ -963,6 +1378,11 @@ void App::tickPlay(double dtSec) {
             input.brushRadiusDelta = 0;
         }
 
+        if (input.togglePaletteHud) {
+            sim.paletteHidden = !sim.paletteHidden;
+            input.togglePaletteHud = false;
+        }
+
         if (input.clearSandbox) {
             simPipeline->clearAll(MAT_EMPTY);
             sim.gridHasMatter = false;
@@ -1043,6 +1463,13 @@ void App::tickPlay(double dtSec) {
                 perf_.beginSim();
                 simPipeline->step(sim.tick, physics, settings.performance.activeTiles);
                 perf_.endSim();
+#if defined(__SWITCH__)
+                if (!playStepLogged_) {
+                    playStepLogged_ = true;
+                    appendLaunchLogf("sim step ok backend=%s",
+                                     simBackendLabel(simPipeline->backend()));
+                }
+#endif
                 perf_.fragmentPasses += simPipeline->lastPasses();
                 perf_.activeTileMode = static_cast<int>(simPipeline->lastActiveTileMode());
                 perf_.activeTileCount = simPipeline->lastActiveTileCount();
@@ -1063,7 +1490,7 @@ void App::tickPlay(double dtSec) {
         const PlayRegion fxPr =
             getPlayRegionForScene(screenW, screenH, sim.grid_w, sim.grid_h,
                                   settings.display.fullscreenSim, !sim.paletteHidden, false,
-                                  profilerOn);
+                                  profilerOn, settings.accessibility.uiScale);
         expandSimExplosionWatch(sim.grid_w, sim.grid_h, 4);
         int ax0 = 0;
         int ay0 = 0;
@@ -1102,35 +1529,102 @@ void App::renderFrame() {
     render->beginUiFrame();
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, screenW, screenH);
+    glViewport(0, 0, framebufferW, framebufferH);
     glDisable(GL_SCISSOR_TEST);
     glClearColor(0.03f, 0.04f, 0.06f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     if (scene == Scene::Play && simPipeline && simPipeline->ready()) {
+        ensureUiFontReady();
+#if defined(__SWITCH__)
+        if (!playRenderLogged_) appendLaunchLog("render play: begin");
+#endif
         const bool profilerOn = settings.debug.profilerHud != ProfilerHud::Off;
         PlayRegion pr = getPlayRegionForScene(screenW, screenH, sim.grid_w, sim.grid_h,
                                               settings.display.fullscreenSim, !sim.paletteHidden,
-                                              false, profilerOn);
+                                              false, profilerOn,
+                                              settings.accessibility.uiScale);
         perf_.beginWorldRender();
-        simPipeline->syncSimForSampling();
-        render->drawSimulation(simPipeline->readTexture(), sim.grid_w, sim.grid_h, pr, screenH,
-                               sim.tick, perf_.simMs);
+#if defined(__SWITCH__)
+        const bool skipEmptySwitchWorldDraw = sim.sleeping && !sim.gridHasMatter;
+        if (skipEmptySwitchWorldDraw) {
+            if (!playRenderLogged_) appendLaunchLog("render play: skip empty sim draw");
+            render->drawSolidRect(pr.x, pr.y, pr.w, pr.h, 0.058f, 0.073f, 0.105f, 1.f, screenW,
+                                  screenH);
+        } else
+#else
+        const bool skipEmptySwitchWorldDraw = false;
+        (void)skipEmptySwitchWorldDraw;
+#endif
+        {
+#if defined(__SWITCH__)
+            if (!playRenderLogged_) appendLaunchLog("render play: sync sim");
+#endif
+            simPipeline->syncSimForSampling();
+#if defined(__SWITCH__)
+            if (!playRenderLogged_) appendLaunchLog("render play: draw sim");
+#endif
+            render->drawSimulation(simPipeline->readTexture(), sim.grid_w, sim.grid_h, pr, screenH,
+                                   sim.tick, perf_.simMs);
+#if defined(__SWITCH__)
+            if (!playRenderLogged_) appendLaunchLog("render play: draw sim done");
+#endif
+        }
+#if defined(__SWITCH__)
+        if (!playRenderLogged_) appendLaunchLog("render play: fx");
+#endif
         drawSimExplosionFx(*render, pr, sim.grid_w, sim.grid_h, screenW, screenH);
         perf_.endWorldRender();
-        render->prepareUiDraw(screenW, screenH);
+#if defined(__SWITCH__)
+        if (!playRenderLogged_) appendLaunchLog("render play: prepare ui");
+#endif
+        render->prepareUiDraw(screenW, screenH, framebufferW, framebufferH);
 
         perf_.beginUi();
+#if defined(__SWITCH__)
+        if (!playRenderLogged_) appendLaunchLog("render play: hud");
+#endif
         drawHudSolid(*render, *this, pr);
+#if defined(__SWITCH__)
+        if (!playRenderLogged_) appendLaunchLog("render play: hud done");
+        if (!playRenderLogged_) appendLaunchLog("render play: brush cursor");
+#endif
         drawBrushCursor(*render, *this, pr);
+#if defined(__SWITCH__)
+        if (!playRenderLogged_) appendLaunchLog("render play: brush cursor done");
+        if (!playRenderLogged_) appendLaunchLog("render play: active overlay enter");
+#endif
         drawActiveTilesOverlay(*render, *this, pr);
-        drawPerfOverlay(*render, font, perf_, settings.debug, pr, !sim.paletteHidden, screenW,
-                        screenH, settings.accessibility.uiScale);
-        if (menu.materialWheelOpen) {
-            drawMaterialWheel(*render, font, *this);
+#if defined(__SWITCH__)
+        if (!playRenderLogged_) appendLaunchLog("render play: active overlay exit");
+        if (!playRenderLogged_) appendLaunchLog("render play: perf enter");
+#endif
+        if (!menu.materialWheelOpen) {
+            drawPerfOverlay(*render, font, perf_, settings.debug, pr, !sim.paletteHidden, screenW,
+                            screenH, settings.accessibility.uiScale);
         }
+#if defined(__SWITCH__)
+        if (!playRenderLogged_) appendLaunchLog("render play: perf exit");
+#endif
+        if (menu.materialWheelOpen) {
+#if defined(__SWITCH__)
+            if (!playRenderLogged_) appendLaunchLog("render play: wheel");
+#endif
+            drawMaterialWheel(*render, font, *this, pr);
+#if defined(__SWITCH__)
+            if (!playRenderLogged_) appendLaunchLog("render play: wheel done");
+#endif
+        }
+#if defined(__SWITCH__)
+        if (!playRenderLogged_) {
+            playRenderLogged_ = true;
+            appendLaunchLog("render play: end");
+        }
+#endif
     } else {
         perf_.beginUi();
+        syncScreenMetrics();
+        ensureUiFontReady();
         drawMenuSolid(*render, font, *this);
     }
 
@@ -1147,9 +1641,13 @@ void App::renderFrame() {
 
 void App::frame(double dtSec) {
     perf_.beginFrame();
+    ensureAudioReady();
     tickPendingSave(dtSec);
     tickPendingHeavySettings();
-    if (window) queryDrawableSize(window, screenW, screenH, settings.display.orientation);
+    if (window) {
+        queryDrawableSize(window, screenW, screenH, settings.display.orientation);
+        queryGlFramebufferSize(window, framebufferW, framebufferH);
+    }
     if (screenW > 0 && screenH > 0 &&
         (screenW != lastScreenW_ || screenH != lastScreenH_)) {
         const bool preserve = lastScreenW_ > 0 && lastScreenH_ > 0 && simPipeline &&

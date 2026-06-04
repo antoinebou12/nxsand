@@ -6,7 +6,7 @@ namespace nx {
 
 static constexpr Material kSettingsMats[] = {
     MAT_FIRE, MAT_WATER, MAT_SMOKE, MAT_ACID, MAT_PLANT, MAT_LAVA, MAT_OIL, MAT_ICE,
-    MAT_SAND, MAT_GUNPOWDER, MAT_COAL, MAT_TNT, MAT_SALT, MAT_BRICK, MAT_METAL, MAT_WOOD,
+    MAT_SAND, MAT_GUNPOWDER, MAT_COAL, MAT_SALT, MAT_BRICK, MAT_METAL, MAT_WOOD,
 };
 
 int settingsMaterialCount() {
@@ -61,7 +61,7 @@ static const ParamSpec kIce[] = {
 };
 static const ParamSpec kSand[] = {
     {"sand_wetSlideScale", "Wet drag", 0.f, 1.f, 0.05f, 0.40f},
-    {"sand_lithifyRate", "Lithify", 0.f, 0.02f, 0.001f, 0.005f},
+    {"sand_lithifyRate", "Lithify", 0.f, 0.08f, 0.005f, 0.025f},
 };
 static const ParamSpec kGunpowder[] = {
     {"gunpowder_wetIgniteScale", "Wet damp", 0.f, 1.f, 0.05f, 0.20f},
@@ -81,9 +81,6 @@ static const ParamSpec kWood[] = {
 static const ParamSpec kCoal[] = {
     {"coal_burnRate", "Burn", 0.f, 0.12f, 0.005f, 0.025f},
 };
-static const ParamSpec kTnt[] = {
-    {"tnt_detonateRate", "Detonate", 0.f, 1.f, 0.05f, 0.92f},
-};
 static const ParamSpec kBrick[] = {
     {"brick_slideScale", "Slide", 0.08f, 0.45f, 0.02f, 0.30f},
     {"brick_cohesionScale", "Cohesion", 0.1f, 1.f, 0.05f, 0.35f},
@@ -101,7 +98,6 @@ static const ParamSpec* specsFor(Material m, int& count) {
         case MAT_SAND: count = 2; return kSand;
         case MAT_GUNPOWDER: count = 2; return kGunpowder;
         case MAT_COAL: count = 1; return kCoal;
-        case MAT_TNT: count = 1; return kTnt;
         case MAT_BRICK: count = 2; return kBrick;
         case MAT_SALT: count = 1; return kSalt;
         case MAT_METAL: count = 2; return kMetal;
@@ -159,7 +155,6 @@ static float* ptr(PhysicsParams& p, const char* id) {
     if (!strcmp(id, "ember_igniteWood")) return &p.ember_igniteWood;
     if (!strcmp(id, "salt_dissolveRate")) return &p.salt_dissolveRate;
     if (!strcmp(id, "coal_burnRate")) return &p.coal_burnRate;
-    if (!strcmp(id, "tnt_detonateRate")) return &p.tnt_detonateRate;
     if (!strcmp(id, "brick_slideScale")) return &p.brick_slideScale;
     if (!strcmp(id, "brick_cohesionScale")) return &p.brick_cohesionScale;
     return nullptr;

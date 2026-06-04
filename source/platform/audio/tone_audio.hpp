@@ -17,5 +17,6 @@ void toneAudioShutdown();
 void toneAudioSetLevel(SoundLevel level);
 void toneAudioSetOutputPaused(bool paused);
 void playTone(ToneId id, bool heavy = false);
+void toneAudioReleaseCachedWavs();
 
 } // namespace nx

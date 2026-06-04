@@ -20,5 +20,5 @@ const uint M_SALT      = 17u;
 const uint M_EMBER     = 18u;
 const uint M_FLOWER    = 19u;
 const uint M_COAL      = 20u;
-const uint M_TNT       = 21u;
+const uint M_LEGACY_TNT = 21u; // removed — sim maps to empty
 const uint M_BRICK     = 22u;

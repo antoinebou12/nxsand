@@ -15,7 +15,7 @@ void test_no_repeat_during_delay(TestContext& ctx) {
     (void)r.tick(0.016f, true, false, false, false);
     float t = 0.f;
     bool any = false;
-    while (t < 0.35f) {
+    while (t < 0.20f) {
         t += 0.016f;
         auto p = r.tick(0.016f, true, false, false, false);
         if (p.up) any = true;

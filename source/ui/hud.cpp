@@ -34,13 +34,18 @@ struct PaletteLayout {
     float chipInsetY;
 };
 
+static void unpackRgb(uint32_t c, float& r, float& g, float& b) {
+    r = float(c & 0xff) / 255.f;
+    g = float((c >> 8) & 0xff) / 255.f;
+    b = float((c >> 16) & 0xff) / 255.f;
+}
+
 static PaletteLayout getPaletteLayout(int W, int H, float s) {
     PaletteLayout l{};
     l.palH = float(theme::getPaletteH(H));
     l.y0 = float(H) - l.palH;
     l.rowSep = 8.f * s;
     l.rowH = (l.palH - l.rowSep * 2.f) / 3.f;
-    // Switch: keep palette chips away from the bezel / TV overscan band.
 #if defined(__SWITCH__)
     float edgePad = 36.f * s;
 #else
@@ -60,12 +65,6 @@ static PaletteLayout getPaletteLayout(int W, int H, float s) {
     l.chipH = std::min(l.rowH - 14.f * s, 44.f * s);
     l.chipInsetY = std::max(6.f * s, (l.rowH - l.chipH) * 0.5f);
     return l;
-}
-
-static void unpackRgb(uint32_t c, float& r, float& g, float& b) {
-    r = float(c & 0xff) / 255.f;
-    g = float((c >> 8) & 0xff) / 255.f;
-    b = float((c >> 16) & 0xff) / 255.f;
 }
 
 static void drawPaletteChip(RenderPipeline& r, FontAtlas& font, float x, float y, float w, float h,
@@ -111,49 +110,50 @@ static void drawPaletteRow(RenderPipeline& r, FontAtlas& font, float rowY, float
     }
 }
 
-} // namespace
-
-void drawHudSolid(RenderPipeline& r, App& app, const PlayRegion& pr) {
-    const int W = app.screenW, H = app.screenH;
-    float s = theme::uiScale(W, H, app.settings.accessibility.uiScale);
-
+static void drawPlayTopBar(RenderPipeline& r, FontAtlas& font, App& app, int W, int H, float s,
+                           bool profilerOn) {
     char title[96];
-    std::snprintf(title, sizeof(title), "%s  R%d  %s", theme::APP_TITLE,
-                  app.sim.brush_radius, material_name(app.sim.brush_mat));
-    const bool profilerOn = app.settings.debug.profilerHud != ProfilerHud::Off;
-#if defined(__SWITCH__)
-    const float hintScale = 0.88f * s;
-#else
+    std::snprintf(title, sizeof(title), "%s  R%d  %s", theme::APP_TITLE, app.sim.brush_radius,
+                  material_name(app.sim.brush_mat));
+
     const float hintScale = 0.90f * s;
-#endif
     const float titleScale = 0.92f * s;
     const float hintPadY = 6.f * s;
-    const float hintAsc = float(app.font.baseline) * hintScale;
-    const float hintLine = float(app.font.lineH) * hintScale;
+    const float hintLine = float(font.lineH) * hintScale;
     const float hintPillH = hintLine + hintPadY * 2.f;
     const float topMargin = 12.f * s;
     const float profilerBand = profilerOn ? 18.f * s : 0.f;
 
+    const bool reservePaletteBand = !app.sim.paletteHidden;
     const float topH =
-        playHudTopBarPx(W, H, !app.sim.paletteHidden, profilerOn, app.settings.accessibility.uiScale);
+        playHudTopBarPx(W, H, reservePaletteBand, profilerOn, app.settings.accessibility.uiScale);
 
     r.drawSolidRect(0, 0, float(W), topH, 0.04f, 0.055f, 0.085f, 0.62f, W, H);
 
     const float bandTop = topMargin;
     const float bandH = std::max(hintPillH, topH - profilerBand - bandTop);
-    const float titleY = menuBaselineInBand(bandTop, bandH, app.font, titleScale);
-    app.font.drawText(r, 14.f * s, titleY, titleScale, title, 0.88f, 0.94f, 1.0f, 0.92f, W, H);
+    const float titleY = menuBaselineInBand(bandTop, bandH, font, titleScale);
+    font.drawText(r, 14.f * s, titleY, titleScale, title, 0.88f, 0.94f, 1.0f, 0.92f, W, H);
 
-    {
-        const char* hint = ui_copy::playHudHint();
-        const float hintPadX = 14.f * s;
-        const float hintW = app.font.textWidth(hint, hintScale);
-        const float pillW = hintW + hintPadX * 2.f;
-        const float pillCx = std::max(pillW * 0.5f + 10.f * s, float(W) - 10.f * s - pillW * 0.5f);
-        const float pillTop = bandTop + (bandH - hintPillH) * 0.5f;
-        const float hintPillY = pillTop + hintPadY + hintAsc;
-        drawHintPill(r, app.font, pillCx, hintPillY, s, hint, W, H);
-    }
+    const char* hint = ui_copy::playHudHint();
+    const float hintPadX = 14.f * s;
+    const float hintW = font.textWidth(hint, hintScale);
+    const float pillW = hintW + hintPadX * 2.f;
+    const float pillCx = std::max(pillW * 0.5f + 10.f * s, float(W) - 10.f * s - pillW * 0.5f);
+    const float pillTop = bandTop + (bandH - hintPillH) * 0.5f;
+    const float hintPillY = pillTop + hintPadY + float(font.baseline) * hintScale;
+    drawHintPill(r, font, pillCx, hintPillY, s, hint, W, H);
+}
+
+} // namespace
+
+void drawHudSolid(RenderPipeline& r, App& app, const PlayRegion& pr) {
+    (void)pr;
+    const int W = app.screenW, H = app.screenH;
+    float s = theme::uiScale(W, H, app.settings.accessibility.uiScale);
+    const bool profilerOn = app.settings.debug.profilerHud != ProfilerHud::Off;
+
+    drawPlayTopBar(r, app.font, app, W, H, s, profilerOn);
 
     if (!app.sim.paletteHidden) {
         PaletteLayout l = getPaletteLayout(W, H, s);
@@ -169,23 +169,6 @@ void drawHudSolid(RenderPipeline& r, App& app, const PlayRegion& pr) {
         drawPaletteRow(r, app.font, l.r3y, l.rowH, r3ChipY, l.chipH, l.r3StartX, l.r3SlotW, padX,
                        app.sim.brush_mat, HUD_PALETTE_ROW3, s, W, H);
     }
-
-    const float cellW = float(pr.w) / float(std::max(1, app.sim.grid_w));
-    const float cellH = float(pr.h) / float(std::max(1, app.sim.grid_h));
-    const float bx = float(pr.x) + (float(app.sim.brush_x) + 0.5f) * cellW;
-    const float by = float(pr.y) + (float(app.sim.brush_y) + 0.5f) * cellH;
-    const float br = float(app.sim.brush_radius) * std::max(cellW, cellH) + 2.f;
-
-    const bool active = app.input.painting || app.input.erasing;
-    const float a = active ? (app.input.erasing ? 0.85f : 0.55f) : 0.22f;
-    const float cr = app.input.erasing ? 0.88f : 1.f;
-    const float cg = app.input.erasing ? 0.32f : 1.f;
-    const float cb = app.input.erasing ? 0.32f : 1.f;
-
-    r.drawSolidRect(bx - br, by - br, br * 2.f, 2.f, cr, cg, cb, a, W, H);
-    r.drawSolidRect(bx - br, by + br - 2.f, br * 2.f, 2.f, cr, cg, cb, a, W, H);
-    r.drawSolidRect(bx - br, by - br, 2.f, br * 2.f, cr, cg, cb, a, W, H);
-    r.drawSolidRect(bx + br - 2.f, by - br, 2.f, br * 2.f, cr, cg, cb, a, W, H);
 }
 
 } // namespace nx

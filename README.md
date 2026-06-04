@@ -32,7 +32,7 @@ Twenty brush materials (IDs 1–17, 20–22) plus spawn-only **Ember** (18) and 
 | Water / acid / lava / oil | Fluids (layer by density) |
 | Fire / smoke / steam / ember | Gases (ember spawns from fire; not paintable) |
 | Wall / plant / ice / glass / wood / metal | Static solids |
-| Gunpowder / coal / TNT / salt / brick | Powders and explosives; **brick** is heavy cohesive (no detonation); salt dissolves in water |
+| Gunpowder / coal / salt / brick | Powders; **brick** is heavy cohesive (no detonation); salt dissolves in water |
 
 Reactions live in `shaders/sim_common.glsl` (included by `sim.frag` / `sim.comp`). Examples: lava + water → stone and smoke; lava + sand → glass; gunpowder + fire → spreading flame.
 
@@ -62,14 +62,15 @@ You need a homebrew-ready Switch ([setup guide](https://switch.hacks.guide/)).
 
 Saves live in `sdmc:/switch/nxsand/`. Legacy `sdmc:/switch/nxengine/` data is migrated on first launch when possible. Full install notes: [docs/INSTALL.md](docs/INSTALL.md).
 
-### Reference versions (May 2026)
+### Reference versions (June 2026)
 
-These are the versions NXSand is documented against. Update your SD setup and devkitPro packages when newer releases ship.
+NXSand is documented against **system firmware 22.1.0**. Update **Atmosphère** (and **fusee**) on the SD card **before** running the official firmware update to 22.1.0. Refresh devkitPro packages when newer libnx/SDL builds ship.
 
 | Component | Version | Role |
 |-----------|---------|------|
-| [Atmosphère](https://github.com/Atmosphere-NX/Atmosphere/releases) | **1.11.1** | Custom firmware (homebrew); update **fusee** with each release |
-| [hekate](https://github.com/CTCaer/hekate/releases) | **6.5.2** (Nyx **1.9.2**) | Bootloader / payload launcher (HOS up to 22.1.0) |
+| Nintendo system firmware (HOS) | **22.1.0** | Official firmware this release is tested against |
+| [Atmosphère](https://github.com/Atmosphere-NX/Atmosphere/releases) | **1.11.1** | Custom firmware for **22.1.0**; update **fusee** with each Atmosphère release |
+| [hekate](https://github.com/CTCaer/hekate/releases) | **6.5.2** (Nyx **1.9.2**) | Bootloader / payload launcher (HOS through **22.1.0**) |
 | [libnx](https://github.com/switchbrew/libnx/releases) | **4.12.0** | Switch homebrew runtime (via devkitPro `switch-dev`) |
 | SDL2 | **2.28.5** (`switch-sdl2`) | Switch port from devkitPro; [upstream SDL2](https://github.com/libsdl-org/SDL/releases) is **2.32.0** |
 
